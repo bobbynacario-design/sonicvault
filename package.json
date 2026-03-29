@@ -1,0 +1,13 @@
+{
+  "name": "sonicvault-watcher",
+  "version": "1.0.0",
+  "description": "Folder watcher that auto-imports Suno downloads into SonicVault via Firebase",
+  "scripts": {
+    "watch": "node watcher.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "chokidar": "^3.6.0",
+    "music-metadata": "^7.14.0"
+  }
+}
