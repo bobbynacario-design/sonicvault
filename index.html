@@ -414,11 +414,21 @@ body.light .search-input-wrap input{color:#1A1A1A}
   <div class="upload-drop" id="upload-drop" onclick="document.getElementById('file-picker').click()">
     <div class="upload-drop-icon">🎶</div>
     <div class="upload-drop-text">Drop MP3/WAV files here or click to browse</div>
-    <div class="upload-drop-text" style="margin-top:.3rem;font-size:10px;opacity:.6">Audio is stored locally via base64 — keep files under 10MB for best performance</div>
+    <div class="upload-drop-text" style="margin-top:.3rem;font-size:10px;opacity:.6">Audio uploads to Cloudinary — supports files up to 100MB</div>
     <input type="file" id="file-picker" accept="audio/*" multiple onchange="handleFileUpload(this.files)">
   </div>
 
   <div id="upload-queue"></div>
+
+  <div id="upload-progress" style="display:none;margin-bottom:1.5rem">
+    <div style="font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.4);margin-bottom:.5rem;display:flex;justify-content:space-between">
+      <span>Uploading to cloud...</span>
+      <span id="upload-progress-pct">0%</span>
+    </div>
+    <div style="background:var(--bg3);border-radius:6px;height:8px;overflow:hidden;border:1px solid var(--rim)">
+      <div id="upload-progress-bar" style="height:100%;border-radius:6px;background:linear-gradient(90deg,var(--coral),var(--coral2));width:0%;transition:width .2s ease"></div>
+    </div>
+  </div>
 
   <!-- Manual metadata form -->
   <div class="form-card" id="upload-form" style="display:none">
@@ -567,6 +577,44 @@ body.light .search-input-wrap input{color:#1A1A1A}
 </div>
 
 <script>
+// ── CLOUDINARY CONFIG ──
+var CLOUDINARY_CLOUD_NAME    = 'dtw4em0ob';
+var CLOUDINARY_UPLOAD_PRESET = 'sonicvault_web';
+
+async function uploadToCloudinary(file, onProgress) {
+  var formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  formData.append('resource_type', 'auto');
+  formData.append('folder', 'sonicvault-bob/audio');
+
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD_NAME + '/auto/upload');
+
+    xhr.upload.addEventListener('progress', function(e) {
+      if (e.lengthComputable && onProgress) {
+        onProgress((e.loaded / e.total) * 100);
+      }
+    });
+
+    xhr.addEventListener('load', function() {
+      if (xhr.status === 200) {
+        var data = JSON.parse(xhr.responseText);
+        resolve(data.secure_url);
+      } else {
+        reject(new Error('Upload failed: ' + xhr.status));
+      }
+    });
+
+    xhr.addEventListener('error', function() {
+      reject(new Error('Upload network error'));
+    });
+
+    xhr.send(formData);
+  });
+}
+
 // ── STORAGE — matching PokerHQ pattern ──
 function load(key, def) { try { return JSON.parse(localStorage.getItem('sv_'+key)) || def; } catch(e) { return def; } }
 
@@ -594,10 +642,18 @@ function flushOfflineQueue() {
 
 function save(key, val) {
   localStorage.setItem('sv_'+key, JSON.stringify(val));
+  var cleanVal = val;
+  if (key === 'tracks' && Array.isArray(val)) {
+    cleanVal = val.map(function(t) {
+      var copy = Object.assign({}, t);
+      delete copy.audioData;
+      return copy;
+    });
+  }
   if (_isOnline && window.fbSave) {
-    window.fbSave(key, val);
+    window.fbSave(key, cleanVal);
   } else {
-    _offlineQueue[key] = val;
+    _offlineQueue[key] = cleanVal;
     localStorage.setItem('sv_offline_queue', JSON.stringify(_offlineQueue));
   }
 }
@@ -1043,75 +1099,102 @@ function sharePlaylist(id) {
 }
 
 // ── FILE UPLOAD ──
-var _pendingAudio = null;
+var _pendingFile = null;
+var _pendingAudioURL = null;
 var _pendingDuration = 0;
 var _pendingFileName = '';
 
 function handleFileUpload(files) {
   if (!files.length) return;
-  var file = files[0]; // Handle first file
+  var file = files[0];
   if (!file.type.startsWith('audio/')) { showToast('Please select an audio file'); return; }
-  if (file.size > 15*1024*1024) { showToast('File too large — keep under 15MB'); return; }
+  if (file.size > 100*1024*1024) { showToast('File too large — keep under 100MB'); return; }
 
-  _pendingFileName = file.name.replace(/\.[^.]+$/,'');
+  _pendingFile = file;
+  _pendingFileName = file.name.replace(/\.[^.]+$/, '');
+  _pendingAudioURL = URL.createObjectURL(file);
 
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    _pendingAudio = e.target.result;
-    // Get duration
-    var tempAudio = new Audio();
-    tempAudio.src = _pendingAudio;
-    tempAudio.addEventListener('loadedmetadata', function() {
-      _pendingDuration = tempAudio.duration;
-      // Show form
-      document.getElementById('upload-form').style.display = 'block';
-      document.getElementById('u-title').value = _pendingFileName;
-      showToast('Audio loaded — fill in the details');
-    });
-    tempAudio.addEventListener('error', function() {
-      _pendingDuration = 0;
-      document.getElementById('upload-form').style.display = 'block';
-      document.getElementById('u-title').value = _pendingFileName;
-    });
-  };
-  reader.readAsDataURL(file);
+  var tempAudio = new Audio();
+  tempAudio.src = _pendingAudioURL;
+  tempAudio.addEventListener('loadedmetadata', function() {
+    _pendingDuration = tempAudio.duration;
+    document.getElementById('upload-form').style.display = 'block';
+    document.getElementById('u-title').value = _pendingFileName;
+    showToast('Audio loaded (' + (file.size/1024/1024).toFixed(1) + 'MB) — fill in the details');
+  });
+  tempAudio.addEventListener('error', function() {
+    _pendingDuration = 0;
+    document.getElementById('upload-form').style.display = 'block';
+    document.getElementById('u-title').value = _pendingFileName;
+  });
 }
 
 function cancelUpload() {
-  _pendingAudio = null;
+  if (_pendingAudioURL) URL.revokeObjectURL(_pendingAudioURL);
+  _pendingFile = null;
+  _pendingAudioURL = null;
   _pendingDuration = 0;
   _pendingFileName = '';
   document.getElementById('upload-form').style.display = 'none';
+  document.getElementById('upload-progress').style.display = 'none';
   document.getElementById('u-title').value = '';
   document.getElementById('u-prompt').value = '';
 }
 
-function saveTrack() {
+async function saveTrack() {
   var title = document.getElementById('u-title').value.trim();
   if (!title) { showToast('Give your track a title'); return; }
-  if (!_pendingAudio) { showToast('No audio file loaded'); return; }
+  if (!_pendingFile) { showToast('No audio file loaded'); return; }
 
-  var track = {
-    id: 't-'+Date.now(),
-    title: title,
-    genre: document.getElementById('u-genre').value,
-    mood: document.getElementById('u-mood').value,
-    source: document.getElementById('u-source').value,
-    prompt: document.getElementById('u-prompt').value || '',
-    audioData: _pendingAudio,
-    duration: _pendingDuration || 0,
-    waveform: generateWaveform(48),
-    created: new Date().toISOString().split('T')[0],
-    plays: 0,
-    shared: false
-  };
+  var saveBtn = document.querySelector('#upload-form .primary');
+  var origText = saveBtn.textContent;
+  saveBtn.textContent = 'UPLOADING...';
+  saveBtn.style.pointerEvents = 'none';
+  saveBtn.style.opacity = '0.5';
 
-  tracks.unshift(track);
-  window.tracks = tracks;
-  save('tracks', tracks);
-  cancelUpload();
-  switchView('library');
-  showToast('"'+title+'" added to your vault');
+  var progWrap = document.getElementById('upload-progress');
+  var progBar  = document.getElementById('upload-progress-bar');
+  var progPct  = document.getElementById('upload-progress-pct');
+  progWrap.style.display = 'block';
+
+  try {
+    var audioURL = await uploadToCloudinary(_pendingFile, function(pct) {
+      progBar.style.width = pct.toFixed(0) + '%';
+      progPct.textContent = pct.toFixed(0) + '%';
+    });
+
+    var track = {
+      id: 't-' + Date.now(),
+      title: title,
+      genre: document.getElementById('u-genre').value,
+      mood: document.getElementById('u-mood').value,
+      source: document.getElementById('u-source').value,
+      prompt: document.getElementById('u-prompt').value || '',
+      audioURL: audioURL,
+      duration: _pendingDuration || 0,
+      waveform: generateWaveform(48),
+      created: new Date().toISOString().split('T')[0],
+      plays: 0,
+      shared: false,
+      fileSize: _pendingFile.size,
+      fileName: _pendingFile.name
+    };
+
+    tracks.unshift(track);
+    window.tracks = tracks;
+    save('tracks', tracks);
+    cancelUpload();
+    switchView('library');
+    showToast('"' + title + '" uploaded & saved');
+
+  } catch(e) {
+    console.error('Upload failed:', e);
+    showToast('Upload failed: ' + (e.message || 'unknown error'));
+  }
+
+  saveBtn.textContent = origText;
+  saveBtn.style.pointerEvents = '';
+  saveBtn.style.opacity = '';
 }
 
 // Drag & drop
