@@ -1,20 +1,25 @@
 # SonicVault — Claude Code Handover
 
 ## What This Is
-SonicVault is a personal music curation web app for managing AI-generated songs (primarily from Suno). It's a single-file vanilla HTML/CSS/JS app deployed on GitHub Pages with Firebase backend. Built to match the architecture of an existing app (PokerHQ) by the same developer.
+SonicVault is a personal music curation web app for managing AI-generated songs (primarily from Suno). It's a single-file vanilla HTML/CSS/JS app deployed on GitHub Pages with Firebase (Firestore) + Cloudinary backend. Built to match the architecture of an existing app (PokerHQ) by the same developer.
 
 ## Repository Setup
 - **Hosting:** GitHub Pages (static single-file deployment)
 - **Structure:** Single `index.html` file — all HTML, CSS, and JS in one file
 - **No build tools** — no npm, no bundler, no React. Pure vanilla.
+- **Watcher:** `watcher.js` — separate Node.js script, runs locally, NOT deployed to GitHub Pages
 
 ## Tech Stack
 - **Frontend:** Vanilla HTML/CSS/JS, no frameworks
 - **Fonts:** Bebas Neue (display), DM Sans (body), DM Mono (mono/labels) — loaded via Google Fonts CDN
-- **Backend:** Firebase (shared project with PokerHQ and Daily Briefer apps)
-  - **Firestore** — metadata storage (tracks, playlists, settings) under collection `sonicvault-bob`
-  - **Firebase Storage** — audio file storage under path `sonicvault-bob/audio/`
-  - **Real-time sync** via `onSnapshot` listeners
+- **Metadata storage:** Firebase Firestore (shared project with PokerHQ and Daily Briefer apps)
+  - Collection: `sonicvault-bob` — docs: `tracks`, `playlists`, `settings`
+  - Real-time sync via `onSnapshot` listeners
+- **Audio storage:** Cloudinary (free plan, 25GB)
+  - Cloud name: `dtw4em0ob`
+  - Upload preset (unsigned, for web UI): `sonicvault_web`
+  - Folder: `sonicvault-bob/audio`
+  - Both the web UI upload and the watcher upload to Cloudinary
 - **Offline:** localStorage with offline queue pattern — saves locally first, syncs to Firebase when online
 - **PWA-ready:** Manifest, apple-touch-icon, mobile bottom nav
 
@@ -34,7 +39,27 @@ Firebase imports used (ES modules via CDN):
 ```javascript
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+```
+
+Note: Firebase Storage is NOT used. Audio files are stored in Cloudinary.
+
+## Cloudinary Config
+```javascript
+// In index.html (web UI — unsigned upload via preset)
+var CLOUDINARY_CLOUD_NAME    = 'dtw4em0ob';
+var CLOUDINARY_UPLOAD_PRESET = 'sonicvault_web';  // unsigned preset
+
+// In watcher.js (Node.js — signed upload via API key + secret)
+const CLOUDINARY_CLOUD   = 'dtw4em0ob';
+const CLOUDINARY_KEY     = '994324175859333';
+const CLOUDINARY_SECRET  = 'MPrTwmnL-ZZRsDGynvbvWkh3qcE';
+const CLOUDINARY_FOLDER  = 'sonicvault-bob/audio';
+```
+
+### Audio Upload Flow
+```
+Web UI upload  → Cloudinary (unsigned, via sonicvault_web preset) → audioURL saved to Firestore
+Watcher        → Cloudinary (signed, via API key + secret)        → audioURL saved to Firestore
 ```
 
 ## Firestore Data Structure
@@ -54,16 +79,19 @@ Documents:
   mood: "Energetic",        // Energetic|Chill|Intense|Dreamy|Warm|Playful|Melancholic|Uplifting|Dark
   source: "Suno",           // Suno|Udio|Original|Other
   prompt: "80s synthwave, driving beat...",
-  audioURL: "https://firebasestorage.googleapis.com/...",  // Firebase Storage download URL
+  audioURL: "https://res.cloudinary.com/dtw4em0ob/...",  // Cloudinary URL — primary audio source
   duration: 194,            // seconds (detected on upload)
-  waveform: [0.2, 0.8, ...], // array of 48 floats 0-1 (randomly generated on upload)
+  waveform: [0.2, 0.8, ...], // array of 48 floats 0.15-1.0 (randomly generated on upload)
   created: "2026-03-15",
   plays: 142,
   shared: false,
   fileSize: 4200000,        // bytes
-  fileName: "neon-highways.mp3"
+  fileName: "neon-highways.mp3",
+  autoImported: true        // only present on watcher-imported tracks
 }
 ```
+
+Note: `audioData` (base64) is a legacy field from before Cloudinary migration. It is no longer written to new tracks. `save()` strips it before writing to Firestore. Playback checks `audioURL` first, falls back to `audioData` for old tracks.
 
 ### Playlist Object Shape
 ```javascript
@@ -76,26 +104,17 @@ Documents:
 }
 ```
 
-## Firebase Storage Structure
-```
-sonicvault-bob/
-  audio/
-    t-1711700000000_neon-highways.mp3
-    t-1711700000001_midnight-garden.mp3
-```
-
 ## Key Architecture Patterns
 
 ### Save Pattern (matching PokerHQ)
 ```javascript
 function save(key, val) {
   localStorage.setItem('sv_'+key, JSON.stringify(val));
-  // Strip audioData from tracks before Firestore save
   var cleanVal = val;
   if (key === 'tracks' && Array.isArray(val)) {
     cleanVal = val.map(function(t) {
       var copy = Object.assign({}, t);
-      delete copy.audioData; // legacy base64 removal
+      delete copy.audioData; // strip legacy base64 — never send to Firestore
       return copy;
     });
   }
@@ -122,9 +141,18 @@ function load(key, def) {
 
 ### Audio Playback
 - Uses HTML5 `Audio()` object
-- Plays from `track.audioURL` (Firebase Storage) with fallback to legacy `track.audioData` (base64)
+- Plays from `track.audioURL` (Cloudinary) — checked first
+- Falls back to legacy `track.audioData` (base64) for old tracks
 - Waveform visualization via div bars with CSS classes `wbar-active` / `wbar-inactive`
 - Now-playing bar fixed to bottom with seek, progress, play/pause
+
+### Cloudinary Upload (Web UI)
+- Unsigned upload via `sonicvault_web` preset
+- `uploadToCloudinary(file, onProgressCallback)` — returns `secure_url`
+- Resource type: `auto`
+- Progress bar shown during upload (`#upload-progress`, `#upload-progress-bar`, `#upload-progress-pct`)
+- File size limit: 100MB
+- `saveTrack()` is async — uploads first, then saves metadata to Firestore
 
 ## Design System
 
@@ -149,9 +177,9 @@ Applied via `body.light` class toggle. All component overrides use `body.light .
 - Toast notifications via `#sv-toast` element
 - Genre colors mapped in `getGenreColor()` function
 
-## Current Features (V1 + V2)
-- [x] Audio upload with drag-and-drop (MP3/WAV, up to 50MB)
-- [x] Firebase Storage for audio files with upload progress bar
+## Current Features
+- [x] Audio upload with drag-and-drop (MP3/WAV/M4A, up to 100MB)
+- [x] Cloudinary storage for audio files with upload progress bar
 - [x] Firestore metadata sync with real-time cross-device updates
 - [x] Audio playback with waveform visualization
 - [x] Now-playing bar with seek/progress
@@ -164,25 +192,50 @@ Applied via `body.light` class toggle. All component overrides use `body.light .
 - [x] Mobile responsive with bottom nav
 - [x] PWA manifest
 - [x] Offline support with queue-based sync
+- [x] Suno folder watcher (`watcher.js`) — auto-imports downloads to Cloudinary + Firestore
+
+## Suno Folder Watcher (`watcher.js`)
+A separate Node.js script that runs locally on Bob's Windows machine.
+
+### How it works
+1. Monitors `C:\Users\BobbyNacario\Downloads\Suno` for new MP3/WAV/M4A files
+2. Waits for file size to stabilize (confirms download is complete)
+3. Uploads audio to Cloudinary (signed upload, API key + secret)
+4. Builds track metadata object (title cleaned from filename, waveform generated)
+5. Prepends track to Firestore `tracks` doc
+6. Moves file to `imported/` subfolder to prevent re-processing
+7. SonicVault's `onSnapshot` listener picks up the change automatically
+
+### Running the watcher
+```bash
+cd C:\Users\BobbyNacario\Claude\sonicvault
+npm install
+npm run watch
+```
+
+### Service account
+The Firebase Admin service account JSON (`pokerhq-a67e4-firebase-adminsdk-fbsvc-c85a762ac5.json`) must be present in the sonicvault folder. It is gitignored. The watcher auto-detects it by filename pattern.
+
+### File size limit: 200MB (watcher) / 100MB (web UI)
 
 ## Planned Features (Priority Order)
-1. ~~Firebase Storage for audio~~ ✅ Done
-2. Suno API auto-sync (when API becomes publicly available)
-3. Export playlist as downloadable ZIP of MP3s
-4. Claude-powered auto-tagging (analyze prompt to suggest genre/mood)
+1. Suno API auto-sync (when API becomes publicly available)
+2. Export playlist as downloadable ZIP of MP3s
+3. Claude-powered auto-tagging (analyze prompt to suggest genre/mood)
 
 ## Developer Context
 - Developer works in a Windows environment
 - App is personal use (single user: "Bob")
-- No authentication — Firestore/Storage rules are open for the `sonicvault-bob` path
+- No authentication — Firestore rules are open for the `sonicvault-bob` path
 - Three apps share one Firebase project: PokerHQ (`pokerhq-bob/`), Daily Briefer (`briefings-bob/`), SonicVault (`sonicvault-bob/`)
 - Developer's timezone: PHT (Philippine Time)
 
 ## How to Work on This
-1. The entire app is ONE file: `index.html`
+1. The entire web app is ONE file: `index.html`
 2. Edit the file, commit, push to GitHub Pages — that's the deploy
-3. Firebase is already configured and running — no setup needed
-4. Test locally by just opening `index.html` in a browser (Firebase will connect)
+3. Firebase Firestore and Cloudinary are already configured — no setup needed
+4. Test locally by opening `index.html` in a browser (Firestore will connect, Cloudinary uploads will work)
 5. Keep the single-file vanilla approach — DO NOT introduce build tools, npm, React, or any framework
 6. Follow the existing code style: `var` declarations, function expressions, DOM manipulation via `getElementById` and `innerHTML`
 7. All new features should use the existing `save(key, val)` / `load(key, def)` pattern for persistence
+8. New tracks must use `audioURL` (Cloudinary link) — never write `audioData` (base64) to Firestore
