@@ -1,12 +1,16 @@
 'use strict';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-const WATCH_FOLDER    = process.env.SUNO_WATCH_FOLDER || 'C:\\Users\\BobbyNacario\\Downloads\\Suno';
-const FILE_EXTENSIONS = ['.mp3', '.wav', '.m4a'];
-const COLLECTION      = 'sonicvault-bob';
-const STORAGE_PATH    = 'sonicvault-bob/audio';
-const DEBOUNCE_MS     = 2000;  // wait for file to finish writing
-const SIZE_STABLE_MS  = 1500;  // re-check after this delay to confirm size is stable
+const WATCH_FOLDER       = process.env.SUNO_WATCH_FOLDER || 'C:\\Users\\BobbyNacario\\Downloads\\Suno';
+const FILE_EXTENSIONS    = ['.mp3', '.wav', '.m4a'];
+const COLLECTION         = 'sonicvault-bob';
+const DEBOUNCE_MS        = 2000;  // wait for file to finish writing
+const SIZE_STABLE_MS     = 1500;  // re-check after this delay to confirm size is stable
+const MAX_FILE_SIZE      = 200 * 1024 * 1024;  // 200MB
+const CLOUDINARY_CLOUD   = 'dtw4em0ob';
+const CLOUDINARY_KEY     = '994324175859333';
+const CLOUDINARY_SECRET  = 'MPrTwmnL-ZZRsDGynvbvWkh3qcE';
+const CLOUDINARY_FOLDER  = 'sonicvault-bob/audio';
 
 // ─── Service account ─────────────────────────────────────────────────────────
 // Place your Firebase Admin service account JSON in this folder and name it:
@@ -34,11 +38,17 @@ try {
 // ─── Firebase Admin init ─────────────────────────────────────────────────────
 var admin = require('firebase-admin');
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  storageBucket: 'pokerhq-a67e4.firebasestorage.app'
+  credential: admin.credential.cert(serviceAccount)
 });
-var db     = admin.firestore();
-var bucket = admin.storage().bucket();
+var db = admin.firestore();
+
+// ─── Cloudinary init ──────────────────────────────────────────────────────────
+var cloudinary = require('cloudinary').v2;
+cloudinary.config({
+  cloud_name: CLOUDINARY_CLOUD,
+  api_key:    CLOUDINARY_KEY,
+  api_secret: CLOUDINARY_SECRET
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 var fs   = require('fs');
@@ -140,30 +150,29 @@ async function processFile(filePath) {
       return;
     }
 
-    log(filename + ' (' + formatBytes(fileSize) + ') — uploading to Firebase Storage...');
+    if (fileSize > MAX_FILE_SIZE) {
+      log('WARNING: ' + filename + ' (' + formatBytes(fileSize) + ') exceeds 200MB limit, skipping.');
+      delete processing[filePath];
+      return;
+    }
+
+    log(filename + ' (' + formatBytes(fileSize) + ') — uploading to Cloudinary...');
 
     try {
       // Generate track ID
-      var trackId   = 't-' + Date.now();
-      var storageName = trackId + '_' + filename.replace(/\s+/g, '-');
-      var destPath  = STORAGE_PATH + '/' + storageName;
+      var trackId = 't-' + Date.now();
 
       // Extract audio duration
       var duration = await extractDuration(filePath);
 
-      // Upload to Firebase Storage
-      var fileBuffer = fs.readFileSync(filePath);
-      var fileRef    = bucket.file(destPath);
-
-      await fileRef.save(fileBuffer, {
-        metadata: {
-          contentType: ext === '.mp3' ? 'audio/mpeg' : ext === '.wav' ? 'audio/wav' : 'audio/mp4'
-        }
+      // Upload to Cloudinary
+      var result = await cloudinary.uploader.upload(filePath, {
+        resource_type: 'video',  // Cloudinary uses 'video' for audio files
+        folder:        CLOUDINARY_FOLDER,
+        public_id:     trackId,
+        use_filename:  false
       });
-
-      // Make the file publicly accessible and get download URL
-      await fileRef.makePublic();
-      var downloadURL = 'https://storage.googleapis.com/' + bucket.name + '/' + destPath;
+      var downloadURL = result.secure_url;
 
       log('Upload complete → ' + downloadURL);
 

@@ -654,7 +654,9 @@ function playTrack(id) {
   }
 
   _currentTrack = track;
-  if (track.audioData) {
+  if (track.audioURL) {
+    _audio.src = track.audioURL;
+  } else if (track.audioData) {
     _audio.src = track.audioData;
   } else {
     showToast('No audio data — re-upload this track');
