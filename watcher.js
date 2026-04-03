@@ -7,9 +7,9 @@ const COLLECTION         = 'sonicvault-bob';
 const DEBOUNCE_MS        = 2000;  // wait for file to finish writing
 const SIZE_STABLE_MS     = 1500;  // re-check after this delay to confirm size is stable
 const MAX_FILE_SIZE      = 200 * 1024 * 1024;  // 200MB
-const CLOUDINARY_CLOUD   = 'dtw4em0ob';
-const CLOUDINARY_KEY     = '994324175859333';
-const CLOUDINARY_SECRET  = 'MPrTwmnL-ZZRsDGynvbvWkh3qcE';
+const CLOUDINARY_CLOUD   = process.env.CLOUDINARY_CLOUD_NAME || process.env.SONICVAULT_CLOUDINARY_CLOUD || 'dtw4em0ob';
+const CLOUDINARY_KEY     = process.env.CLOUDINARY_API_KEY || process.env.SONICVAULT_CLOUDINARY_KEY || '';
+const CLOUDINARY_SECRET  = process.env.CLOUDINARY_API_SECRET || process.env.SONICVAULT_CLOUDINARY_SECRET || '';
 const CLOUDINARY_FOLDER  = 'sonicvault-bob/audio';
 
 // ─── Service account ─────────────────────────────────────────────────────────
@@ -44,6 +44,11 @@ var db = admin.firestore();
 
 // ─── Cloudinary init ──────────────────────────────────────────────────────────
 var cloudinary = require('cloudinary').v2;
+if (!CLOUDINARY_KEY || !CLOUDINARY_SECRET) {
+  console.error('[SonicVault Watcher] ERROR: Missing Cloudinary credentials.');
+  console.error('  Set CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in your environment and run again.');
+  process.exit(1);
+}
 cloudinary.config({
   cloud_name: CLOUDINARY_CLOUD,
   api_key:    CLOUDINARY_KEY,
@@ -185,15 +190,28 @@ async function processFile(filePath) {
         mood:         'Energetic',
         source:       'Suno',
         prompt:       '',
+        lyrics:       '',
         audioURL:     downloadURL,
         duration:     duration,
-        waveform:     generateWaveform(),
+        waveform:     [],
         created:      todayISO(),
         plays:        0,
         shared:       false,
         fileSize:     fileSize,
         fileName:     filename,
-        autoImported: true
+        autoImported: true,
+        aiTags:       [],
+        aiSummary:    '',
+        aiMood:       '',
+        aiGenre:      '',
+        aiTheme:      '',
+        aiEnergy:     '',
+        aiVocalStyle: '',
+        aiEra:        '',
+        aiInstruments: [],
+        aiExplicit:   false,
+        aiMetadataVersion: 0,
+        aiGeneratedAt: ''
       };
 
       // Load existing tracks from Firestore, prepend new track, save back

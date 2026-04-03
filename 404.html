@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SonicVault Redirect</title>
+<script>
+(function() {
+  var path = window.location.pathname || '/';
+  var parts = path.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+  var routeIndex = parts.indexOf('track');
+  if (routeIndex === -1) routeIndex = parts.indexOf('playlist');
+
+  var prefix = routeIndex > 0 ? '/' + parts.slice(0, routeIndex).join('/') : '';
+  var route = routeIndex !== -1 ? '/' + parts.slice(routeIndex).join('/') : '/';
+  var target = window.location.origin + prefix + '/?sv-route=' + encodeURIComponent(route);
+  if (window.location.hash) target += window.location.hash;
+  window.location.replace(target);
+})();
+</script>
+</head>
+<body></body>
+</html>

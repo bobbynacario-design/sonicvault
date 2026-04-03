@@ -49,18 +49,20 @@ Note: Firebase Storage is NOT used. Audio files are stored in Cloudinary.
 var CLOUDINARY_CLOUD_NAME    = 'dtw4em0ob';
 var CLOUDINARY_UPLOAD_PRESET = 'sonicvault_web';  // unsigned preset
 
-// In watcher.js (Node.js — signed upload via API key + secret)
-const CLOUDINARY_CLOUD   = 'dtw4em0ob';
-const CLOUDINARY_KEY     = '994324175859333';
-const CLOUDINARY_SECRET  = 'MPrTwmnL-ZZRsDGynvbvWkh3qcE';
+// In watcher.js (Node.js — signed upload via environment variables)
+const CLOUDINARY_CLOUD   = process.env.CLOUDINARY_CLOUD_NAME || 'dtw4em0ob';
+const CLOUDINARY_KEY     = process.env.CLOUDINARY_API_KEY || '';
+const CLOUDINARY_SECRET  = process.env.CLOUDINARY_API_SECRET || '';
 const CLOUDINARY_FOLDER  = 'sonicvault-bob/audio';
 ```
 
 ### Audio Upload Flow
 ```
 Web UI upload  → Cloudinary (unsigned, via sonicvault_web preset) → audioURL saved to Firestore
-Watcher        → Cloudinary (signed, via API key + secret)        → audioURL saved to Firestore
+Watcher        → Cloudinary (signed, via environment variables)   → audioURL saved to Firestore
 ```
+
+Keep the signed Cloudinary credentials out of git. Store them in local environment variables or another non-tracked secret store only.
 
 ## Firestore Data Structure
 Collection: `sonicvault-bob`
@@ -200,7 +202,7 @@ A separate Node.js script that runs locally on Bob's Windows machine.
 ### How it works
 1. Monitors `C:\Users\BobbyNacario\Downloads\Suno` for new MP3/WAV/M4A files
 2. Waits for file size to stabilize (confirms download is complete)
-3. Uploads audio to Cloudinary (signed upload, API key + secret)
+3. Uploads audio to Cloudinary (signed upload, credentials loaded from local environment variables)
 4. Builds track metadata object (title cleaned from filename, waveform generated)
 5. Prepends track to Firestore `tracks` doc
 6. Moves file to `imported/` subfolder to prevent re-processing
@@ -239,3 +241,24 @@ The Firebase Admin service account JSON (`pokerhq-a67e4-firebase-adminsdk-fbsvc-
 6. Follow the existing code style: `var` declarations, function expressions, DOM manipulation via `getElementById` and `innerHTML`
 7. All new features should use the existing `save(key, val)` / `load(key, def)` pattern for persistence
 8. New tracks must use `audioURL` (Cloudinary link) — never write `audioData` (base64) to Firestore
+## Share + Security Notes
+- Public share routes now use dedicated Firestore collections:
+  - `sonicvault-public-tracks`
+  - `sonicvault-public-playlists`
+- The private owner data remains in:
+  - `sonicvault-bob/tracks`
+  - `sonicvault-bob/playlists`
+  - `sonicvault-bob/settings`
+- Apply the repo's `firestore.rules` before considering the deployment hardened.
+- Replace `replace-with-owner-email@example.com` in `firestore.rules` with the real owner email, or set a custom auth claim like `sonicvaultOwner: true` on the owner account.
+
+## Cloudinary Hardening
+- The web UI still uses an unsigned preset because GitHub Pages cannot safely mint signed uploads client-side.
+- Tighten the `sonicvault_web` preset in Cloudinary:
+  - lock it to the `sonicvault-bob/audio` folder
+  - allow only `mp3`, `wav`, and `m4a`
+  - cap file size at 100MB
+  - disable overwrite
+  - disable any transformations that are not required
+  - restrict allowed origins if your Cloudinary plan supports it
+- If you later add a tiny signed upload endpoint, move the web UI off the unsigned preset entirely.

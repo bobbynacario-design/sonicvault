@@ -1,3 +1,8 @@
 node_modules/
 serviceAccount.json
 *firebase-adminsdk*.json
+.env
+.env.local
+.env.*
+.codex-index-inline-check.js
+index.generated.html

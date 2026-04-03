@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner() {
+      return request.auth != null && (
+        request.auth.token.sonicvaultOwner == true ||
+        request.auth.token.email == "replace-with-owner-email@example.com"
+      );
+    }
+
+    match /sonicvault-bob/{docId} {
+      allow read, write, delete: if isOwner();
+    }
+
+    match /sonicvault-public-tracks/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isOwner();
+    }
+
+    match /sonicvault-public-playlists/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isOwner();
+    }
+  }
+}

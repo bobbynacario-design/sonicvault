@@ -2,7 +2,7 @@
 
 ## What to Build
 A Node.js script (`watcher.js`) that monitors a folder on Bob's Windows machine for new audio files (MP3/WAV). When a new file appears, it automatically:
-1. Uploads the audio to Firebase Storage (`sonicvault-bob/audio/`)
+1. Uploads the audio to Cloudinary (`sonicvault-bob/audio/`)
 2. Creates a track metadata entry in Firestore (`sonicvault-bob/tracks`)
 3. SonicVault's real-time `onSnapshot` listener picks it up instantly — no manual upload needed
 
@@ -58,7 +58,7 @@ const serviceAccount = require('./serviceAccount.json');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  storageBucket: 'pokerhq-a67e4.firebasestorage.app'
+  // Firestore only; audio upload happens through Cloudinary
 });
 
 const db = admin.firestore();
@@ -72,8 +72,8 @@ const bucket = admin.storage().bucket();
 3. Verify file is complete (check file size is stable)
 4. Extract duration using music-metadata
 5. Generate trackId: 't-' + Date.now()
-6. Upload file to Firebase Storage: STORAGE_PATH/{trackId}_{filename}
-7. Get download URL
+6. Upload file to Cloudinary under `sonicvault-bob/audio`
+7. Get the Cloudinary secure URL
 8. Build track metadata object (auto-detect genre/mood from filename if possible)
 9. Load current tracks array from Firestore doc
 10. Prepend new track to array
@@ -91,7 +91,7 @@ const bucket = admin.storage().bucket();
   mood: "Energetic",        // Default
   source: "Suno",           // Auto-set since it's from the watcher
   prompt: "",               // Empty — user can add in UI
-  audioURL: downloadURL,    // From Firebase Storage
+  audioURL: downloadURL,    // From Cloudinary
   duration: extractedDuration,
   waveform: Array of 48 random floats 0.15-1.0,
   created: today's date (YYYY-MM-DD),
@@ -116,7 +116,7 @@ Suno downloads often have names like `"Neon Highways - Suno AI.mp3"` or `"123456
 [SonicVault Watcher] Ready — drop Suno downloads here
 
 [14:32:05] New file detected: Neon Highways - Suno AI.mp3 (4.2MB)
-[14:32:07] Uploading to Firebase Storage...
+[14:32:07] Uploading to Cloudinary...
 [14:32:12] Upload complete → https://firebasestorage.googleapis.com/...
 [14:32:12] Track "Neon Highways" added to SonicVault ✓
 ```
