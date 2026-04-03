@@ -3239,13 +3239,39 @@ function getTrackAIInstruments(track) {
   return sanitizeMetadataArray(track && track.aiInstruments, 8);
 }
 
+function getLyricContentLines(text) {
+  return String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').map(function(line) {
+    return String(line || '').trim();
+  }).filter(function(line) {
+    return line && !/^\[[^\]]+\]$/.test(line);
+  });
+}
+
+function getLyricSectionCounts(text) {
+  var counts = { verse:0, chorus:0, bridge:0, outro:0, intro:0, pre:0 };
+  String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').forEach(function(line) {
+    var trimmed = String(line || '').trim().toLowerCase();
+    if (!/^\[[^\]]+\]$/.test(trimmed)) return;
+    if (trimmed.indexOf('[verse') === 0) counts.verse++;
+    else if (trimmed.indexOf('[chorus') === 0) counts.chorus++;
+    else if (trimmed.indexOf('[bridge') === 0) counts.bridge++;
+    else if (trimmed.indexOf('[outro') === 0) counts.outro++;
+    else if (trimmed.indexOf('[intro') === 0) counts.intro++;
+    else if (trimmed.indexOf('[pre') === 0) counts.pre++;
+  });
+  return counts;
+}
+
 function deriveTextTags(text, limit) {
   var stop = {
-    a:1, an:1, and:1, are:1, around:1, at:1, be:1, been:1, before:1, behind:1, but:1, by:1,
-    can:1, chorus:1, could:1, down:1, for:1, from:1, into:1, just:1, like:1, line:1, lines:1,
-    more:1, over:1, pre:1, repeat:1, than:1, that:1, the:1, their:1, them:1, then:1, there:1,
-    these:1, this:1, those:1, through:1, under:1, verse:1, verses:1, very:1, vocal:1, vocals:1,
-    what:1, when:1, where:1, with:1, would:1, your:1, you:1, song:1, track:1
+    a:1, ah:1, an:1, and:1, are:1, around:1, at:1, away:1, be:1, been:1, before:1, behind:1, but:1,
+    by:1, can:1, chorus:1, come:1, could:1, did:1, doing:1, don:1, down:1, ever:1, for:1, from:1,
+    get:1, gotta:1, had:1, has:1, have:1, he:1, her:1, him:1, his:1, into:1, just:1, know:1, like:1,
+    line:1, lines:1, lot:1, me:1, more:1, much:1, my:1, now:1, oh:1, ooh:1, our:1, out:1, over:1,
+    pre:1, really:1, repeat:1, she:1, some:1, still:1, than:1, that:1, the:1, their:1, them:1, then:1,
+    there:1, these:1, they:1, this:1, those:1, through:1, under:1, very:1, verse:1, verses:1, vocal:1,
+    vocals:1, wanna:1, was:1, were:1, what:1, when:1, where:1, who:1, with:1, would:1, yeah:1, your:1,
+    you:1, song:1, track:1
   };
   var counts = {};
   String(text || '').toLowerCase().split(/[^a-z0-9]+/).forEach(function(word) {
@@ -3289,10 +3315,62 @@ function detectInstruments(text) {
   return uniqueStrings(found, 5);
 }
 
+function normalizePhrase(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z0-9\s']/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function titleCasePhrase(text) {
+  return String(text || '').split(/\s+/).filter(Boolean).map(function(word) {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+}
+
+function derivePhraseTags(input, limit) {
+  var phrases = [];
+  var title = normalizePhrase(input && input.title || '');
+  var lyricLines = getLyricContentLines(input && input.lyrics);
+  var repeated = {};
+  var phraseCounts = {};
+
+  if (title && title.split(' ').length > 1 && title.split(' ').length <= 6) phrases.push(titleCasePhrase(title));
+
+  lyricLines.forEach(function(line) {
+    var normalized = normalizePhrase(line);
+    var words = normalized.split(' ').filter(Boolean);
+    if (words.length >= 3 && words.length <= 9) repeated[normalized] = (repeated[normalized] || 0) + 1;
+  });
+
+  Object.keys(repeated).sort(function(a, b) {
+    return repeated[b] - repeated[a] || a.length - b.length;
+  }).forEach(function(phrase) {
+    if (repeated[phrase] >= 2) phrases.push(titleCasePhrase(phrase));
+  });
+
+  lyricLines.join(' ').split(/[^a-z0-9']+/).filter(Boolean).forEach(function(_, idx, words) {
+    [2, 3].forEach(function(size) {
+      if (idx + size > words.length) return;
+      var slice = words.slice(idx, idx + size).filter(Boolean);
+      if (slice.length !== size) return;
+      if (slice.filter(function(word) { return word.length >= 3; }).length < size) return;
+      var phrase = slice.join(' ');
+      if (/^(the|and|for|with|from|into|your|this|that)\b/.test(phrase)) return;
+      phraseCounts[phrase] = (phraseCounts[phrase] || 0) + 1;
+    });
+  });
+
+  Object.keys(phraseCounts).sort(function(a, b) {
+    return phraseCounts[b] - phraseCounts[a] || b.length - a.length;
+  }).forEach(function(phrase) {
+    if (phraseCounts[phrase] >= 2) phrases.push(titleCasePhrase(phrase));
+  });
+
+  return uniqueStrings(phrases, limit || 4);
+}
+
 function buildThemeFromTags(tags) {
   if (!tags.length) return 'Personal narrative';
-  if (tags.length === 1) return tags[0];
-  return tags.slice(0, 2).join(' / ');
+  if (tags.length === 1) return titleCasePhrase(tags[0]);
+  return titleCasePhrase(tags[0]) + ' and ' + titleCasePhrase(tags[1]);
 }
 
 function detectExplicit(text) {
@@ -3301,6 +3379,75 @@ function detectExplicit(text) {
 
 function getTrackMetadataText(input) {
   return [input && input.title, input && input.prompt, input && input.lyrics].join('\n');
+}
+
+function inferThemeLabel(text, tags, phraseTags) {
+  var body = lower(text);
+  var themes = [
+    { label:'Coastal reset', words:['water', 'ocean', 'shore', 'shoreline', 'salt', 'tide', 'sky', 'sun', 'sunset'] },
+    { label:'Family devotion', words:['wife', 'kids', 'family', 'daddy', 'dad', 'home', 'present', 'childhood'] },
+    { label:'Faith and gratitude', words:['god', 'lord', 'church', 'pray', 'grace', 'blessing'] },
+    { label:'Romantic afterglow', words:['love', 'kiss', 'touch', 'heart', 'forever'] },
+    { label:'Night-drive escape', words:['midnight', 'neon', 'city', 'drive', 'lights', 'highway'] },
+    { label:'Heartbreak fallout', words:['broken', 'goodbye', 'tears', 'alone', 'ache', 'empty'] }
+  ];
+  var found = themes.filter(function(entry) {
+    return entry.words.some(function(word) { return body.indexOf(word) !== -1; });
+  }).map(function(entry) {
+    return entry.label;
+  });
+  if (found.length >= 2) return found[0] + ' and ' + lower(found[1]);
+  if (found.length === 1) return found[0];
+  if (phraseTags.length) return phraseTags[0];
+  return buildThemeFromTags(tags);
+}
+
+function inferVocalStyle(input, mood) {
+  var body = lower(getTrackMetadataText(input));
+  var sections = getLyricSectionCounts(input && input.lyrics);
+  if (!getTrackLyrics(input)) return 'Instrumental';
+  if (/\b(rap|trap|808|freestyle|bars|spit)\b/.test(body)) return 'Rap lead';
+  if (/\b(duet|call and response)\b/.test(body)) return 'Duet';
+  if (/\b(choir|choral|hymn|gospel)\b/.test(body)) return 'Choir-led';
+  if (/\b(whisper|hush|breathy)\b/.test(body)) return 'Hushed lead';
+  if (sections.chorus >= 2) return 'Anthemic lead';
+  if (sections.verse >= 2) return mood === 'Melancholic' || mood === 'Warm' ? 'Reflective lead' : 'Narrative lead';
+  return 'Lead vocal';
+}
+
+function inferEra(text, genre) {
+  var body = lower(text);
+  if (/\b(80s|vhs|arcade|retro|outrun|synthwave)\b/.test(body)) return '1980s';
+  if (/\b(90s|boom bap|grunge)\b/.test(body)) return '1990s';
+  if (/\b(2000s|bloghouse|millennial)\b/.test(body)) return '2000s';
+  if (genre === 'Country' || genre === 'Folk') return 'Timeless';
+  if (/\b(future|cyber|digital|neon)\b/.test(body)) return 'Future-facing';
+  if (/\b(vinyl|analog|dusty|classic)\b/.test(body)) return 'Vintage';
+  return 'Contemporary';
+}
+
+function inferProductionDetail(genre, instruments, text) {
+  if (instruments.length) return instruments.join(', ').toLowerCase();
+  if (genre === 'Country') return 'acoustic strums and open-air rhythm';
+  if (genre === 'Folk') return 'acoustic guitar and intimate room detail';
+  if (genre === 'Pop') return 'bright hooks and clean melodic framing';
+  if (genre === 'Ambient') return 'soft pads and slow-bloom atmosphere';
+  if (genre === 'Electronic') return 'pulsing low end and glossy synth detail';
+  if (genre === 'Rock') return 'guitars and live-drum momentum';
+  if (genre === 'Hip Hop') return '808 low end and pocketed percussion';
+  if (/\b(ocean|water|tide|shore|salt|sky)\b/.test(lower(text))) return 'open-air detail and widescreen atmosphere';
+  return 'focused production detail';
+}
+
+function buildEditorialSummary(title, genre, mood, theme, energy, vocalStyle, productionDetail, phraseTags) {
+  var cue = lower(phraseTags[0] || theme);
+  var openers = [
+    '"' + title + '" lands as a ' + mood.toLowerCase() + ' ' + genre.toLowerCase() + ' cut built around ' + lower(theme) + ', with the writing anchored by ' + cue + '.',
+    '"' + title + '" leans into ' + lower(theme) + ' as a ' + mood.toLowerCase() + ' ' + genre.toLowerCase() + ' release, framing the hook around ' + cue + '.',
+    '"' + title + '" plays like a ' + mood.toLowerCase() + ' ' + genre.toLowerCase() + ' piece centered on ' + lower(theme) + ', with ' + cue + ' giving it the strongest image.'
+  ];
+  var closer = 'The lyric sheet points to a ' + energy.toLowerCase() + '-energy arrangement with ' + productionDetail + ' and a ' + vocalStyle.toLowerCase() + ' delivery.';
+  return openers[hashString(title + '|' + theme) % openers.length] + ' ' + closer;
 }
 
 function normalizeAIMetadata(raw, input) {
@@ -3334,7 +3481,8 @@ function getAIMetadataSourceLabel(item) {
 function buildLocalMetadataSuggestion(input) {
   var text = getTrackMetadataText(input);
   var title = String(input && input.title || 'Untitled release').trim();
-  var tags = deriveTextTags(text, 8);
+  var phraseTags = derivePhraseTags(input, 4);
+  var tags = uniqueStrings(phraseTags.concat(deriveTextTags(text, 8)), 10);
   var genre = detectMappedValue(text, [
     { value:'Synthwave', words:['synthwave', 'neon', 'outrun', 'retro', '80s', 'arcade'] },
     { value:'Lo-fi', words:['lofi', 'lo-fi', 'study', 'dusty', 'cassette', 'bedroom'] },
@@ -3347,40 +3495,30 @@ function buildLocalMetadataSuggestion(input) {
     { value:'Jazz', words:['jazz', 'swing', 'blue note', 'sax'] },
     { value:'Classical', words:['classical', 'orchestra', 'string quartet', 'sonata'] },
     { value:'R&B', words:['r&b', 'soul', 'slow jam', 'silky'] },
-    { value:'Metal', words:['metal', 'blast beat', 'scream', 'distorted'] }
+    { value:'Metal', words:['metal', 'blast beat', 'scream', 'distorted'] },
+    { value:'Country', words:['highway', 'whiskey', 'dust', 'southern', 'boots', 'backroad', 'church', 'daddy'] }
   ], input && input.genre || 'Other');
   var mood = detectMappedValue(text, [
     { value:'Energetic', words:['run', 'fire', 'ignite', 'wild', 'chase', 'rush', 'midnight drive'] },
-    { value:'Chill', words:['coast', 'slow', 'breeze', 'afterglow', 'soft', 'easy'] },
+    { value:'Chill', words:['coast', 'slow', 'breeze', 'afterglow', 'soft', 'easy', 'ocean'] },
     { value:'Intense', words:['war', 'battle', 'storm', 'rage', 'burning', 'explosive'] },
     { value:'Dreamy', words:['dream', 'moon', 'neon', 'starlight', 'velvet', 'floating'] },
-    { value:'Warm', words:['golden', 'sunset', 'home', 'ember', 'warm'] },
+    { value:'Warm', words:['golden', 'sunset', 'home', 'ember', 'warm', 'wife', 'kids', 'family'] },
     { value:'Playful', words:['bounce', 'smile', 'glitter', 'playful', 'cheeky'] },
     { value:'Melancholic', words:['alone', 'ache', 'broken', 'tears', 'empty', 'goodbye'] },
-    { value:'Uplifting', words:['rise', 'hope', 'brighter', 'alive', 'victory'] },
+    { value:'Uplifting', words:['rise', 'hope', 'brighter', 'alive', 'victory', 'survive'] },
     { value:'Dark', words:['shadow', 'midnight', 'void', 'haunted', 'blackout'] }
   ], input && input.mood || 'Dreamy');
-  var theme = buildThemeFromTags(tags);
+  var theme = inferThemeLabel(text, tags, phraseTags);
   var energy = detectMappedValue(text, [
     { value:'High', words:['fast', 'rush', 'ignite', 'drop', 'club', 'wild'] },
     { value:'Low', words:['slow', 'still', 'haze', 'whisper', 'soft', 'drift'] }
   ], mood === 'Energetic' || mood === 'Intense' ? 'High' : mood === 'Chill' || mood === 'Dreamy' ? 'Low' : 'Medium');
-  var vocalStyle = detectMappedValue(text, [
-    { value:'Rap lead', words:['rap', 'bars', 'verse'] },
-    { value:'Whispered lead', words:['whisper', 'hush', 'breath'] },
-    { value:'Choir-driven', words:['choir', 'choral', 'hymn'] },
-    { value:'Duet', words:['duet', 'call and response'] },
-    { value:'Instrumental', words:['instrumental', 'no vocals'] }
-  ], getTrackLyrics(input) ? 'Lead vocal' : 'Instrumental');
-  var era = detectMappedValue(text, [
-    { value:'1980s', words:['80s', 'retro', 'arcade', 'vhs'] },
-    { value:'1990s', words:['90s', 'boom bap', 'grunge'] },
-    { value:'2000s', words:['2000s', 'millennial', 'bloghouse'] },
-    { value:'Future-facing', words:['future', 'cyber', 'neon', 'digital'] },
-    { value:'Vintage', words:['vinyl', 'dusty', 'classic', 'analog'] }
-  ], 'Contemporary');
+  var vocalStyle = inferVocalStyle(input, mood);
+  var era = inferEra(text, genre);
   var instruments = detectInstruments(text);
   var summary = '“' + title + '” reads like a ' + mood.toLowerCase() + ' ' + genre.toLowerCase() + ' piece centered on ' + lower(theme) + '. The lyrics and prompt suggest a ' + energy.toLowerCase() + '-energy arrangement with ' + (instruments.length ? instruments.join(', ').toLowerCase() : 'focused production detail') + ' and a ' + vocalStyle.toLowerCase() + ' delivery.';
+  summary = buildEditorialSummary(title, genre, mood, theme, energy, vocalStyle, inferProductionDetail(genre, instruments, text), phraseTags);
   return normalizeAIMetadata({
     aiGenre: genre,
     aiMood: mood,
@@ -3391,7 +3529,8 @@ function buildLocalMetadataSuggestion(input) {
     aiInstruments: instruments,
     aiTags: tags,
     aiSummary: summary,
-    aiExplicit: detectExplicit(text)
+    aiExplicit: detectExplicit(text),
+    aiSource: 'local'
   }, input);
 }
 
