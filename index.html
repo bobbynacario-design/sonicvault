@@ -2203,6 +2203,22 @@ body.light .player-modal{
   z-index:35;
 }
 body.light .mobile-nav{background:rgba(255,255,255,.9)}
+.mobile-nav-pulse{
+  display:none;
+  position:absolute;
+  top:-4px;right:-4px;
+  width:14px;height:14px;
+  border-radius:999px;
+  background:var(--accent);
+  box-shadow:0 0 0 0 rgba(240,139,98,.6);
+  pointer-events:none;
+}
+.mobile-nav.is-playing .mobile-nav-pulse{display:block;animation:np-pulse 1.6s ease-out infinite}
+@keyframes np-pulse{
+  0%{box-shadow:0 0 0 0 rgba(240,139,98,.55)}
+  70%{box-shadow:0 0 0 10px rgba(240,139,98,0)}
+  100%{box-shadow:0 0 0 0 rgba(240,139,98,0)}
+}
 .mobile-tab{
   flex:1;
   padding:.72rem .35rem;
@@ -2806,7 +2822,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 
 <div id="sv-toast"></div>
 
-<div class="mobile-nav">
+<div class="mobile-nav" id="mobile-nav">
+  <span class="mobile-nav-pulse" id="mobile-nav-pulse" aria-hidden="true"></span>
   <button class="mobile-tab active" id="mob-library" onclick="switchView('library')">Home</button>
   <button class="mobile-tab" id="mob-playlists" onclick="switchView('playlists')">Playlists</button>
   <button class="mobile-tab" id="mob-upload" onclick="switchView('upload')">Import</button>
@@ -4257,9 +4274,17 @@ function updateNowPlaying() {
   document.getElementById('np-queue').textContent = queueLine;
   document.getElementById('np-play-btn').textContent = _isPlaying ? 'Pause' : 'Play';
   applyTrackTint(_currentTrack);
+  updateMobileNavPulse();
   updateMediaSession();
   updateExpandedPlayer();
   if (_routeState.mode !== 'app') renderRouteAwareView(true);
+}
+
+function updateMobileNavPulse() {
+  var nav = document.getElementById('mobile-nav');
+  if (!nav) return;
+  if (_currentTrack && _isPlaying) nav.classList.add('is-playing');
+  else nav.classList.remove('is-playing');
 }
 
 // Throttle the expensive expanded-waveform DOM rebuild to ~5fps.
@@ -4292,6 +4317,11 @@ _audio.addEventListener('loadedmetadata', function() {
   document.getElementById('xp-total').textContent = fmtTime(_audio.duration);
   updateMediaSession();
 });
+
+// Keep the mobile-nav pulse in sync with native audio play/pause events,
+// in addition to updateNowPlaying() which already runs on most state changes.
+_audio.addEventListener('play', function() { if (typeof updateMobileNavPulse === 'function') updateMobileNavPulse(); });
+_audio.addEventListener('pause', function() { if (typeof updateMobileNavPulse === 'function') updateMobileNavPulse(); });
 
 _audio.addEventListener('ended', function() {
   _isPlaying = false;
