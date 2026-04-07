@@ -3785,11 +3785,29 @@ function normalizeWaveform(values, count) {
   return out;
 }
 
+// Memoize the normalized bar array per track+count. The expanded player
+// throttles redraws to ~5fps but every redraw used to slice/normalize the
+// peak array; this returns the same cached array reference when nothing
+// changed. Bust via invalidateVisualWaveform(trackId).
+var _visualWaveformCache = {};
+function invalidateVisualWaveform(trackId) {
+  if (!trackId) { _visualWaveformCache = {}; return; }
+  Object.keys(_visualWaveformCache).forEach(function(k) {
+    if (k.indexOf(trackId + '|') === 0) delete _visualWaveformCache[k];
+  });
+}
+
 function getVisualWaveform(track, count) {
   if (!track) return buildFallbackWaveform(null, count || 48);
+  var n = count || 48;
+  var key = track.id + '|' + n;
+  if (_visualWaveformCache[key]) return _visualWaveformCache[key];
   var cache = getWaveformCache()[track.id];
-  if (Array.isArray(cache) && cache.length) return normalizeWaveform(cache, count || 48);
-  return buildFallbackWaveform(track, count || 48);
+  var bars = (Array.isArray(cache) && cache.length)
+    ? normalizeWaveform(cache, n)
+    : buildFallbackWaveform(track, n);
+  _visualWaveformCache[key] = bars;
+  return bars;
 }
 
 function extractWaveformPeaks(buffer, count) {
@@ -3829,6 +3847,7 @@ async function ensureWaveformForTrack(track) {
     var decoded = await _audioContext.decodeAudioData(bufferData.slice(0));
     var peaks = extractWaveformPeaks(decoded, 72);
     getWaveformCache()[track.id] = peaks;
+    invalidateVisualWaveform(track.id);
     window.appSettings = appSettings;
     save('settings', appSettings);
     renderTracks();
@@ -5387,6 +5406,7 @@ function deleteTrack(id) {
   });
   save('tracks', tracks);
   invalidateFilterCache();
+  invalidateVisualWaveform(id);
   persistPlaylists();
   if (_currentTrack && _currentTrack.id === id) {
     _audio.pause();
