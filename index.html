@@ -2216,7 +2216,8 @@ body.light .player-modal{
   position:fixed;
   left:14px;
   right:14px;
-  bottom:calc(var(--player-height) + .7rem);
+  bottom:14px;
+  transition:bottom .22s ease;
   padding:.42rem;
   border-radius:999px;
   border:1px solid var(--rim);
@@ -2225,6 +2226,7 @@ body.light .player-modal{
   z-index:35;
 }
 body.light .mobile-nav{background:rgba(255,255,255,.9)}
+.mobile-nav.player-active{bottom:calc(var(--player-height) + .7rem)}
 .mobile-nav-pulse{
   display:none;
   position:absolute;
@@ -4287,8 +4289,10 @@ function updateMediaSession() {
 function updateNowPlaying() {
   var bar = document.getElementById('now-playing');
   var art = document.getElementById('np-art');
+  var mobileNav = document.getElementById('mobile-nav');
   if (!_currentTrack) {
     bar.classList.remove('active');
+    if (mobileNav) mobileNav.classList.remove('player-active');
     art.innerHTML = '';
     document.getElementById('np-name').textContent = 'Choose a track';
     document.getElementById('np-genre').textContent = 'Your private AI label is ready.';
@@ -4304,6 +4308,7 @@ function updateNowPlaying() {
   }
 
   bar.classList.add('active');
+  if (mobileNav) mobileNav.classList.add('player-active');
   art.innerHTML = buildCoverArt(_currentTrack, 'sm', false);
   document.getElementById('np-name').textContent = _currentTrack.title;
   document.getElementById('np-genre').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno');
