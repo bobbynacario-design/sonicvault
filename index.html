@@ -4347,6 +4347,7 @@ function startPlayback(id, queueIds, queueLabel) {
     privateTrack.plays = Number(privateTrack.plays || 0) + 1;
     if (track !== privateTrack) track.plays = Number(track.plays || 0) + 1;
     save('tracks', tracks);
+    invalidateFilterCache();
     rememberPlayback(privateTrack);
   } else {
     track.plays = Number(track.plays || 0) + 1;
@@ -5064,8 +5065,22 @@ function renderRouteAwareView(skipScroll) {
   if (!skipScroll) window.scrollTo({ top:0, behavior:'smooth' });
 }
 
+// Cached filtered/sorted tracks. Invalidated when filter state, search,
+// sort, or the tracks array length/version changes. Edits to existing
+// tracks bump _tracksVersion via invalidateFilterCache().
+var _filterCache = { key: null, result: null };
+var _tracksVersion = 0;
+function invalidateFilterCache() { _tracksVersion++; _filterCache.key = null; }
+
 function getFilteredTracks() {
   var searchVal = lower(document.getElementById('search-input') ? document.getElementById('search-input').value : '');
+  var cacheKey = [
+    searchVal, _genreFilter, _moodFilter, _sourceFilter, _tagFilter || '',
+    _sortMode || '', tracks.length, _tracksVersion
+  ].join('|');
+  if (_filterCache.key === cacheKey && _filterCache.result) {
+    return _filterCache.result.slice();
+  }
   var filtered = tracks.filter(function(track) {
     var haystack = [
       track.title,
@@ -5103,7 +5118,9 @@ function getFilteredTracks() {
     filtered.sort(function(a, b) { return trackTimestamp(b) - trackTimestamp(a); });
   }
 
-  return filtered;
+  _filterCache.key = cacheKey;
+  _filterCache.result = filtered;
+  return filtered.slice();
 }
 
 function renderBrowseSummary(filtered) {
@@ -5327,6 +5344,7 @@ function deleteTrack(id) {
     pl.trackIds = (pl.trackIds || []).filter(function(trackId) { return trackId !== id; });
   });
   save('tracks', tracks);
+  invalidateFilterCache();
   persistPlaylists();
   if (_currentTrack && _currentTrack.id === id) {
     _audio.pause();
@@ -5951,6 +5969,7 @@ async function saveAllUploads() {
     tracks = createdTracks.concat(tracks);
     window.tracks = tracks;
     save('tracks', tracks);
+    invalidateFilterCache();
   }
 
   var failedCount = _pendingUploads.filter(function(item) { return item.status === 'error'; }).length;
