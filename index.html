@@ -1392,6 +1392,18 @@ body.light .playlist-track-pill{background:rgba(0,0,0,.03)}
   display:grid;
   gap:.95rem;
 }
+.upload-lyrics-banner{
+  padding:.85rem 1rem;
+  border-radius:14px;
+  background:rgba(255,124,116,.12);
+  border:1px solid rgba(255,124,116,.45);
+  color:var(--danger);
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.04em;
+  line-height:1.55;
+  text-transform:uppercase;
+}
 .upload-editor-head{
   display:flex;
   align-items:flex-end;
@@ -5731,8 +5743,13 @@ function renderUploadEditor() {
   var aiState = item.aiStatus === 'generating' ? 'Generating metadata...' : item.aiStatus === 'error' ? ('AI metadata failed: ' + esc(item.aiError || 'Unknown error')) : item.aiGeneratedAt ? ((aiSourceLabel || 'AI') + ' metadata generated ' + esc(new Date(item.aiGeneratedAt).toLocaleString())) : 'Generate metadata from title, prompt, and lyrics when you are ready.';
   var aiFacts = [item.aiTheme, item.aiEnergy, item.aiVocalStyle, item.aiEra].filter(Boolean);
 
+  var lyricsBanner = !hasLyrics(item)
+    ? '<div class="upload-lyrics-banner" role="alert">⚠ Lyrics required — paste the full lyric sheet below before this track can be saved to the vault.</div>'
+    : '';
+
   el.innerHTML = ''
     + '<div class="upload-editor-card">'
+    +   lyricsBanner
     +   '<div class="upload-editor-head"><div class="upload-editor-copy"><div class="section-kicker">Focused release</div><div class="section-title" style="font-size:28px">' + esc(item.title || 'Untitled release') + '</div><div class="upload-editor-meta">' + esc(item.file.name) + ' / ' + formatFileSize(item.file.size) + ' / ' + (item.duration ? fmtTime(item.duration) : 'Length pending') + '</div></div><div class="upload-editor-nav"><button class="sec-action" onclick="stepUploadFocus(-1)"' + (_pendingUploads[0] && _pendingUploads[0].id === item.id ? ' disabled' : '') + '>Prev</button><button class="sec-action" onclick="stepUploadFocus(1)"' + (_pendingUploads[_pendingUploads.length - 1] && _pendingUploads[_pendingUploads.length - 1].id === item.id ? ' disabled' : '') + '>Next</button><div class="upload-queue-status">' + esc(item.status === 'done' ? 'Saved to vault' : item.status === 'error' ? 'Needs retry' : item.status === 'uploading' ? 'Uploading now' : 'Ready to save') + '</div></div></div>'
     +   buildCoverArt(item, 'md', true)
     +   '<div class="form-grid">'
