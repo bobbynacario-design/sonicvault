@@ -4245,6 +4245,11 @@ function updateNowPlaying() {
   if (_routeState.mode !== 'app') renderRouteAwareView(true);
 }
 
+// Throttle the expensive expanded-waveform DOM rebuild to ~5fps.
+// timeupdate fires ~60x/sec; rebuilding 72 bars on each tick caused
+// noticeable layout cost during long tracks.
+var _lastWaveDraw = 0;
+var WAVE_DRAW_INTERVAL_MS = 200;
 _audio.addEventListener('timeupdate', function() {
   if (!_currentTrack) return;
   var pct = _audio.duration ? (_audio.currentTime / _audio.duration) * 100 : 0;
@@ -4254,9 +4259,13 @@ _audio.addEventListener('timeupdate', function() {
   document.getElementById('xp-current').textContent = fmtTime(_audio.currentTime);
   document.getElementById('xp-total').textContent = fmtTime(_audio.duration || _currentTrack.duration || 0);
   document.getElementById('xp-progress-fill').style.width = pct + '%';
-  var xpWave = document.getElementById('xp-wave');
-  if (xpWave && document.getElementById('modal-now-playing').classList.contains('open')) {
-    xpWave.innerHTML = renderExpandedWaveform(_currentTrack);
+  var now = Date.now();
+  if (now - _lastWaveDraw >= WAVE_DRAW_INTERVAL_MS) {
+    var xpWave = document.getElementById('xp-wave');
+    if (xpWave && document.getElementById('modal-now-playing').classList.contains('open')) {
+      xpWave.innerHTML = renderExpandedWaveform(_currentTrack);
+      _lastWaveDraw = now;
+    }
   }
   updateMediaSessionPosition();
 });
