@@ -813,7 +813,7 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
 .filter-chip.active{color:var(--accent-dynamic);border-color:var(--accent-ghost);background:var(--accent-dynamic-soft)}
 .browse-summary{
   margin-top:1rem;
-  padding-top:1rem;
+  padding:1rem 0 .8rem;
   border-top:1px solid var(--rim);
   display:flex;
   align-items:center;
@@ -824,6 +824,27 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   font-size:13px;
 }
 .browse-summary strong{color:var(--text)}
+.browse-summary.has-filters{
+  position:sticky;
+  top:0;
+  z-index:6;
+  background:linear-gradient(180deg, var(--bg) 70%, transparent);
+  backdrop-filter:blur(8px);
+}
+.browse-clear-pill{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  padding:.5rem .9rem;
+  border-radius:999px;
+  border:1px solid var(--accent);
+  color:var(--accent);
+  background:rgba(240,139,98,.12);
+  cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.browse-clear-pill:hover{background:var(--accent);color:#fff}
 
 .track-grid{
   display:grid;
@@ -5193,7 +5214,14 @@ function renderBrowseSummary(filtered) {
   if (_sourceFilter !== 'All') filters.push('source: ' + _sourceFilter);
   if (_tagFilter) filters.push('tag: ' + _tagFilter);
   if (_sortMode !== 'newest') filters.push('sort: ' + _sortMode.replace('-', ' '));
-  el.innerHTML = '<div><strong>' + filtered.length + '</strong> track' + (filtered.length !== 1 ? 's' : '') + ' in view.</div><div>' + (filters.length ? 'Active filters: ' + esc(filters.join(' / ')) : 'Showing the full collection in listening-first order.') + '</div>';
+  var clearBtn = filters.length
+    ? '<button class="browse-clear-pill" onclick="clearFilters()">Clear all filters</button>'
+    : '';
+  el.classList.toggle('has-filters', filters.length > 0);
+  el.innerHTML = ''
+    + '<div><strong>' + filtered.length + '</strong> track' + (filtered.length !== 1 ? 's' : '') + ' in view.</div>'
+    + '<div>' + (filters.length ? 'Active filters: ' + esc(filters.join(' / ')) : 'Showing the full collection in listening-first order.') + '</div>'
+    + clearBtn;
 }
 
 function buildMiniTrackCard(track, queueLabel, queueIds) {
