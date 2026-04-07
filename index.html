@@ -4428,8 +4428,7 @@ function startPlayback(id, queueIds, queueLabel) {
   if (privateTrack) {
     privateTrack.plays = Number(privateTrack.plays || 0) + 1;
     if (track !== privateTrack) track.plays = Number(track.plays || 0) + 1;
-    save('tracks', tracks);
-    invalidateFilterCache();
+    persistTracks();
     rememberPlayback(privateTrack);
   } else {
     track.plays = Number(track.plays || 0) + 1;
@@ -4512,6 +4511,15 @@ function persistPlaylists() {
   playlists.forEach(function(pl) {
     if (pl.shared) syncSharedPlaylist(pl);
   });
+}
+
+// Mirror of persistPlaylists() for tracks. All track mutations should
+// route through here so the filter cache is busted in one place
+// instead of every call site remembering to call invalidateFilterCache().
+function persistTracks() {
+  window.tracks = tracks;
+  save('tracks', tracks);
+  invalidateFilterCache();
 }
 
 function duplicatePlaylist(id) {
@@ -5428,12 +5436,10 @@ function toggleExpand(id) {
 function deleteTrack(id) {
   if (!confirm('Delete this track from SonicVault?')) return;
   tracks = tracks.filter(function(track) { return track.id !== id; });
-  window.tracks = tracks;
   playlists.forEach(function(pl) {
     pl.trackIds = (pl.trackIds || []).filter(function(trackId) { return trackId !== id; });
   });
-  save('tracks', tracks);
-  invalidateFilterCache();
+  persistTracks();
   invalidateVisualWaveform(id);
   persistPlaylists();
   if (_currentTrack && _currentTrack.id === id) {
@@ -5450,7 +5456,7 @@ async function shareTrack(id) {
   var track = getTrackById(id);
   if (!track) return;
   track.shared = true;
-  save('tracks', tracks);
+  persistTracks();
   try {
     if (window.fbPublishShare) await window.fbPublishShare('track', track.id, buildTrackSharePayload(track));
     openShareLinkModal('Share "' + track.title + '"', 'Anyone with the link can jump straight into this track.', buildShareURL('track', track.id));
@@ -6084,9 +6090,7 @@ async function saveAllUploads() {
 
   if (createdTracks.length) {
     tracks = createdTracks.concat(tracks);
-    window.tracks = tracks;
-    save('tracks', tracks);
-    invalidateFilterCache();
+    persistTracks();
   }
 
   var failedCount = _pendingUploads.filter(function(item) { return item.status === 'error'; }).length;
