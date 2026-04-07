@@ -4518,7 +4518,7 @@ function mergePlaylistEditDraft(pl) {
   var colorInput = document.getElementById('pl-edit-color');
   if (nameInput && nameInput.value.trim()) pl.name = nameInput.value.trim();
   if (descInput) pl.desc = descInput.value.trim();
-  if (colorInput) pl.color = colorInput.value;
+  if (colorInput) pl.color = safePlaylistColor(colorInput.value);
 }
 
 function shufflePlaylistMix(id) {
@@ -4583,7 +4583,7 @@ function savePlaylistEdits(id) {
   var descInput = document.getElementById('pl-edit-desc');
   var colorInput = document.getElementById('pl-edit-color');
   pl.desc = descInput ? descInput.value.trim() : '';
-  pl.color = colorInput ? colorInput.value : (pl.color || '#F08B62');
+  pl.color = safePlaylistColor(colorInput ? colorInput.value : pl.color);
   persistPlaylists();
   renderPlaylists();
   _editingPlaylistId = '';
@@ -5468,12 +5468,26 @@ function renderPlaylistHero() {
   }).join('') + '</div></div></div></div></div>';
 }
 
-// Returns a sanitized playlist accent color. Falls back to the default
-// if the input is empty or not a 3/6-digit hex literal. Fix #8 tightens
-// this to an explicit whitelist of allowed accent values.
+// Whitelist of allowed playlist accent colors. Anything not in this set
+// is coerced to the default. Keeps the inline style attribute safe and
+// the visual palette consistent across the app.
+var PLAYLIST_COLOR_OPTIONS = [
+  { value:'#F08B62', label:'Coral' },
+  { value:'#78D0A4', label:'Green' },
+  { value:'#79A6FF', label:'Blue' },
+  { value:'#A794FF', label:'Violet' },
+  { value:'#F3CA78', label:'Amber' },
+  { value:'#FF7C74', label:'Red' }
+];
+var PLAYLIST_COLOR_DEFAULT = '#F08B62';
+var PLAYLIST_COLOR_SET = (function() {
+  var set = {};
+  PLAYLIST_COLOR_OPTIONS.forEach(function(opt) { set[opt.value.toUpperCase()] = true; });
+  return set;
+})();
 function safePlaylistColor(c) {
-  if (typeof c === 'string' && /^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(c)) return c;
-  return '#F08B62';
+  if (typeof c !== 'string') return PLAYLIST_COLOR_DEFAULT;
+  return PLAYLIST_COLOR_SET[c.toUpperCase()] ? c : PLAYLIST_COLOR_DEFAULT;
 }
 
 // Emit a CSS variable bundle from a playlist's accent color so child
@@ -5531,7 +5545,7 @@ function addPlaylist() {
   var playlist = {
     id: 'pl-' + Date.now(),
     name: name,
-    color: document.getElementById('pl-color').value || '#F08B62',
+    color: safePlaylistColor(document.getElementById('pl-color').value),
     desc: document.getElementById('pl-desc').value || '',
     trackIds: tids
   };
@@ -5560,14 +5574,7 @@ function viewPlaylist(id) {
   var items = getPlaylistTracks(pl);
   var isPrivatePlaylist = playlists.some(function(item) { return item.id === id; });
   var isEditing = isPrivatePlaylist && _editingPlaylistId === id;
-  var colorOptions = [
-    { value:'#F08B62', label:'Coral' },
-    { value:'#78D0A4', label:'Green' },
-    { value:'#79A6FF', label:'Blue' },
-    { value:'#A794FF', label:'Violet' },
-    { value:'#F3CA78', label:'Amber' },
-    { value:'#FF7C74', label:'Red' }
-  ];
+  var colorOptions = PLAYLIST_COLOR_OPTIONS;
   var actionRow = '<button class="sec-action primary" onclick="playPlaylist(' + jsq(pl.id) + ');closeModal(\'modal-playlist-detail\')">Play all</button>';
   if (isPrivatePlaylist) {
     actionRow += '<button class="sec-action" onclick="shufflePlaylistMix(' + jsq(pl.id) + ')">Shuffle this mix</button><button class="sec-action" onclick="duplicatePlaylist(' + jsq(pl.id) + ')">Duplicate</button><button class="sec-action" onclick="' + (isEditing ? 'savePlaylistEdits(' + jsq(pl.id) + ')' : 'setPlaylistEditMode(' + jsq(pl.id) + ', true)') + '">' + (isEditing ? 'Save edits' : 'Edit mix') + '</button><button class="sec-action" onclick="sharePlaylist(' + jsq(pl.id) + ')">Share playlist</button>';
