@@ -294,6 +294,11 @@ body.light::after{
 a{color:inherit}
 button,input,select,textarea{font:inherit}
 button{border:none;background:none}
+/* Accessible focus ring — keyboard nav only, no outline on mouse click */
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--accent-dynamic);outline-offset:2px;border-radius:6px}
+button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--accent-dynamic);outline-offset:2px;border-radius:8px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent-dynamic);outline-offset:1px}
 ::selection{background:var(--accent-dynamic-soft)}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-track{background:transparent}
