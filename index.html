@@ -5418,6 +5418,21 @@ function renderPlaylistHero() {
   }).join('') + '</div></div></div></div></div>';
 }
 
+// Returns a sanitized playlist accent color. Falls back to the default
+// if the input is empty or not a 3/6-digit hex literal. Fix #8 tightens
+// this to an explicit whitelist of allowed accent values.
+function safePlaylistColor(c) {
+  if (typeof c === 'string' && /^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(c)) return c;
+  return '#F08B62';
+}
+
+// Emit a CSS variable bundle from a playlist's accent color so child
+// elements can use var(--pl-accent) instead of repeating raw hex values.
+function playlistAccentVars(pl) {
+  var c = safePlaylistColor(pl && pl.color);
+  return '--pl-accent:' + c + ';--pl-accent-rim:' + c + '66;--pl-accent-soft:' + c + '1f';
+}
+
 function renderPlaylists() {
   renderPlaylistHero();
   var el = document.getElementById('playlist-grid');
@@ -5432,7 +5447,7 @@ function renderPlaylists() {
   }).map(function(pl) {
     var items = getPlaylistTracks(pl);
     var totalDuration = getCollectionDuration(items);
-    return '<div class="playlist-card" onclick="viewPlaylist(' + jsq(pl.id) + ')"><div class="playlist-card-top">' + buildPlaylistCover(pl, 'sm') + '<div><div class="section-kicker" style="margin-bottom:.35rem;color:' + esc(pl.color || '#F08B62') + '">Curated playlist</div><div class="playlist-name">' + esc(pl.name) + '</div><div class="playlist-desc">' + esc(pl.desc || 'An editorial mix from the vault.') + '</div><div class="pill-row" style="margin-top:.7rem"><span class="meta-pill highlight" style="color:' + esc(pl.color || '#F08B62') + ';border-color:' + esc(pl.color || '#F08B62') + '66;background:' + esc(pl.color || '#F08B62') + '1f">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(totalDuration) + '</span><span class="meta-pill">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + ' plays</span></div></div></div><div class="playlist-track-list">' + (items.slice(0, 3).map(function(track, index) {
+    return '<div class="playlist-card" style="' + playlistAccentVars(pl) + '" onclick="viewPlaylist(' + jsq(pl.id) + ')"><div class="playlist-card-top">' + buildPlaylistCover(pl, 'sm') + '<div><div class="section-kicker" style="margin-bottom:.35rem;color:var(--pl-accent)">Curated playlist</div><div class="playlist-name">' + esc(pl.name) + '</div><div class="playlist-desc">' + esc(pl.desc || 'An editorial mix from the vault.') + '</div><div class="pill-row" style="margin-top:.7rem"><span class="meta-pill highlight" style="color:var(--pl-accent);border-color:var(--pl-accent-rim);background:var(--pl-accent-soft)">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(totalDuration) + '</span><span class="meta-pill">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + ' plays</span></div></div></div><div class="playlist-track-list">' + (items.slice(0, 3).map(function(track, index) {
       return '<div class="playlist-track-pill"><div class="playlist-track-pill-main"><span class="playlist-track-order">' + (index + 1) + '</span><span>' + esc(track.title) + '</span></div><span>' + esc(track.mood || 'Mood') + '</span></div>';
     }).join('') || '<div class="playlist-track-pill"><span>Empty playlist</span><span>Ready for curation</span></div>') + '</div><div class="section-action-row"><button class="sec-action primary" onclick="event.stopPropagation();playPlaylist(' + jsq(pl.id) + ')">Play</button><button class="sec-action" onclick="event.stopPropagation();sharePlaylist(' + jsq(pl.id) + ')">Share</button><button class="sec-action" onclick="event.stopPropagation();deletePlaylist(' + jsq(pl.id) + ')">Delete</button></div></div>';
   }).join('');
@@ -5509,7 +5524,7 @@ function viewPlaylist(id) {
   } else {
     actionRow += '<button class="sec-action" onclick="openShareLinkModal(' + jsq('Share \"' + pl.name + '\"') + ', ' + jsq('Send the playlist link for a front-to-back listen.') + ', ' + jsq(buildShareURL('playlist', pl.id)) + ')">Copy share link</button>';
   }
-  var html = '<div class="playlist-modal-hero">' + buildPlaylistCover(pl, 'sm') + '<div><div class="section-kicker" style="color:' + esc(pl.color || '#F08B62') + '">' + (isEditing ? 'Edit mixtape' : 'Playlist detail') + '</div><div class="modal-title" style="margin-bottom:.55rem;color:' + esc(pl.color || '#F08B62') + '">' + esc(pl.name) + '</div><div class="section-sub">' + esc(pl.desc || 'An editorial mix from the vault.') + '</div><div class="pill-row" style="margin-top:.85rem"><span class="meta-pill highlight" style="color:' + esc(pl.color || '#F08B62') + ';border-color:' + esc(pl.color || '#F08B62') + '66;background:' + esc(pl.color || '#F08B62') + '1f">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(items)) + '</span><span class="meta-pill">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + ' plays</span></div><div class="section-action-row" style="margin-top:1rem">' + actionRow + '</div></div></div>';
+  var html = '<div class="playlist-modal-hero" style="' + playlistAccentVars(pl) + '">' + buildPlaylistCover(pl, 'sm') + '<div><div class="section-kicker" style="color:var(--pl-accent)">' + (isEditing ? 'Edit mixtape' : 'Playlist detail') + '</div><div class="modal-title" style="margin-bottom:.55rem;color:var(--pl-accent)">' + esc(pl.name) + '</div><div class="section-sub">' + esc(pl.desc || 'An editorial mix from the vault.') + '</div><div class="pill-row" style="margin-top:.85rem"><span class="meta-pill highlight" style="color:var(--pl-accent);border-color:var(--pl-accent-rim);background:var(--pl-accent-soft)">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(items)) + '</span><span class="meta-pill">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + ' plays</span></div><div class="section-action-row" style="margin-top:1rem">' + actionRow + '</div></div></div>';
 
   if (isEditing) {
     html += '<div class="playlist-edit-shell"><div class="playlist-edit-card"><div class="form-grid"><div class="form-group"><label class="form-label">Playlist name</label><input class="form-input" type="text" id="pl-edit-name" value="' + attr(pl.name) + '"></div><div class="form-group"><label class="form-label">Accent color</label><select class="form-input" id="pl-edit-color">' + colorOptions.map(function(option) { return '<option value="' + option.value + '"' + ((pl.color || '#F08B62') === option.value ? ' selected' : '') + '>' + option.label + '</option>'; }).join('') + '</select></div></div><div class="form-group" style="margin-top:.8rem"><label class="form-label">Description</label><textarea class="form-input" id="pl-edit-desc" rows="4">' + esc(pl.desc || '') + '</textarea></div><div class="playlist-edit-actions"><button class="sec-action" onclick="setPlaylistEditMode(' + jsq(pl.id) + ', false)">Cancel</button><button class="sec-action primary" onclick="savePlaylistEdits(' + jsq(pl.id) + ')">Save mixtape</button></div></div>';
