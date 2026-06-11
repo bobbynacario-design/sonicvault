@@ -186,6 +186,10 @@ Applied via `body.light` class toggle. All component overrides use `body.light .
 - [x] Audio playback with waveform visualization
 - [x] Now-playing bar with seek/progress
 - [x] Auto-advance to next track
+- [x] Shuffle mode (Fisher-Yates over the active queue, current track pinned first)
+- [x] Repeat modes: off / queue / one
+- [x] Volume slider + playback speed cycle (0.75x-2x) in the expanded player
+- [x] Player prefs persisted device-locally in `sv_player_prefs` (not synced to Firestore)
 - [x] Library view with search and genre filtering
 - [x] Track detail expansion (click to reveal Suno prompt)
 - [x] Playlists — create, view, delete, with track selection
@@ -249,8 +253,10 @@ The Firebase Admin service account JSON (`pokerhq-a67e4-firebase-adminsdk-fbsvc-
   - `sonicvault-bob/tracks`
   - `sonicvault-bob/playlists`
   - `sonicvault-bob/settings`
-- Apply the repo's `firestore.rules` before considering the deployment hardened.
-- Replace `replace-with-owner-email@example.com` in `firestore.rules` with the real owner email, or set a custom auth claim like `sonicvaultOwner: true` on the owner account.
+- DONE (2026-06-11): `firestore.rules` now carries the FULL project ruleset (Daily Briefer + PokerHQ + SonicVault) with the owner email set to `bobbynacario@gmail.com`, and was deployed via `firebase deploy --only firestore:rules`. Unauthenticated reads of `sonicvault-bob` return 403; public share collections remain world-readable.
+- The repo also has `firebase.json` + `.firebaserc` so future rule deploys are just `firebase deploy --only firestore:rules`.
+- IMPORTANT: because Firestore deploys ALL rules at once, `firestore.rules` here includes the PokerHQ and Daily Briefer blocks. Never trim it back to SonicVault-only rules.
+- After this change, the web app must be signed in (Owner button, Google account `bobbynacario@gmail.com`) on each device to read/write the private vault. The watcher is unaffected (Admin SDK bypasses rules).
 
 ## Cloudinary Hardening
 - The web UI still uses an unsigned preset because GitHub Pages cannot safely mint signed uploads client-side.

@@ -2143,6 +2143,52 @@ body.light .player-modal{
   color:#fff;
   border-color:transparent;
 }
+.player-btn.mode-on{
+  color:var(--accent-dynamic);
+  border-color:var(--accent-ghost);
+  background:var(--accent-dynamic-soft);
+}
+.player-sound-row{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:.7rem;
+  flex-wrap:wrap;
+  margin-top:.65rem;
+}
+.player-sound-label{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.vol-slider{
+  -webkit-appearance:none;
+  appearance:none;
+  width:150px;
+  height:4px;
+  border-radius:999px;
+  background:var(--rim2);
+  outline:none;
+  cursor:pointer;
+}
+.vol-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  appearance:none;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:var(--accent-dynamic);
+  border:none;
+}
+.vol-slider::-moz-range-thumb{
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:var(--accent-dynamic);
+  border:none;
+}
 .player-side-card .section-kicker{margin-bottom:.35rem}
 .queue-list,
 .playlist-chip-list,
@@ -2368,6 +2414,12 @@ body.light .now-playing-bar{
   background:linear-gradient(135deg, var(--accent-dynamic), var(--accent2));
   color:#fff;
   border-color:transparent;
+}
+.np-btn.mode-btn{width:40px;height:40px;font-size:10px}
+.np-btn.mode-on{
+  color:var(--accent-dynamic);
+  border-color:var(--accent-ghost);
+  background:var(--accent-dynamic-soft);
 }
 
 #sv-toast{
@@ -2814,9 +2866,18 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
             </div>
 
             <div class="player-controls">
+              <button class="player-btn" id="xp-shuffle-btn" onclick="toggleShuffle()">Shuffle: Off</button>
               <button class="player-btn" onclick="playPrevious()">Prev</button>
               <button class="player-btn primary" id="xp-play-btn" onclick="togglePlayback()">Play</button>
               <button class="player-btn" onclick="playNext()">Next</button>
+              <button class="player-btn" id="xp-repeat-btn" onclick="cycleRepeat()">Repeat: Off</button>
+            </div>
+
+            <div class="player-sound-row">
+              <span class="player-sound-label">Vol</span>
+              <input type="range" class="vol-slider" id="xp-volume" min="0" max="100" step="1" value="100" oninput="setPlayerVolume(this.value / 100)" aria-label="Volume">
+              <span class="player-sound-label" id="xp-volume-pct">100%</span>
+              <button class="player-btn" id="xp-rate-btn" onclick="cyclePlaybackRate()" title="Playback speed">1x</button>
             </div>
 
             <div class="section-action-row">
@@ -2882,9 +2943,11 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
     </div>
   </div>
   <div class="np-controls">
+    <button class="np-btn mode-btn" id="np-shuffle-btn" title="Shuffle" onclick="event.stopPropagation();toggleShuffle()">Shuf</button>
     <button class="np-btn" onclick="event.stopPropagation();playPrevious()">Prev</button>
     <button class="np-btn primary" id="np-play-btn" onclick="event.stopPropagation();togglePlayback()">Play</button>
     <button class="np-btn" onclick="event.stopPropagation();playNext()">Next</button>
+    <button class="np-btn mode-btn" id="np-repeat-btn" title="Repeat" onclick="event.stopPropagation();cycleRepeat()">Rep</button>
   </div>
 </div>
 <script>
@@ -3003,6 +3066,15 @@ var _publicRoutePayload = null;
 var _publicRouteLoading = false;
 var _mediaSessionActionBound = false;
 var _mediaSessionArtworkCache = {};
+var PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2];
+var _playerPrefs = loadPlayerPrefs();
+var _shuffleMode = _playerPrefs.shuffle === true;
+var _repeatMode = (_playerPrefs.repeat === 'all' || _playerPrefs.repeat === 'one') ? _playerPrefs.repeat : 'off';
+var _playbackRate = PLAYBACK_RATES.indexOf(Number(_playerPrefs.rate)) !== -1 ? Number(_playerPrefs.rate) : 1;
+var _shuffleOrder = [];
+_audio.volume = (typeof _playerPrefs.volume === 'number' && _playerPrefs.volume >= 0 && _playerPrefs.volume <= 1) ? _playerPrefs.volume : 1;
+_audio.defaultPlaybackRate = _playbackRate;
+_audio.playbackRate = _playbackRate;
 var _aiConfig = loadLocalAIConfig();
 var AI_METADATA_VERSION = 1;
 
@@ -4160,8 +4232,11 @@ function getCollectionDuration(list) {
 }
 
 function setPlaybackQueue(ids, label) {
-  _playQueueIds = (ids || []).slice();
+  var next = (ids || []).slice();
+  var changed = next.length !== _playQueueIds.length || next.some(function(id, i) { return id !== _playQueueIds[i]; });
+  _playQueueIds = next;
   _playQueueLabel = label || 'Vault';
+  if (_shuffleMode && (changed || _shuffleOrder.length !== _playQueueIds.length)) rebuildShuffleOrder();
   if (_currentTrack) updateMediaSession();
 }
 
@@ -4169,22 +4244,130 @@ function getQueueTracks() {
   return _playQueueIds.map(function(id) { return getTrackById(id); }).filter(Boolean);
 }
 
+// Fisher-Yates over the canonical queue. The current track is pinned to
+// the front so toggling shuffle mid-listen never causes an instant skip.
+function rebuildShuffleOrder() {
+  var ids = _playQueueIds.slice();
+  for (var i = ids.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = ids[i];
+    ids[i] = ids[j];
+    ids[j] = temp;
+  }
+  if (_currentTrack) {
+    var idx = ids.indexOf(_currentTrack.id);
+    if (idx > 0) {
+      ids.splice(idx, 1);
+      ids.unshift(_currentTrack.id);
+    }
+  }
+  _shuffleOrder = ids;
+}
+
+// Queue in the order playback will actually walk it: shuffled when
+// shuffle is on, canonical otherwise.
+function getOrderedQueueTracks() {
+  var ids = _shuffleMode && _shuffleOrder.length === _playQueueIds.length ? _shuffleOrder : _playQueueIds;
+  return ids.map(function(id) { return getTrackById(id); }).filter(Boolean);
+}
+
 function getNextTrack() {
   if (!_currentTrack) return null;
-  var queue = getQueueTracks();
+  var queue = getOrderedQueueTracks();
   if (!queue.length) return null;
   var idx = queue.findIndex(function(track) { return track.id === _currentTrack.id; });
-  if (idx === -1 || idx >= queue.length - 1) return null;
+  if (idx === -1) return null;
+  if (idx >= queue.length - 1) return _repeatMode === 'all' ? queue[0] : null;
   return queue[idx + 1];
 }
 
 function getPreviousTrack() {
   if (!_currentTrack) return null;
-  var queue = getQueueTracks();
+  var queue = getOrderedQueueTracks();
   if (!queue.length) return null;
   var idx = queue.findIndex(function(track) { return track.id === _currentTrack.id; });
-  if (idx <= 0) return null;
+  if (idx === -1) return null;
+  if (idx <= 0) return _repeatMode === 'all' ? queue[queue.length - 1] : null;
   return queue[idx - 1];
+}
+
+function loadPlayerPrefs() {
+  try { return JSON.parse(localStorage.getItem('sv_player_prefs')) || {}; } catch (e) { return {}; }
+}
+
+function savePlayerPrefs() {
+  localStorage.setItem('sv_player_prefs', JSON.stringify({
+    shuffle: _shuffleMode,
+    repeat: _repeatMode,
+    volume: _audio.volume,
+    rate: _playbackRate
+  }));
+}
+
+function toggleShuffle() {
+  _shuffleMode = !_shuffleMode;
+  if (_shuffleMode) rebuildShuffleOrder();
+  savePlayerPrefs();
+  updatePlayerModeUI();
+  if (_currentTrack) updateNowPlaying();
+  showToast(_shuffleMode ? 'Shuffle on' : 'Shuffle off');
+}
+
+function cycleRepeat() {
+  _repeatMode = _repeatMode === 'off' ? 'all' : (_repeatMode === 'all' ? 'one' : 'off');
+  savePlayerPrefs();
+  updatePlayerModeUI();
+  if (_currentTrack) updateNowPlaying();
+  showToast(_repeatMode === 'off' ? 'Repeat off' : (_repeatMode === 'all' ? 'Repeat queue' : 'Repeat one'));
+}
+
+function setPlayerVolume(value) {
+  var vol = Math.max(0, Math.min(1, Number(value) || 0));
+  _audio.volume = vol;
+  savePlayerPrefs();
+  updatePlayerModeUI();
+}
+
+function applyPlaybackRate() {
+  _audio.defaultPlaybackRate = _playbackRate;
+  _audio.playbackRate = _playbackRate;
+}
+
+function cyclePlaybackRate() {
+  var idx = PLAYBACK_RATES.indexOf(_playbackRate);
+  _playbackRate = PLAYBACK_RATES[(idx + 1) % PLAYBACK_RATES.length];
+  applyPlaybackRate();
+  savePlayerPrefs();
+  updatePlayerModeUI();
+  updateMediaSessionPosition();
+  showToast('Speed ' + _playbackRate + 'x');
+}
+
+function updatePlayerModeUI() {
+  var npShuffle = document.getElementById('np-shuffle-btn');
+  var npRepeat = document.getElementById('np-repeat-btn');
+  var xpShuffle = document.getElementById('xp-shuffle-btn');
+  var xpRepeat = document.getElementById('xp-repeat-btn');
+  var xpVolume = document.getElementById('xp-volume');
+  var xpVolumePct = document.getElementById('xp-volume-pct');
+  var xpRate = document.getElementById('xp-rate-btn');
+  if (npShuffle) npShuffle.classList.toggle('mode-on', _shuffleMode);
+  if (npRepeat) {
+    npRepeat.textContent = _repeatMode === 'one' ? 'Rep1' : 'Rep';
+    npRepeat.classList.toggle('mode-on', _repeatMode !== 'off');
+  }
+  if (xpShuffle) {
+    xpShuffle.textContent = _shuffleMode ? 'Shuffle: On' : 'Shuffle: Off';
+    xpShuffle.classList.toggle('mode-on', _shuffleMode);
+  }
+  if (xpRepeat) {
+    xpRepeat.textContent = _repeatMode === 'off' ? 'Repeat: Off' : (_repeatMode === 'all' ? 'Repeat: Queue' : 'Repeat: One');
+    xpRepeat.classList.toggle('mode-on', _repeatMode !== 'off');
+  }
+  var volPct = Math.round((_audio.volume || 0) * 100);
+  if (xpVolume && Number(xpVolume.value) !== volPct) xpVolume.value = volPct;
+  if (xpVolumePct) xpVolumePct.textContent = volPct + '%';
+  if (xpRate) xpRate.textContent = _playbackRate + 'x';
 }
 
 function applyTrackTint(track) {
@@ -4322,9 +4505,11 @@ function updateNowPlaying() {
   document.getElementById('np-name').textContent = _currentTrack.title;
   document.getElementById('np-genre').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno');
   var next = getNextTrack();
-  var queueCount = getQueueTracks().length;
+  var orderedQueue = getOrderedQueueTracks();
+  var queueCount = orderedQueue.length;
   var queueLine = _playQueueLabel + ' queue';
-  if (queueCount) queueLine += ' / ' + (getQueueTracks().findIndex(function(track) { return track.id === _currentTrack.id; }) + 1) + ' of ' + queueCount;
+  if (_shuffleMode) queueLine += ' / Shuffle';
+  if (queueCount) queueLine += ' / ' + (orderedQueue.findIndex(function(track) { return track.id === _currentTrack.id; }) + 1) + ' of ' + queueCount;
   if (next) queueLine += ' / Next: ' + next.title;
   document.getElementById('np-queue').textContent = queueLine;
   document.getElementById('np-play-btn').textContent = _isPlaying ? 'Pause' : 'Play';
@@ -4380,6 +4565,13 @@ _audio.addEventListener('pause', function() { if (typeof updateMobileNavPulse ==
 
 _audio.addEventListener('ended', function() {
   _isPlaying = false;
+  if (_repeatMode === 'one' && _currentTrack) {
+    _audio.currentTime = 0;
+    _audio.play().catch(function(e) { console.error('Repeat playback error:', e); });
+    _isPlaying = true;
+    updateNowPlaying();
+    return;
+  }
   var next = getNextTrack();
   if (next) {
     startPlayback(next.id, _playQueueIds, _playQueueLabel);
@@ -4435,6 +4627,7 @@ function startPlayback(id, queueIds, queueLabel) {
     return;
   }
 
+  applyPlaybackRate();
   _audio.play().catch(function(e) {
     console.error('Playback error:', e);
     showToast('Playback failed in this browser');
@@ -4650,6 +4843,7 @@ function renderExpandedWaveform(track) {
 function updateExpandedPlayer() {
   var title = document.getElementById('xp-title');
   if (!title) return;
+  updatePlayerModeUI();
   if (!_currentTrack) {
     title.textContent = 'Choose a track';
     document.getElementById('xp-cover').innerHTML = '';
@@ -4695,8 +4889,8 @@ function updateExpandedPlayer() {
   document.getElementById('xp-wave').innerHTML = renderExpandedWaveform(_currentTrack);
   document.getElementById('xp-play-btn').textContent = _isPlaying ? 'Pause' : 'Play';
 
-  var queueTracks = getQueueTracks();
-  document.getElementById('xp-queue-copy').textContent = queueTracks.length ? _playQueueLabel + ' / ' + queueTracks.length + ' track' + (queueTracks.length !== 1 ? 's' : '') : 'The active queue will show up here.';
+  var queueTracks = getOrderedQueueTracks();
+  document.getElementById('xp-queue-copy').textContent = queueTracks.length ? _playQueueLabel + (_shuffleMode ? ' / Shuffle' : '') + ' / ' + queueTracks.length + ' track' + (queueTracks.length !== 1 ? 's' : '') : 'The active queue will show up here.';
   document.getElementById('xp-queue-list').innerHTML = queueTracks.length ? queueTracks.map(function(track, index) {
     var isActive = _currentTrack && _currentTrack.id === track.id;
     return '<div class="queue-item' + (isActive ? ' active' : '') + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(_playQueueIds) + ', ' + jsq(_playQueueLabel) + ')"><div class="queue-num">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state">' + (isActive ? (_isPlaying ? 'Playing' : 'Paused') : 'Queued') + '</div></div>';
