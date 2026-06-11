@@ -442,8 +442,8 @@ body.light .section-card{background:linear-gradient(180deg, rgba(255,255,255,.78
 .sec-action{
   padding:.72rem 1.05rem;
   border-radius:999px;
-  border:1px solid var(--rim2);
-  background:rgba(255,255,255,.03);
+  border:1px solid transparent;
+  background:rgba(255,255,255,.05);
   color:var(--muted);
   cursor:pointer;
   font-family:var(--mono);
@@ -452,7 +452,8 @@ body.light .section-card{background:linear-gradient(180deg, rgba(255,255,255,.78
   text-transform:uppercase;
   transition:all .18s ease;
 }
-.sec-action:hover{color:var(--text);border-color:var(--accent-ghost);background:var(--accent-dynamic-soft)}
+.sec-action:hover{color:var(--text);background:var(--accent-dynamic-soft)}
+body.light .sec-action{background:rgba(0,0,0,.05)}
 .sec-action.primary{
   background:linear-gradient(135deg, var(--accent-dynamic), var(--accent2));
   color:#fff;
@@ -579,19 +580,25 @@ body.light .hero-main{
   font-size:13px;
   line-height:1.65;
 }
-.pill-row{display:flex;gap:.45rem;flex-wrap:wrap}
+.pill-row{display:flex;gap:.34rem .8rem;flex-wrap:wrap;align-items:center}
 .meta-pill{
-  padding:.36rem .7rem;
-  border-radius:999px;
-  border:1px solid var(--rim2);
-  background:rgba(255,255,255,.045);
+  padding:0;
+  border:none;
+  background:none;
   font-family:var(--mono);
   font-size:10px;
-  letter-spacing:.08em;
+  letter-spacing:.1em;
   text-transform:uppercase;
   color:var(--muted);
 }
-.meta-pill.highlight{color:var(--accent-dynamic);border-color:var(--accent-ghost);background:var(--accent-dynamic-soft)}
+.meta-pill:not(.highlight):not(.warn) + .meta-pill:not(.highlight):not(.warn)::before{content:'/';color:var(--muted2);margin-right:.55rem;opacity:.6}
+.meta-pill.highlight{
+  padding:.34rem .7rem;
+  border-radius:999px;
+  color:var(--accent-dynamic);
+  background:var(--accent-dynamic-soft);
+}
+.meta-pill.warn{color:var(--danger)}
 
 .hero-side{
   display:grid;
@@ -930,8 +937,8 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
 .action-btn,.icon-btn{
   padding:.56rem .8rem;
   border-radius:999px;
-  border:1px solid var(--rim);
-  background:rgba(255,255,255,.03);
+  border:1px solid transparent;
+  background:rgba(255,255,255,.05);
   color:var(--muted);
   cursor:pointer;
   transition:all .18s ease;
@@ -940,7 +947,8 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   letter-spacing:.08em;
   text-transform:uppercase;
 }
-.action-btn:hover,.icon-btn:hover{border-color:var(--accent-ghost);background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+.action-btn:hover,.icon-btn:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+body.light .action-btn,body.light .icon-btn{background:rgba(0,0,0,.05)}
 .action-btn.primary{
   background:linear-gradient(135deg, var(--accent-dynamic), var(--accent2));
   color:#fff;
@@ -952,18 +960,19 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   line-height:1.7;
 }
 .prompt-fragment strong{color:var(--text)}
-.track-tag-row{display:flex;gap:.45rem;flex-wrap:wrap}
+.track-tag-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.7}
 .track-tag{
-  padding:.36rem .62rem;
-  border-radius:999px;
-  background:rgba(255,255,255,.04);
-  border:1px solid var(--rim);
+  display:inline;
+  padding:0;
+  border:none;
+  background:none;
   font-family:var(--mono);
   font-size:10px;
-  letter-spacing:.08em;
+  letter-spacing:.1em;
   text-transform:uppercase;
   color:var(--muted2);
 }
+.track-tag + .track-tag::before{content:'\00B7';margin:0 .55rem;opacity:.7}
 .track-footer{
   display:grid;
   gap:.8rem;
@@ -973,11 +982,8 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   display:flex;
   align-items:flex-end;
   gap:2px;
-  height:54px;
-  padding:.75rem .8rem;
-  border-radius:18px;
-  background:rgba(255,255,255,.03);
-  border:1px solid var(--rim);
+  height:46px;
+  padding:.3rem 0 0;
   cursor:pointer;
 }
 .track-waveform .wbar{
@@ -993,7 +999,6 @@ body.light .wbar-inactive{background:rgba(0,0,0,.1)}
   padding:.95rem 1rem;
   border-radius:18px;
   background:rgba(255,255,255,.03);
-  border:1px solid var(--rim);
   display:none;
 }
 .track-card.expanded .track-expand{display:grid;gap:.85rem}
@@ -1003,12 +1008,9 @@ body.light .wbar-inactive{background:rgba(0,0,0,.1)}
   gap:.7rem;
 }
 .expand-item{
-  padding:.8rem;
-  border-radius:16px;
-  background:rgba(255,255,255,.03);
-  border:1px solid rgba(255,255,255,.04);
+  padding:.2rem 0;
 }
-body.light .expand-item{background:rgba(0,0,0,.03)}
+body.light .expand-item{background:none}
 .expand-label{
   font-family:var(--mono);
   font-size:9px;
@@ -1351,12 +1353,12 @@ body.light .playlist-track-pill{background:rgba(0,0,0,.03)}
   align-items:start;
   padding:.8rem;
   border-radius:22px;
-  border:1px solid var(--rim);
+  border:1px solid transparent;
   background:rgba(255,255,255,.035);
   cursor:pointer;
   transition:transform .16s ease,border-color .16s ease,background .16s ease;
 }
-.upload-queue-item:hover{transform:translateY(-1px);border-color:var(--rim2)}
+.upload-queue-item:hover{transform:translateY(-1px);background:rgba(255,255,255,.055)}
 .upload-queue-item.active{
   border-color:var(--accent-ghost);
   background:var(--accent-dynamic-soft);
@@ -1974,8 +1976,7 @@ body.light .player-modal{
 .player-prompt{
   padding:1rem 1.05rem;
   border-radius:20px;
-  border:1px solid var(--rim);
-  background:rgba(255,255,255,.035);
+  background:rgba(255,255,255,.03);
   color:var(--muted);
   line-height:1.75;
   font-size:14px;
@@ -1989,8 +1990,7 @@ body.light .player-modal{
 .player-copy-card{
   padding:1rem 1.05rem;
   border-radius:20px;
-  border:1px solid var(--rim);
-  background:rgba(255,255,255,.035);
+  background:rgba(255,255,255,.03);
   display:grid;
   gap:.7rem;
 }
@@ -2044,16 +2044,16 @@ body.light .player-modal{
   flex-wrap:wrap;
 }
 .player-ai-pill{
-  padding:.35rem .62rem;
-  border-radius:999px;
-  border:1px solid var(--rim2);
-  background:rgba(255,255,255,.04);
+  padding:0;
+  border:none;
+  background:none;
   font-family:var(--mono);
   font-size:10px;
-  letter-spacing:.08em;
+  letter-spacing:.1em;
   text-transform:uppercase;
   color:var(--muted);
 }
+.player-ai-pill + .player-ai-pill::before{content:'\00B7';margin:0 .5rem;opacity:.7;color:var(--muted2)}
 .player-copy-card .player-prompt{
   padding:0;
   border:none;
@@ -2126,8 +2126,8 @@ body.light .player-modal{
 .player-btn{
   padding:.88rem 1.05rem;
   border-radius:999px;
-  border:1px solid var(--rim2);
-  background:rgba(255,255,255,.04);
+  border:1px solid transparent;
+  background:rgba(255,255,255,.05);
   color:var(--muted);
   cursor:pointer;
   font-family:var(--mono);
@@ -2136,7 +2136,8 @@ body.light .player-modal{
   text-transform:uppercase;
   transition:all .18s ease;
 }
-.player-btn:hover{color:var(--accent-dynamic);border-color:var(--accent-ghost);background:var(--accent-dynamic-soft)}
+.player-btn:hover{color:var(--accent-dynamic);background:var(--accent-dynamic-soft)}
+body.light .player-btn{background:rgba(0,0,0,.05)}
 .player-btn.primary{
   min-width:104px;
   background:linear-gradient(135deg, var(--accent-dynamic), var(--accent2));
@@ -2145,7 +2146,6 @@ body.light .player-modal{
 }
 .player-btn.mode-on{
   color:var(--accent-dynamic);
-  border-color:var(--accent-ghost);
   background:var(--accent-dynamic-soft);
 }
 .player-sound-row{
@@ -2198,18 +2198,15 @@ body.light .player-modal{
   grid-template-columns:auto 58px minmax(0,1fr) auto;
   gap:.8rem;
   align-items:center;
-  padding:.7rem;
-  border-radius:18px;
-  border:1px solid transparent;
-  background:rgba(255,255,255,.035);
+  padding:.55rem .6rem;
+  border-radius:16px;
+  background:transparent;
   cursor:pointer;
-  transition:border-color .16s ease, transform .16s ease, background .16s ease;
+  transition:background .16s ease;
 }
-.queue-item:hover{border-color:var(--rim2);transform:translateY(-1px)}
-.queue-item.active{
-  border-color:var(--accent-ghost);
-  background:var(--accent-dynamic-soft);
-}
+.queue-item:hover{background:rgba(255,255,255,.045)}
+body.light .queue-item:hover{background:rgba(0,0,0,.04)}
+.queue-item.active{background:var(--accent-dynamic-soft)}
 .queue-num{
   font-family:var(--mono);
   font-size:10px;
@@ -2237,7 +2234,6 @@ body.light .player-modal{
   padding:.72rem .82rem;
   border-radius:18px;
   background:rgba(255,255,255,.035);
-  border:1px solid var(--rim);
 }
 .playlist-chip-copy{min-width:0}
 .playlist-chip-title{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2250,12 +2246,11 @@ body.light .player-modal{
   gap:.8rem;
   padding:.85rem;
   border-radius:20px;
-  border:1px solid var(--rim);
   background:rgba(255,255,255,.035);
   cursor:pointer;
-  transition:transform .16s ease,border-color .16s ease;
+  transition:transform .16s ease,background .16s ease;
 }
-.related-card:hover{transform:translateY(-2px);border-color:var(--rim2)}
+.related-card:hover{transform:translateY(-2px);background:rgba(255,255,255,.055)}
 .related-card .cover-art{width:100%;aspect-ratio:1/1}
 .related-title{
   font-size:14px;
@@ -2399,15 +2394,16 @@ body.light .now-playing-bar{
   display:flex;
   align-items:center;
   justify-content:center;
-  border:1px solid var(--rim2);
-  background:rgba(255,255,255,.04);
+  border:1px solid transparent;
+  background:rgba(255,255,255,.06);
   color:var(--muted);
   cursor:pointer;
   transition:all .18s ease;
   font-family:var(--mono);
   font-size:12px;
 }
-.np-btn:hover{border-color:var(--accent-ghost);background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+.np-btn:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+body.light .np-btn{background:rgba(0,0,0,.05)}
 .np-btn.primary{
   width:56px;
   height:56px;
@@ -2418,7 +2414,6 @@ body.light .now-playing-bar{
 .np-btn.mode-btn{width:40px;height:40px;font-size:10px}
 .np-btn.mode-on{
   color:var(--accent-dynamic);
-  border-color:var(--accent-ghost);
   background:var(--accent-dynamic-soft);
 }
 
@@ -3865,6 +3860,14 @@ function getWaveformCache() {
   return appSettings.waveformCache;
 }
 
+function getRealPeaksForTrack(track) {
+  if (!track) return [];
+  var cache = getWaveformCache()[track.id];
+  if (Array.isArray(cache) && cache.length) return cache.slice();
+  if (Array.isArray(track.peaks) && track.peaks.length) return track.peaks.slice();
+  return [];
+}
+
 function buildFallbackWaveform(track, count) {
   var len = count || 48;
   var seed = hashString((track && track.title || '') + '|' + (track && track.genre || '') + '|' + (track && track.mood || ''));
@@ -3907,10 +3910,12 @@ function getVisualWaveform(track, count) {
   var n = count || 48;
   var key = track.id + '|' + n;
   if (_visualWaveformCache[key]) return _visualWaveformCache[key];
+  // Real decoded peaks only: the extraction cache, then peaks stored on the
+  // track itself. Legacy track.waveform is random data and is never used.
   var cache = getWaveformCache()[track.id];
-  var bars = (Array.isArray(cache) && cache.length)
-    ? normalizeWaveform(cache, n)
-    : buildFallbackWaveform(track, n);
+  var source = (Array.isArray(cache) && cache.length) ? cache
+    : (Array.isArray(track.peaks) && track.peaks.length ? track.peaks : null);
+  var bars = source ? normalizeWaveform(source, n) : buildFallbackWaveform(track, n);
   _visualWaveformCache[key] = bars;
   return bars;
 }
@@ -3938,14 +3943,17 @@ function extractWaveformPeaks(buffer, count) {
   return peaks;
 }
 
-async function ensureWaveformForTrack(track) {
-  if (!track || !track.audioURL || _waveformExtractionJobs[track.id]) return;
-  if (Array.isArray(getWaveformCache()[track.id]) && getWaveformCache()[track.id].length) return;
-  if (!(window.AudioContext || window.webkitAudioContext)) return;
+async function ensureWaveformForTrack(track, opts) {
+  var src = track && (track.audioURL || track.audioData);
+  if (!track || !src || _waveformExtractionJobs[track.id]) return false;
+  if (Array.isArray(getWaveformCache()[track.id]) && getWaveformCache()[track.id].length) return false;
+  if (!(window.AudioContext || window.webkitAudioContext)) return false;
+  var skipSave = !!(opts && opts.skipSave);
 
   _waveformExtractionJobs[track.id] = true;
+  var extracted = false;
   try {
-    var response = await fetch(track.audioURL, { mode:'cors' });
+    var response = await fetch(src, { mode:'cors' });
     if (!response.ok) throw new Error('Waveform fetch failed');
     var bufferData = await response.arrayBuffer();
     if (!_audioContext) _audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -3954,13 +3962,47 @@ async function ensureWaveformForTrack(track) {
     getWaveformCache()[track.id] = peaks;
     invalidateVisualWaveform(track.id);
     window.appSettings = appSettings;
-    save('settings', appSettings);
+    // Stamp real peaks onto the private track too so share payloads carry them.
+    var privateTrack = tracks.find(function(item) { return item.id === track.id; });
+    if (privateTrack) privateTrack.peaks = peaks.slice();
+    if (!skipSave) {
+      save('settings', appSettings);
+      if (privateTrack) persistTracks();
+    }
     renderTracks();
     updateExpandedPlayer();
+    extracted = true;
   } catch (e) {
     console.warn('Waveform extraction skipped for', track.id, e);
   }
   delete _waveformExtractionJobs[track.id];
+  return extracted;
+}
+
+// One-time backfill: decode real peaks for every track that still lacks
+// them, one at a time so playback and UI stay responsive. Firestore writes
+// are batched into a single save at the end.
+var _waveformSweepStarted = false;
+async function sweepWaveformBackfill() {
+  if (_waveformSweepStarted) return;
+  _waveformSweepStarted = true;
+  var cache = getWaveformCache();
+  var missing = tracks.filter(function(t) {
+    return (t.audioURL || t.audioData)
+      && !(Array.isArray(cache[t.id]) && cache[t.id].length)
+      && !(Array.isArray(t.peaks) && t.peaks.length);
+  });
+  var extracted = 0;
+  for (var i = 0; i < missing.length; i++) {
+    if (navigator.onLine === false) break;
+    if (await ensureWaveformForTrack(missing[i], { skipSave: true })) extracted++;
+    await new Promise(function(resolve) { setTimeout(resolve, 600); });
+  }
+  if (extracted) {
+    window.appSettings = appSettings;
+    save('settings', appSettings);
+    persistTracks();
+  }
 }
 
 function getTopPromptTags(limit) {
@@ -4131,6 +4173,7 @@ function makeTrackSnapshot(track) {
     prompt: track.prompt || '',
     duration: Number(track.duration || 0),
     audioURL: track.audioURL || '',
+    peaks: getRealPeaksForTrack(track),
     plays: Number(track.plays || 0),
     created: track.created || '',
     shared: !!track.shared,
@@ -4626,6 +4669,7 @@ function startPlayback(id, queueIds, queueLabel) {
     showToast('No audio source found for this track');
     return;
   }
+  ensureWaveformForTrack(track);
 
   applyPlaybackRate();
   _audio.play().catch(function(e) {
@@ -5476,10 +5520,10 @@ function buildTrackCard(track) {
     +         '<span class="meta-pill highlight">' + esc(track.genre || 'Other') + '</span>'
     +         '<span class="meta-pill">' + esc(track.mood || 'Mood') + '</span>'
     +         '<span class="meta-pill">' + fmtTime(track.duration || 0) + '</span>'
-    +         (!hasLyrics(track) ? '<span class="meta-pill" style="color:var(--danger);border-color:rgba(255,124,116,.3)">Lyrics missing</span>' : '')
+    +         (!hasLyrics(track) ? '<span class="meta-pill warn">Lyrics missing</span>' : '')
     +         (track.autoImported ? '<span class="meta-pill">Watcher import</span>' : '')
     +       '</div>'
-    +       '<div class="track-tag-row">' + tags.map(function(tag) { return '<span class="track-tag">' + esc(tag) + '</span>'; }).join('') + '</div>'
+    +       '<div class="track-tag-row">' + tags.slice(0, 6).map(function(tag) { return '<span class="track-tag">' + esc(tag) + '</span>'; }).join('') + '</div>'
     +       '<div class="track-meta-strip">'
     +         '<div class="track-stats"><span>' + fmtCompactNumber(track.plays || 0) + ' plays</span><span>' + esc(track.fileName || 'manual upload') + '</span></div>'
     +         '<div class="track-actions">'
@@ -5965,6 +6009,21 @@ function probeUploadDraft(draft) {
     renderUploadQueue();
     renderUploadEditor();
   }, { once:true });
+  decodeUploadPeaks(draft);
+}
+
+// Decode real waveform peaks straight from the picked file while it is
+// still in memory — no Cloudinary round-trip needed after saving.
+async function decodeUploadPeaks(draft) {
+  if (!draft || !draft.file || !(window.AudioContext || window.webkitAudioContext)) return;
+  try {
+    var bufferData = await draft.file.arrayBuffer();
+    if (!_audioContext) _audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    var decoded = await _audioContext.decodeAudioData(bufferData);
+    draft.peaks = extractWaveformPeaks(decoded, 72);
+  } catch (e) {
+    console.warn('Upload peak decode skipped for', draft && draft.id, e);
+  }
 }
 
 function renderUploadProgress() {
@@ -6268,6 +6327,7 @@ async function saveAllUploads() {
         audioURL: audioURL,
         duration: item.duration || 0,
         waveform: [],
+        peaks: Array.isArray(item.peaks) && item.peaks.length ? item.peaks.slice() : [],
         created: new Date().toISOString().split('T')[0],
         plays: 0,
         shared: false,
@@ -6298,6 +6358,15 @@ async function saveAllUploads() {
   }
 
   if (createdTracks.length) {
+    var wfCache = getWaveformCache();
+    createdTracks.forEach(function(t) {
+      if (Array.isArray(t.peaks) && t.peaks.length) {
+        wfCache[t.id] = t.peaks.slice();
+        invalidateVisualWaveform(t.id);
+      }
+    });
+    window.appSettings = appSettings;
+    save('settings', appSettings);
     tracks = createdTracks.concat(tracks);
     persistTracks();
   }
@@ -6382,6 +6451,10 @@ renderPendingPreview();
 updateNowPlaying();
 updateAIConfigStatus();
 renderRouteAwareView(true);
+
+// Backfill real waveforms for any tracks still missing decoded peaks,
+// after initial render and first sync have had a moment to settle.
+setTimeout(sweepWaveformBackfill, 4000);
 
 // Service worker: offline shell + cached fonts/SDK + recently played audio.
 // Guarded so opening index.html via file:// (local dev) stays error-free.
