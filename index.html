@@ -20,7 +20,7 @@
 <meta name="twitter:title" content="SonicVault — Private AI Music Vault">
 <meta name="twitter:description" content="Curate tracks, build mixtapes, and stream your AI-generated music from anywhere.">
 <title>SonicVault - Private AI Music Vault</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -209,10 +209,10 @@ if (initialRoute.mode === 'app') {
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#090b12;
-  --bg2:#10131d;
-  --bg3:#161b27;
-  --bg4:#1d2433;
+  --bg:#05060c;
+  --bg2:#0b0e17;
+  --bg3:#121624;
+  --bg4:#1a2032;
   --panel:rgba(16,19,29,.78);
   --panel-strong:rgba(22,27,39,.92);
   --panel-soft:rgba(255,255,255,.03);
@@ -236,7 +236,7 @@ if (initialRoute.mode === 'app') {
   --violet:#a794ff;
   --amber:#f3ca78;
   --display:'Syne',sans-serif;
-  --sans:'DM Sans',sans-serif;
+  --sans:'Space Grotesk','DM Sans',sans-serif;
   --mono:'DM Mono',monospace;
   --player-height:118px;
 }
@@ -271,18 +271,24 @@ body.light{
 html,body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
 body{
   background-image:
-    radial-gradient(circle at 15% 20%, rgba(129,96,255,.07), transparent 26%),
-    radial-gradient(circle at 82% 18%, rgba(240,139,98,.08), transparent 28%),
-    radial-gradient(circle at 50% 86%, rgba(85,161,255,.06), transparent 24%);
+    radial-gradient(880px 660px at 12% -6%, rgba(129,96,255,.17), transparent 62%),
+    radial-gradient(980px 720px at 90% 2%, rgba(240,139,98,.13), transparent 62%),
+    radial-gradient(900px 900px at 50% 112%, rgba(85,161,255,.10), transparent 64%);
+  background-attachment:fixed;
+}
+body.light{
+  background-image:
+    radial-gradient(880px 660px at 12% -6%, rgba(118,87,203,.10), transparent 62%),
+    radial-gradient(980px 720px at 90% 2%, rgba(197,111,73,.10), transparent 62%);
 }
 body::before{
   content:'';
   position:fixed;
   inset:0;
   background:
-    radial-gradient(circle at 20% 16%, var(--accent-dynamic-soft), transparent 20%),
-    radial-gradient(circle at 80% 84%, rgba(255,255,255,.025), transparent 16%);
-  opacity:.7;
+    radial-gradient(760px 560px at 16% 6%, var(--accent-dynamic-deep), transparent 64%),
+    radial-gradient(680px 540px at 86% 80%, var(--accent-dynamic-soft), transparent 62%);
+  opacity:.9;
   pointer-events:none;
   z-index:-2;
 }
@@ -455,12 +461,14 @@ body.light .section-card{background:linear-gradient(180deg, rgba(255,255,255,.78
 .sec-action:hover{color:var(--text);background:var(--accent-dynamic-soft)}
 body.light .sec-action{background:rgba(0,0,0,.05)}
 .sec-action.primary{
-  background:linear-gradient(135deg, var(--accent-dynamic), var(--accent2));
-  color:#fff;
+  background:rgba(255,255,255,.94);
+  color:#10121c;
   border-color:transparent;
-  box-shadow:0 12px 26px rgba(0,0,0,.22);
+  box-shadow:0 14px 34px rgba(0,0,0,.3);
 }
-.sec-action.primary:hover{filter:brightness(1.03)}
+.sec-action.primary:hover{background:#fff;color:#10121c}
+body.light .sec-action.primary{background:#171420;color:#f7f2eb}
+body.light .sec-action.primary:hover{background:#241f30;color:#fff}
 
 .hero-stage{
   display:grid;
@@ -872,14 +880,14 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   position:relative;
   display:grid;
   gap:1rem;
-  padding:1rem;
+  padding:1.15rem;
   border-radius:28px;
   border:1px solid var(--rim);
-  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018));
   box-shadow:var(--shadow);
-  transition:transform .18s ease,border-color .18s ease,background .18s ease;
+  transition:transform .18s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease;
 }
-.track-card:hover{transform:translateY(-3px);border-color:var(--rim2)}
+.track-card:hover{transform:translateY(-3px);border-color:var(--rim2);box-shadow:0 30px 70px rgba(0,0,0,.45), 0 0 0 1px var(--accent-dynamic-soft)}
 .track-card.playing{
   border-color:var(--accent-ghost);
   background:linear-gradient(180deg, var(--accent-dynamic-soft), rgba(255,255,255,.03));
@@ -950,10 +958,12 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
 .action-btn:hover,.icon-btn:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 body.light .action-btn,body.light .icon-btn{background:rgba(0,0,0,.05)}
 .action-btn.primary{
-  background:linear-gradient(135deg, var(--accent-dynamic), var(--accent2));
-  color:#fff;
+  background:rgba(255,255,255,.94);
+  color:#10121c;
   border-color:transparent;
 }
+.action-btn.primary:hover{background:#fff;color:#10121c}
+body.light .action-btn.primary{background:#171420;color:#f7f2eb}
 .prompt-fragment{
   color:var(--muted);
   font-size:13px;
@@ -992,7 +1002,7 @@ body.light .action-btn,body.light .icon-btn{background:rgba(0,0,0,.05)}
   border-radius:999px;
   transition:background .15s ease,opacity .15s ease;
 }
-.wbar-active{background:var(--accent-dynamic)}
+.wbar-active{background:linear-gradient(180deg, var(--violet), var(--accent-dynamic))}
 .wbar-inactive{background:rgba(255,255,255,.11)}
 body.light .wbar-inactive{background:rgba(0,0,0,.1)}
 .track-expand{
@@ -2096,7 +2106,7 @@ body.light .player-modal{
   transition:background .16s ease, opacity .16s ease, transform .16s ease;
 }
 .player-wave .pbar.active{
-  background:linear-gradient(180deg, var(--accent-dynamic), var(--accent2));
+  background:linear-gradient(180deg, var(--violet), var(--accent-dynamic));
   box-shadow:0 0 18px var(--accent-dynamic-soft);
 }
 .player-wave .pbar.current{transform:scaleY(1.04)}
@@ -2114,7 +2124,7 @@ body.light .player-modal{
   inset:0 auto 0 0;
   width:0;
   border-radius:999px;
-  background:linear-gradient(90deg, var(--accent-dynamic), var(--accent2));
+  background:linear-gradient(90deg, var(--violet), var(--accent-dynamic));
 }
 .player-controls{
   display:flex;
@@ -2140,10 +2150,12 @@ body.light .player-modal{
 body.light .player-btn{background:rgba(0,0,0,.05)}
 .player-btn.primary{
   min-width:104px;
-  background:linear-gradient(135deg, var(--accent-dynamic), var(--accent2));
-  color:#fff;
+  background:rgba(255,255,255,.94);
+  color:#10121c;
   border-color:transparent;
 }
+.player-btn.primary:hover{background:#fff;color:#10121c}
+body.light .player-btn.primary{background:#171420;color:#f7f2eb}
 .player-btn.mode-on{
   color:var(--accent-dynamic);
   background:var(--accent-dynamic-soft);
@@ -2384,7 +2396,7 @@ body.light .now-playing-bar{
   inset:0 auto 0 0;
   width:0;
   border-radius:999px;
-  background:linear-gradient(90deg, var(--accent-dynamic), var(--accent2));
+  background:linear-gradient(90deg, var(--violet), var(--accent-dynamic));
 }
 .np-controls{display:flex;align-items:center;gap:.45rem;justify-content:flex-end}
 .np-btn{
@@ -2407,10 +2419,12 @@ body.light .np-btn{background:rgba(0,0,0,.05)}
 .np-btn.primary{
   width:56px;
   height:56px;
-  background:linear-gradient(135deg, var(--accent-dynamic), var(--accent2));
-  color:#fff;
+  background:rgba(255,255,255,.94);
+  color:#10121c;
   border-color:transparent;
 }
+.np-btn.primary:hover{background:#fff;color:#10121c}
+body.light .np-btn.primary{background:#171420;color:#f7f2eb}
 .np-btn.mode-btn{width:40px;height:40px;font-size:10px}
 .np-btn.mode-on{
   color:var(--accent-dynamic);

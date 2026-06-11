@@ -170,6 +170,13 @@ function load(key, def) {
 ### Light Theme
 Applied via `body.light` class toggle. All component overrides use `body.light .component` selectors.
 
+### Aurora Glass Design Language (2026-06 redesign)
+- Deep near-black base (`--bg:#05060c`) with large soft radial "aurora" blooms: static violet/coral washes on `body`, plus dynamic blooms on `body::before` driven by `--accent-dynamic` (set per playing track) — the background literally re-tints to the current track's palette.
+- Body font is Space Grotesk (`--sans`); Syne stays for display, DM Mono for labels.
+- Primary buttons are solid white pills with dark text (inverted to dark pills in light theme). Coral/accent lives in highlights, blooms, and waveforms — not CTAs.
+- Waveforms and progress fills use a violet-to-accent gradient.
+- Interior card elements are borderless (typographic pills/tags, ghost secondary buttons); only outer structural cards keep 1px rims.
+
 ### Design Conventions (matching PokerHQ)
 - Monospace uppercase labels for metadata (font-family:var(--mono); font-size:9-11px; letter-spacing:.08-.14em)
 - Card-based UI with 12-14px border-radius, 1px solid var(--rim) borders
