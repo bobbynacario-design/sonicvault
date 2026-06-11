@@ -265,6 +265,7 @@ The Firebase Admin service account JSON (`pokerhq-a67e4-firebase-adminsdk-fbsvc-
 - DONE (2026-06-11): `firestore.rules` now carries the FULL project ruleset (Daily Briefer + PokerHQ + SonicVault) with the owner email set to `bobbynacario@gmail.com`, and was deployed via `firebase deploy --only firestore:rules`. Unauthenticated reads of `sonicvault-bob` return 403; public share collections remain world-readable.
 - The repo also has `firebase.json` + `.firebaserc` so future rule deploys are just `firebase deploy --only firestore:rules`.
 - IMPORTANT: because Firestore deploys ALL rules at once, `firestore.rules` here includes the PokerHQ and Daily Briefer blocks. Never trim it back to SonicVault-only rules.
+- THIS HAS ALREADY GONE WRONG ONCE (2026-06-11): a PokerHQ-only rules deploy from the pokerhq repo replaced the project ruleset and locked SonicVault (and Daily Briefer) out — the app showed "ERR Blocked: bobbynacario@gmail.com" even for the owner. The canonical merged ruleset now lives identically in `sonicvault/firestore.rules`, `pokerhq/deploy/firestore.rules`, and `bobdailybriefing/firestore.rules`. If you change rules for ANY app, update all three copies and deploy the full merged file.
 - After this change, the web app must be signed in (Owner button, Google account `bobbynacario@gmail.com`) on each device to read/write the private vault. The watcher is unaffected (Admin SDK bypasses rules).
 
 ## Cloudinary Hardening

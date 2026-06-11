@@ -1,18 +1,43 @@
 rules_version = '2';
 
-// Shared Firebase project: pokerhq-a67e4
-// Hosts THREE apps — each gets its own collection rules below.
-// IMPORTANT: Firestore deploys ALL rules at once. Do not remove the
-// PokerHQ / Daily Briefing blocks unless you also update those apps.
+// Shared Firebase project: pokerhq-a67e4 — ONE ruleset for THREE apps.
+// Firestore keeps a single ruleset per project: deploying from ANY repo
+// replaces the rules for ALL apps (this has happened — a PokerHQ-only
+// deploy on 2026-06-11 locked SonicVault and Daily Briefer out).
+//
+// This file is the canonical merged ruleset. Keep these copies identical:
+//   - sonicvault/firestore.rules
+//   - pokerhq/deploy/firestore.rules
+//   - bobdailybriefing/firestore.rules
+// and always deploy the FULL file: firebase deploy --only firestore:rules
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isBobGoogleAccount() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() in [
+          'bobbynacario@gmail.com'
+        ];
+    }
+
     function isSonicVaultOwner() {
-      return request.auth != null && (
-        request.auth.token.sonicvaultOwner == true ||
-        request.auth.token.email == "bobbynacario@gmail.com"
-      );
+      return (request.auth != null && request.auth.token.sonicvaultOwner == true)
+        || isBobGoogleAccount();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PokerHQ — owner-locked, requires verified Google email
+    // ─────────────────────────────────────────────────────────────
+    match /pokerhq-bob/{docId} {
+      allow read, write: if isBobGoogleAccount()
+        && request.auth.token.email_verified == true;
+    }
+    match /{collection}/{docId} {
+      allow read, write: if isBobGoogleAccount()
+        && request.auth.token.email_verified == true
+        && collection.matches('pokerhq-profile-.*');
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -31,13 +56,6 @@ service cloud.firestore {
 
       allow delete: if request.auth != null
         && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // PokerHQ — single-user app, no auth (preserve current behavior)
-    // ─────────────────────────────────────────────────────────────
-    match /pokerhq-bob/{docId} {
-      allow read, write: if true;
     }
 
     // ─────────────────────────────────────────────────────────────
