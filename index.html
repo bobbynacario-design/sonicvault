@@ -165,7 +165,8 @@ function startPrivateSync() {
       setSyncStatus('ok', 'Synced');
       if (window.refreshAll) window.refreshAll();
     }, function(err) {
-      setSyncStatus('error', 'Read blocked');
+      var who = window.fbOwnerUser && window.fbOwnerUser.email;
+      setSyncStatus('error', who ? 'Blocked: ' + who : 'Sign in required');
       console.error('onSnapshot error:', err);
     });
     _privateUnsubs.push(unsub);
@@ -190,19 +191,27 @@ window.fbSignIn = fbSignIn;
 window.fbSignOutOwner = fbSignOutOwner;
 
 onAuthStateChanged(auth, function(user) {
-  window.fbOwnerUser = user ? { email:user.email || '', uid:user.uid || '' } : null;
-  if (user) {
+  // Email-less sessions (e.g. anonymous auth left behind by PokerHQ or
+  // Daily Briefer on this shared origin) can never pass the owner rules.
+  // Treat them as signed out so the Owner button offers sign-in instead
+  // of silently signing the phantom session out.
+  var ownerCandidate = !!(user && user.email);
+  window.fbOwnerUser = ownerCandidate ? { email:user.email, uid:user.uid || '' } : null;
+  if (ownerCandidate) {
     startPrivateSync();
-  } else if (_privateSyncStarted) {
-    stopPrivateSync();
-    setSyncStatus('offline', 'Local only');
+  } else {
+    if (_privateSyncStarted) stopPrivateSync();
+    setSyncStatus('offline', user ? 'Sign in required' : 'Local only');
   }
   if (window.refreshAll) window.refreshAll();
 });
 
 var initialRoute = getInitialRouteState();
 if (initialRoute.mode === 'app') {
-  startPrivateSync();
+  // Private sync starts from onAuthStateChanged once the restored session
+  // is known — subscribing before the token is ready just gets a
+  // permission-denied that kills the listeners.
+  setSyncStatus('syncing', 'Connecting');
 } else {
   setSyncStatus('syncing', 'Loading share');
   fbLoadPublicRoute(initialRoute.mode, initialRoute.id).then(function(payload) {
