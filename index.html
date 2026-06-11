@@ -140,11 +140,22 @@ async function fbLoadAll() {
   }
 }
 
+let _privateUnsubs = [];
+
+function stopPrivateSync() {
+  _privateUnsubs.forEach(function(unsub) { try { unsub(); } catch (e) {} });
+  _privateUnsubs = [];
+  _privateSyncStarted = false;
+}
+
 function startPrivateSync() {
-  if (_privateSyncStarted) return;
+  // Always rebuild the listeners: a permission-denied error (signed out)
+  // kills an onSnapshot subscription permanently, so re-entry after
+  // sign-in must subscribe fresh rather than assume the old ones live.
+  stopPrivateSync();
   _privateSyncStarted = true;
   ['tracks', 'playlists', 'settings'].forEach(function(k) {
-    onSnapshot(doc(db, USER_PATH, k), function(snap) {
+    var unsub = onSnapshot(doc(db, USER_PATH, k), function(snap) {
       if (!snap.exists()) return;
       var val = JSON.parse(snap.data().value);
       if (k === 'tracks') window.tracks = Array.isArray(val) ? val : [];
@@ -157,6 +168,7 @@ function startPrivateSync() {
       setSyncStatus('error', 'Read blocked');
       console.error('onSnapshot error:', err);
     });
+    _privateUnsubs.push(unsub);
   });
   fbLoadAll();
 }
@@ -180,11 +192,10 @@ window.fbSignOutOwner = fbSignOutOwner;
 onAuthStateChanged(auth, function(user) {
   window.fbOwnerUser = user ? { email:user.email || '', uid:user.uid || '' } : null;
   if (user) {
-    if (_privateSyncStarted) {
-      fbLoadAll();
-    } else {
-      startPrivateSync();
-    }
+    startPrivateSync();
+  } else if (_privateSyncStarted) {
+    stopPrivateSync();
+    setSyncStatus('offline', 'Local only');
   }
   if (window.refreshAll) window.refreshAll();
 });
