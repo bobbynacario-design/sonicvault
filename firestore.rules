@@ -1,26 +1,67 @@
 rules_version = '2';
 
+// Shared Firebase project: pokerhq-a67e4
+// Hosts THREE apps — each gets its own collection rules below.
+// IMPORTANT: Firestore deploys ALL rules at once. Do not remove the
+// PokerHQ / Daily Briefing blocks unless you also update those apps.
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isOwner() {
+
+    function isSonicVaultOwner() {
       return request.auth != null && (
         request.auth.token.sonicvaultOwner == true ||
-        request.auth.token.email == "replace-with-owner-email@example.com"
+        request.auth.token.email == "bobbynacario@gmail.com"
       );
     }
 
-    match /sonicvault-bob/{docId} {
-      allow read, write, delete: if isOwner();
+    // ─────────────────────────────────────────────────────────────
+    // Bob's Daily Briefing — authenticated, uid-scoped
+    // ─────────────────────────────────────────────────────────────
+    match /briefings-bob/{docId} {
+      allow read: if request.auth != null
+        && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
+
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update: if request.auth != null
+        && (resource.data.uid == request.auth.uid || !('uid' in resource.data))
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if request.auth != null
+        && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // PokerHQ — single-user app, no auth (preserve current behavior)
+    // ─────────────────────────────────────────────────────────────
+    match /pokerhq-bob/{docId} {
+      allow read, write: if true;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // SonicVault — private vault locked to owner; public share
+    // catalogs are world-readable but owner-writable only.
+    // The watcher uses the Admin SDK and bypasses these rules.
+    // ─────────────────────────────────────────────────────────────
+    match /sonicvault-bob/{docId} {
+      allow read, write, delete: if isSonicVaultOwner();
+    }
     match /sonicvault-public-tracks/{docId} {
       allow read: if true;
-      allow create, update, delete: if isOwner();
+      allow create, update, delete: if isSonicVaultOwner();
     }
-
     match /sonicvault-public-playlists/{docId} {
       allow read: if true;
-      allow create, update, delete: if isOwner();
+      allow create, update, delete: if isSonicVaultOwner();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Deny everything else (any unknown collection)
+    // ─────────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
