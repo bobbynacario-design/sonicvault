@@ -198,6 +198,7 @@ Applied via `body.light` class toggle. All component overrides use `body.light .
 - [x] Mobile responsive with bottom nav
 - [x] PWA manifest
 - [x] Offline support with queue-based sync
+- [x] Service worker (`sw.js`) — offline app shell, cached fonts/Firebase SDK, last 30 played Cloudinary audio files cached with Range support. Shell is network-first so a normal deploy still propagates on the next online load; bump `VERSION` in `sw.js` only when cache logic changes.
 - [x] Suno folder watcher (`watcher.js`) — auto-imports downloads to Cloudinary + Firestore
 
 ## Suno Folder Watcher (`watcher.js`)

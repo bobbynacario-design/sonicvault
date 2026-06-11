@@ -6382,6 +6382,26 @@ renderPendingPreview();
 updateNowPlaying();
 updateAIConfigStatus();
 renderRouteAwareView(true);
+
+// Service worker: offline shell + cached fonts/SDK + recently played audio.
+// Guarded so opening index.html via file:// (local dev) stays error-free.
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').then(function(reg) {
+      reg.addEventListener('updatefound', function() {
+        var sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', function() {
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+            showToast('SonicVault updated - reload for the latest version');
+          }
+        });
+      });
+    }).catch(function(e) {
+      console.warn('Service worker registration failed:', e);
+    });
+  });
+}
 </script>
 </body>
 </html>
