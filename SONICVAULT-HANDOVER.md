@@ -199,6 +199,7 @@ Applied via `body.light` class toggle. All component overrides use `body.light .
 - [x] Repeat modes: off / queue / one
 - [x] Volume slider + playback speed cycle (0.75x-2x) in the expanded player
 - [x] Player prefs persisted device-locally in `sv_player_prefs` (not synced to Firestore)
+- [x] Insights dashboard (`#page-insights` / `renderInsights`) — a fourth nav view with stat tiles (tracks, total plays, estimated listening time = Σ plays×duration, avg plays/track), clickable genre/mood/source distribution bars (jump to the filtered library), most-played + hidden-gems (least-played) rails, and a "library health" card (AI-tagged %, lyrics %, watcher imports, catalog runtime). All metrics are derived from existing track data + play counts — no external tracking, no per-play timestamps (so no fabricated "this month" stats).
 - [x] Library view with search and genre filtering
 - [x] Track detail expansion (click to reveal Suno prompt)
 - [x] Edit-track modal (`openEditTrack` → `#modal-edit-track`) — edit title/genre/mood/source/prompt/lyrics on tracks already in the vault (including watcher imports that arrived without lyrics), with an inline "Generate AI metadata" button that reuses the same remote-or-local engine as the upload editor. Explicit form values always win over AI suggestions on save.

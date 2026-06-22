@@ -2300,6 +2300,40 @@ body.light .queue-item:hover{background:rgba(0,0,0,.04)}
 .queue-reorder button:hover:not(:disabled){background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 .queue-reorder button:disabled{opacity:.28;cursor:default}
 body.light .queue-reorder button{background:rgba(0,0,0,.05)}
+/* ── Insights dashboard ───────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1.4rem}
+.stat-tile{padding:1.2rem 1.1rem;border-radius:22px;border:1px solid var(--rim);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015))}
+.stat-value{font-family:var(--display);font-size:clamp(2rem,3.6vw,2.9rem);line-height:1;letter-spacing:-.02em}
+.stat-label{margin-top:.5rem;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted2)}
+.insight-cols{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-top:1.2rem}
+.dist-list{display:grid;gap:.55rem;margin-top:1.1rem}
+.dist-row{display:grid;grid-template-columns:minmax(92px,150px) minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.35rem .4rem;border-radius:12px;transition:background .14s ease}
+.dist-row[style*="cursor"]:hover{background:rgba(255,255,255,.05)}
+.dist-label{display:flex;align-items:center;gap:.5rem;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dist-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dist-track{height:9px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.dist-fill{height:100%;border-radius:999px;min-width:4px}
+.dist-val{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.rank-list{display:grid;gap:.55rem;margin-top:1.1rem}
+.rank-row{display:grid;grid-template-columns:auto 54px minmax(0,1fr) auto;gap:.75rem;align-items:center;padding:.5rem .55rem;border-radius:16px;cursor:pointer;transition:background .14s ease}
+.rank-row:hover{background:rgba(255,255,255,.05)}
+.rank-num{font-family:var(--mono);font-size:11px;color:var(--muted2);width:20px;text-align:center}
+.rank-copy{min-width:0}
+.rank-title{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-sub{font-size:11px;color:var(--muted2);margin-top:.2rem}
+.rank-bar{height:7px;border-radius:999px;background:rgba(255,255,255,.07);margin-top:.35rem;overflow:hidden}
+.rank-fill{height:100%;border-radius:999px;min-width:4px}
+.rank-val{font-family:var(--mono);font-size:12px;color:var(--accent-dynamic);white-space:nowrap}
+.health-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1.1rem}
+.health-tile{padding:1.1rem 1rem;border-radius:20px;background:rgba(255,255,255,.03)}
+.health-val{font-family:var(--display);font-size:2rem;line-height:1;letter-spacing:-.02em}
+.health-label{margin-top:.4rem;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-dynamic)}
+.health-sub{margin-top:.3rem;font-size:11px;color:var(--muted2);line-height:1.5}
+.insight-empty-row{padding:.8rem;color:var(--muted2);font-size:13px}
+body.light .dist-track,body.light .rank-bar{background:rgba(0,0,0,.06)}
+body.light .stat-tile{background:linear-gradient(180deg,rgba(0,0,0,.03),rgba(0,0,0,.01))}
+body.light .rank-row:hover,body.light .dist-row[style*="cursor"]:hover{background:rgba(0,0,0,.04)}
+body.light .health-tile{background:rgba(0,0,0,.03)}
 .playlist-chip{
   display:flex;
   align-items:center;
@@ -2557,6 +2591,9 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .queue-item{grid-template-columns:auto 44px minmax(0,1fr)}
   .queue-state{grid-column:1 / -1}
   .queue-reorder{display:none}
+  .stat-grid,.health-grid{grid-template-columns:1fr 1fr}
+  .insight-cols{grid-template-columns:1fr}
+  .dist-row{grid-template-columns:minmax(82px,108px) minmax(0,1fr) auto}
   .player-modal-shell{padding:1rem 1rem 2rem}
   .now-playing-bar{
     left:10px;
@@ -2603,6 +2640,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
         <button class="group-tab active" id="gtab-library" onclick="switchView('library')">Home</button>
         <button class="group-tab" id="gtab-playlists" onclick="switchView('playlists')">Playlists</button>
         <button class="group-tab" id="gtab-upload" onclick="switchView('upload')">Import</button>
+        <button class="group-tab" id="gtab-insights" onclick="switchView('insights')">Insights</button>
       </div>
     </div>
     <div class="nav-right">
@@ -2814,6 +2852,10 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
       </div>
     </div>
   </div>
+</div>
+
+<div class="page" id="page-insights">
+  <div class="page-stack" id="insights-view"></div>
 </div>
 
 <div class="modal-overlay" id="modal-playlist">
@@ -3063,6 +3105,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   <button class="mobile-tab active" id="mob-library" onclick="switchView('library')">Home</button>
   <button class="mobile-tab" id="mob-playlists" onclick="switchView('playlists')">Playlists</button>
   <button class="mobile-tab" id="mob-upload" onclick="switchView('upload')">Import</button>
+  <button class="mobile-tab" id="mob-insights" onclick="switchView('insights')">Insights</button>
 </div>
 
 <div class="now-playing-bar" id="now-playing" onclick="openExpandedPlayer(event)">
@@ -5270,6 +5313,7 @@ function switchView(view) {
   if (view === 'library') renderTracks();
   if (view === 'playlists') renderPlaylists();
   if (view === 'upload') renderPendingPreview();
+  if (view === 'insights') renderInsights();
   updatePageChrome(null, _currentTrack || null);
   if (!skipRoute) window.scrollTo({ top:0, behavior:'smooth' });
 }
@@ -5379,6 +5423,110 @@ function getAutoImportedTracks(limit) {
 function getContinueTrack() {
   var savedId = appSettings && appSettings.lastPlayedTrackId;
   return savedId ? getTrackById(savedId) : null;
+}
+
+// Hours/minutes formatter for long spans (listening time, catalog runtime),
+// where fmtTime's m:ss would read awkwardly.
+function fmtLongDuration(totalSeconds) {
+  var s = Math.max(0, Math.round(Number(totalSeconds) || 0));
+  var h = Math.floor(s / 3600);
+  var m = Math.floor((s % 3600) / 60);
+  if (h > 0) return h + 'h ' + m + 'm';
+  if (m > 0) return m + 'm';
+  return s + 's';
+}
+
+// Sorted horizontal bar rows for a {label: count} map. onclickFn(key) returns
+// an inline handler string (jump to the filtered library), or null for static.
+function buildDistributionBars(counts, colorFn, total, onclickFn) {
+  var keys = Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a]; });
+  if (!keys.length) return '<div class="insight-empty-row">No data yet.</div>';
+  var max = counts[keys[0]] || 1;
+  return keys.map(function(key) {
+    var n = counts[key];
+    var pct = Math.round((n / total) * 100);
+    var w = Math.max(4, Math.round((n / max) * 100));
+    var color = colorFn ? colorFn(key) : 'var(--accent-dynamic)';
+    var click = onclickFn ? ' onclick="' + onclickFn(key) + '" style="cursor:pointer"' : '';
+    return '<div class="dist-row"' + click + '>'
+      + '<div class="dist-label"><span class="dist-dot" style="background:' + color + '"></span>' + esc(key) + '</div>'
+      + '<div class="dist-track"><div class="dist-fill" style="width:' + w + '%;background:' + color + '"></div></div>'
+      + '<div class="dist-val">' + n + ' / ' + pct + '%</div>'
+      + '</div>';
+  }).join('');
+}
+
+function renderInsights() {
+  var el = document.getElementById('insights-view');
+  if (!el) return;
+  if (!tracks.length) {
+    el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="empty-state"><strong>No insights yet.</strong>Import a few tracks and start listening — SonicVault will chart your genres, moods, most-played records, and library health here.<div class="modal-actions" style="justify-content:center;margin-top:1rem"><button class="sec-action primary" onclick="switchView(\'upload\')">Import first track</button></div></div></div></div>';
+    return;
+  }
+
+  var totalPlays = tracks.reduce(function(s, t) { return s + Number(t.plays || 0); }, 0);
+  var catalogSecs = tracks.reduce(function(s, t) { return s + Number(t.duration || 0); }, 0);
+  var listenSecs = tracks.reduce(function(s, t) { return s + (Number(t.plays || 0) * Number(t.duration || 0)); }, 0);
+  var avgPlays = tracks.length ? (totalPlays / tracks.length) : 0;
+
+  var genres = {}, moods = {}, sources = {};
+  var withLyrics = 0, withAI = 0, watcherCount = 0;
+  tracks.forEach(function(t) {
+    genres[t.genre || 'Other'] = (genres[t.genre || 'Other'] || 0) + 1;
+    moods[t.mood || 'Other'] = (moods[t.mood || 'Other'] || 0) + 1;
+    sources[t.source || 'Other'] = (sources[t.source || 'Other'] || 0) + 1;
+    if (hasLyrics(t)) withLyrics++;
+    if (getTrackSummary(t) || (t.aiTags && t.aiTags.length)) withAI++;
+    if (t.autoImported) watcherCount++;
+  });
+  var lyricPct = Math.round((withLyrics / tracks.length) * 100);
+  var aiPct = Math.round((withAI / tracks.length) * 100);
+
+  var statTiles = [
+    { label: 'Tracks in vault', value: fmtCompactNumber(tracks.length) },
+    { label: 'Total plays', value: fmtCompactNumber(totalPlays) },
+    { label: 'Est. listening time', value: fmtLongDuration(listenSecs) },
+    { label: 'Avg plays / track', value: String(Math.round(avgPlays * 10) / 10) }
+  ];
+  var statsHtml = statTiles.map(function(s) {
+    return '<div class="stat-tile"><div class="stat-value">' + esc(s.value) + '</div><div class="stat-label">' + esc(s.label) + '</div></div>';
+  }).join('');
+
+  var mostPlayed = getMostPlayedTracks(6).filter(function(t) { return Number(t.plays || 0) > 0; });
+  var maxPlay = mostPlayed.length ? Number(mostPlayed[0].plays || 0) : 1;
+  var mostHtml = mostPlayed.length ? mostPlayed.map(function(t, i) {
+    var w = Math.max(4, Math.round((Number(t.plays || 0) / maxPlay) * 100));
+    return '<div class="rank-row" onclick="playTrack(' + jsq(t.id) + ')"><div class="rank-num">' + (i + 1) + '</div>' + buildCoverArt(t, 'xs', false) + '<div class="rank-copy"><div class="rank-title">' + esc(t.title) + '</div><div class="rank-bar"><div class="rank-fill" style="width:' + w + '%;background:' + getGenreColor(t.genre || 'Other') + '"></div></div></div><div class="rank-val">' + fmtCompactNumber(t.plays || 0) + '</div></div>';
+  }).join('') : '<div class="insight-empty-row">No plays logged yet — start listening to build this rail.</div>';
+
+  var gems = getLeastPlayedTracks(6);
+  var gemsHtml = gems.map(function(t) {
+    return '<div class="rank-row" onclick="playTrack(' + jsq(t.id) + ')">' + buildCoverArt(t, 'xs', false) + '<div class="rank-copy"><div class="rank-title">' + esc(t.title) + '</div><div class="rank-sub">' + esc(t.genre || 'Other') + ' / ' + esc(t.mood || 'Mood') + '</div></div><div class="rank-val">' + fmtCompactNumber(t.plays || 0) + ' plays</div></div>';
+  }).join('');
+
+  el.innerHTML = ''
+    + '<div class="section-card"><div class="section-inner">'
+    +   '<div class="section-head"><div><div class="section-kicker">Insights</div><div class="section-title">Your private listening room, by the numbers</div><div class="section-sub">Everything here is derived from the tracks and play counts already in your vault — no external tracking.</div></div></div>'
+    +   '<div class="stat-grid">' + statsHtml + '</div>'
+    + '</div></div>'
+    + '<div class="insight-cols">'
+    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">Genres</div><div class="section-title" style="font-size:30px">Genre distribution</div><div class="dist-list">' + buildDistributionBars(genres, getGenreColor, tracks.length, function(k) { return 'setGenreFilter(' + jsq(k) + ");switchView('library')"; }) + '</div></div></div>'
+    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">Moods</div><div class="section-title" style="font-size:30px">Mood distribution</div><div class="dist-list">' + buildDistributionBars(moods, getMoodColor, tracks.length, function(k) { return 'browseMood(' + jsq(k) + ')'; }) + '</div></div></div>'
+    + '</div>'
+    + '<div class="insight-cols">'
+    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">On repeat</div><div class="section-title" style="font-size:30px">Most played</div><div class="rank-list">' + mostHtml + '</div></div></div>'
+    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">Hidden gems</div><div class="section-title" style="font-size:30px">Give these a spin</div><div class="section-sub" style="margin-bottom:1rem">Your least-played records — the under-loved corners of the vault.</div><div class="rank-list">' + gemsHtml + '</div></div></div>'
+    + '</div>'
+    + '<div class="section-card"><div class="section-inner">'
+    +   '<div class="section-kicker">Library health</div><div class="section-title" style="font-size:30px">Catalog coverage</div>'
+    +   '<div class="health-grid">'
+    +     '<div class="health-tile"><div class="health-val">' + aiPct + '%</div><div class="health-label">AI-tagged</div><div class="health-sub">' + withAI + ' of ' + tracks.length + ' have AI metadata</div></div>'
+    +     '<div class="health-tile"><div class="health-val">' + lyricPct + '%</div><div class="health-label">Lyrics on file</div><div class="health-sub">' + withLyrics + ' of ' + tracks.length + ' have a lyric sheet</div></div>'
+    +     '<div class="health-tile"><div class="health-val">' + fmtCompactNumber(watcherCount) + '</div><div class="health-label">Watcher imports</div><div class="health-sub">auto-imported from downloads</div></div>'
+    +     '<div class="health-tile"><div class="health-val">' + fmtLongDuration(catalogSecs) + '</div><div class="health-label">Catalog runtime</div><div class="health-sub">total length of the vault</div></div>'
+    +   '</div>'
+    +   '<div class="dist-list" style="margin-top:1.2rem">' + buildDistributionBars(sources, function() { return 'var(--accent-dynamic)'; }, tracks.length, function(k) { return 'setSourceFilter(' + jsq(k) + ");switchView('library')"; }) + '</div>'
+    + '</div></div>';
 }
 
 function getFeaturedTrack() {
