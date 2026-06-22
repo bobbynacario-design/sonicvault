@@ -1,6 +1,10 @@
 name = "sonicvault-metadata"
 main = "worker.js"
-compatibility_date = "2025-01-01"
+compatibility_date = "2026-04-02"
+
+# Keep request logs in the dashboard for debugging AI calls.
+[observability]
+enabled = true
 
 # Secrets (set with `wrangler secret put <NAME>`, never commit these):
 #   ANTHROPIC_API_KEY        required — Anthropic API key the worker calls Claude with
