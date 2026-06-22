@@ -1,4 +1,4 @@
-name = "sonicvault-metadata"
+name = "sonicvault-ai"
 main = "worker.js"
 compatibility_date = "2026-04-02"
 
