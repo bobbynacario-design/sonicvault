@@ -1,0 +1,13 @@
+name = "sonicvault-metadata"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# Secrets (set with `wrangler secret put <NAME>`, never commit these):
+#   ANTHROPIC_API_KEY        required — Anthropic API key the worker calls Claude with
+#   SONICVAULT_CLIENT_TOKEN  optional — bearer token the web UI must send as Authorization
+#
+# Vars below are non-secret and safe to keep in source control.
+[vars]
+# Comma-separated origin allowlist for CORS. Use "*" to allow any origin.
+# Set to your GitHub Pages origin once deployed, e.g. "https://bobbynacario.github.io".
+ALLOWED_ORIGIN = "*"

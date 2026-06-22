@@ -1,51 +1,33 @@
-const MODEL_NAME = "gemini-1.5-flash";
+// SonicVault metadata worker — Anthropic (Claude) edition.
+//
+// Deploy with Wrangler and set these secrets / vars:
+//   wrangler secret put ANTHROPIC_API_KEY        (required)
+//   wrangler secret put SONICVAULT_CLIENT_TOKEN   (optional — bearer token the web UI must send)
+//   ALLOWED_ORIGIN  (optional, comma-separated list of allowed origins, e.g. "https://bobbynacario.github.io")
+//
+// The web UI posts { title, prompt, lyrics, model, fallback } and expects a raw
+// metadata object back (the ai* schema below). Lyrics are optional so
+// instrumentals and watcher imports can be tagged too.
+
+const MODEL_NAME = "claude-haiku-4-5";
+const ANTHROPIC_VERSION = "2023-06-01";
+const MAX_TOKENS = 1024;
 
 const SYSTEM_PROMPT = [
-  "You are a strict music metadata extraction engine for SonicVault.",
-  "Return ONLY a raw JSON object.",
-  "Do not use markdown.",
-  "Do not wrap the JSON in code fences.",
-  "Do not add commentary before or after the JSON.",
-  "Do not omit keys.",
-  "Do not add extra keys.",
-  'The JSON must match this exact schema:',
+  "You are a strict music metadata extraction engine for SonicVault, a personal vault of AI-generated songs.",
+  "Return ONLY a raw JSON object — no markdown, no code fences, no commentary before or after.",
+  "Do not omit keys. Do not add extra keys.",
+  "The JSON must match this exact schema:",
   '{ "aiGenre": "string", "aiMood": "string", "aiTheme": "string", "aiEnergy": "High/Medium/Low", "aiVocalStyle": "string", "aiEra": "string", "aiInstruments": ["array", "of", "strings"], "aiTags": ["array", "of", "strings"], "aiSummary": "A 2 sentence editorial summary", "aiExplicit": boolean }',
   "Rules:",
   "- aiEnergy must be exactly one of: High, Medium, Low.",
   "- aiSummary must be exactly 2 sentences.",
+  "- aiVocalStyle should read 'Instrumental' when no lyrics are provided.",
   "- aiInstruments must be a short array of strings.",
   "- aiTags must be a short array of strings.",
-  "- Use the title, prompt, and lyrics together.",
+  "- Use the title, prompt, and lyrics together when available.",
   "- Be concise, useful, and editorial."
 ].join("\n");
-
-const RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    aiGenre: { type: "string" },
-    aiMood: { type: "string" },
-    aiTheme: { type: "string" },
-    aiEnergy: { type: "string", enum: ["High", "Medium", "Low"] },
-    aiVocalStyle: { type: "string" },
-    aiEra: { type: "string" },
-    aiInstruments: { type: "array", items: { type: "string" } },
-    aiTags: { type: "array", items: { type: "string" } },
-    aiSummary: { type: "string" },
-    aiExplicit: { type: "boolean" }
-  },
-  required: [
-    "aiGenre",
-    "aiMood",
-    "aiTheme",
-    "aiEnergy",
-    "aiVocalStyle",
-    "aiEra",
-    "aiInstruments",
-    "aiTags",
-    "aiSummary",
-    "aiExplicit"
-  ]
-};
 
 export default {
   async fetch(request, env) {
@@ -95,18 +77,9 @@ export default {
       );
     }
 
-    if (!lyrics) {
+    if (!env.ANTHROPIC_API_KEY) {
       return jsonResponse(
-        { error: 'Missing required field "lyrics".' },
-        400,
-        request,
-        env
-      );
-    }
-
-    if (!env.GEMINI_API_KEY) {
-      return jsonResponse(
-        { error: "Worker secret GEMINI_API_KEY is not configured." },
+        { error: "Worker secret ANTHROPIC_API_KEY is not configured." },
         500,
         request,
         env
@@ -114,56 +87,46 @@ export default {
     }
 
     const model = cleanString(payload.model) || MODEL_NAME;
-    const geminiUrl =
-      "https://generativelanguage.googleapis.com/v1beta/models/" +
-      encodeURIComponent(model) +
-      ":generateContent";
 
-    const geminiBody = {
-      system_instruction: {
-        parts: [{ text: SYSTEM_PROMPT }]
-      },
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: [
-                "Track title:",
-                title,
-                "",
-                "Prompt / notes:",
-                prompt || "(none provided)",
-                "",
-                "Lyrics:",
-                lyrics
-              ].join("\n")
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.25,
-        topP: 0.9,
-        responseMimeType: "application/json",
-        responseJsonSchema: RESPONSE_SCHEMA
-      }
+    const userText = [
+      "Track title:",
+      title,
+      "",
+      "Prompt / notes:",
+      prompt || "(none provided)",
+      "",
+      "Lyrics:",
+      lyrics || "(instrumental — no lyrics provided)"
+    ].join("\n");
+
+    const anthropicBody = {
+      model: model,
+      max_tokens: MAX_TOKENS,
+      temperature: 0.25,
+      system: SYSTEM_PROMPT,
+      messages: [
+        { role: "user", content: userText },
+        // Prefill the assistant turn with "{" so the model is forced to emit a
+        // bare JSON object; we re-add the leading brace before parsing.
+        { role: "assistant", content: "{" }
+      ]
     };
 
-    let geminiResponse;
+    let anthropicResponse;
     try {
-      geminiResponse = await fetch(geminiUrl, {
+      anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": env.GEMINI_API_KEY
+          "x-api-key": env.ANTHROPIC_API_KEY,
+          "anthropic-version": ANTHROPIC_VERSION
         },
-        body: JSON.stringify(geminiBody)
+        body: JSON.stringify(anthropicBody)
       });
     } catch (err) {
       return jsonResponse(
         {
-          error: "Could not reach Gemini.",
+          error: "Could not reach Anthropic.",
           details: cleanString(err && err.message) || "Network request failed."
         },
         502,
@@ -172,36 +135,36 @@ export default {
       );
     }
 
-    const rawText = await geminiResponse.text();
-    if (!geminiResponse.ok) {
+    const rawText = await anthropicResponse.text();
+    if (!anthropicResponse.ok) {
       return jsonResponse(
         {
-          error: "Gemini API request failed.",
-          status: geminiResponse.status,
+          error: "Anthropic API request failed.",
+          status: anthropicResponse.status,
           details: safeJsonParse(rawText) || rawText
         },
-        geminiResponse.status === 429 ? 429 : 502,
+        anthropicResponse.status === 429 ? 429 : 502,
         request,
         env
       );
     }
 
-    let geminiData;
+    let anthropicData;
     try {
-      geminiData = JSON.parse(rawText);
+      anthropicData = JSON.parse(rawText);
     } catch (err) {
       return jsonResponse(
-        { error: "Gemini returned invalid JSON.", raw: rawText },
+        { error: "Anthropic returned invalid JSON.", raw: rawText },
         502,
         request,
         env
       );
     }
 
-    const text = extractGeminiText(geminiData);
+    const text = extractAnthropicText(anthropicData);
     if (!text) {
       return jsonResponse(
-        { error: "Gemini returned no text content.", raw: geminiData },
+        { error: "Anthropic returned no text content.", raw: anthropicData },
         502,
         request,
         env
@@ -210,13 +173,14 @@ export default {
 
     let metadata;
     try {
-      metadata = extractJsonObject(text);
+      // Re-add the prefilled "{" before parsing.
+      metadata = extractJsonObject("{" + text);
       metadata = normalizeMetadata(metadata);
       validateMetadata(metadata);
     } catch (err) {
       return jsonResponse(
         {
-          error: "Gemini returned invalid metadata JSON.",
+          error: "Anthropic returned invalid metadata JSON.",
           details: cleanString(err && err.message) || "Schema validation failed.",
           raw: text
         },
@@ -292,16 +256,14 @@ function safeJsonParse(text) {
   }
 }
 
-function extractGeminiText(data) {
+function extractAnthropicText(data) {
   try {
-    return (
-      data.candidates &&
-      data.candidates[0] &&
-      data.candidates[0].content &&
-      data.candidates[0].content.parts &&
-      data.candidates[0].content.parts[0] &&
-      data.candidates[0].content.parts[0].text
-    ) || "";
+    if (!Array.isArray(data.content)) return "";
+    return data.content
+      .filter(function (block) { return block && block.type === "text"; })
+      .map(function (block) { return cleanString(block.text); })
+      .join("")
+      .trim();
   } catch (err) {
     return "";
   }

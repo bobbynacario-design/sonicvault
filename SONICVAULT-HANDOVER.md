@@ -200,6 +200,8 @@ Applied via `body.light` class toggle. All component overrides use `body.light .
 - [x] Player prefs persisted device-locally in `sv_player_prefs` (not synced to Firestore)
 - [x] Library view with search and genre filtering
 - [x] Track detail expansion (click to reveal Suno prompt)
+- [x] Edit-track modal (`openEditTrack` → `#modal-edit-track`) — edit title/genre/mood/source/prompt/lyrics on tracks already in the vault (including watcher imports that arrived without lyrics), with an inline "Generate AI metadata" button that reuses the same remote-or-local engine as the upload editor. Explicit form values always win over AI suggestions on save.
+- [x] Keyboard shortcuts — global `keydown` handler (skipped while typing in a field; dialogs swallow shortcuts but Escape still closes them). Space/K play-pause, J/L ±10s, ←/→ ±5s, ↑/↓ volume, N/P next/prev, S shuffle, R repeat, M mute, `/` jump-to-search, 1/2/3 switch views, `?` opens the shortcuts overlay (`#modal-shortcuts`), Esc closes dialogs/expanded tracks. Also reachable via the "Keys" button in the nav.
 - [x] Playlists — create, view, delete, with track selection
 - [x] Share modal with copy link, Twitter, WhatsApp, Email
 - [x] Dark/light theme toggle (persisted)
@@ -233,10 +235,14 @@ The Firebase Admin service account JSON (`pokerhq-a67e4-firebase-adminsdk-fbsvc-
 
 ### File size limit: 200MB (watcher) / 100MB (web UI)
 
+## AI Metadata (remote worker)
+- The web UI's "AI endpoint" field (Import view) points at a Cloudflare Worker. When set, `requestRemoteAIMetadata` POSTs `{title, prompt, lyrics, model, fallback}` and expects the raw `ai*` metadata object back; when blank, SonicVault falls back to the local heuristic tagger (`buildLocalMetadataSuggestion`). Endpoint/token/model live in `localStorage` (`sv_ai_config`) only — never written to Firestore.
+- `cloudflare-worker/worker.js` calls the **Anthropic Messages API** (default model `claude-haiku-4-5`). Lyrics are optional so instrumentals and watcher imports can be tagged. Deploy with Wrangler and set secrets `ANTHROPIC_API_KEY` (required), optional `SONICVAULT_CLIENT_TOKEN` (bearer the UI must send) and `ALLOWED_ORIGIN` (comma-separated origin allowlist). The worker forces JSON via an assistant `"{"` prefill and validates the schema before returning.
+
 ## Planned Features (Priority Order)
 1. Suno API auto-sync (when API becomes publicly available)
 2. Export playlist as downloadable ZIP of MP3s
-3. Claude-powered auto-tagging (analyze prompt to suggest genre/mood)
+3. ~~Claude-powered auto-tagging~~ — DONE (2026-06-22): `cloudflare-worker/worker.js` now runs the Anthropic API; the upload editor and the new edit-track modal both call it.
 
 ## Developer Context
 - Developer works in a Windows environment
