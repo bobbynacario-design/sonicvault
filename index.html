@@ -2334,6 +2334,16 @@ body.light .dist-track,body.light .rank-bar{background:rgba(0,0,0,.06)}
 body.light .stat-tile{background:linear-gradient(180deg,rgba(0,0,0,.03),rgba(0,0,0,.01))}
 body.light .rank-row:hover,body.light .dist-row[style*="cursor"]:hover{background:rgba(0,0,0,.04)}
 body.light .health-tile{background:rgba(0,0,0,.03)}
+/* ── Smart mixes ──────────────────────────────────────────────── */
+.smart-mix-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:1rem;margin-top:1.2rem}
+.smart-mix-card{position:relative;overflow:hidden;padding:1.1rem;border-radius:22px;border:1px solid var(--rim);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015))}
+.smart-mix-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--sm-accent,var(--accent-dynamic))}
+.smart-mix-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.55rem}
+.smart-mix-badge{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--sm-accent,var(--accent-dynamic))}
+.smart-mix-count{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted2)}
+.smart-mix-name{font-family:var(--display);font-size:26px;line-height:1;letter-spacing:-.02em}
+.smart-mix-desc{margin-top:.45rem;color:var(--muted);font-size:13px;line-height:1.55}
+body.light .smart-mix-card{background:linear-gradient(180deg,rgba(0,0,0,.03),rgba(0,0,0,.01))}
 .playlist-chip{
   display:flex;
   align-items:center;
@@ -2701,6 +2711,18 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 <div class="page" id="page-playlists">
   <div class="page-stack">
     <div id="playlist-hero"></div>
+    <div class="section-card" id="smart-mix-card">
+      <div class="section-inner">
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">Smart mixes</div>
+            <div class="section-title">Auto-curated from your tags</div>
+            <div class="section-sub">Rule-based mixes that rebuild themselves as the vault grows — driven by genre, mood, energy, and the AI tags Claude assigns. Play them live or snapshot one into a regular playlist.</div>
+          </div>
+        </div>
+        <div class="smart-mix-grid" id="smart-mix-grid"></div>
+      </div>
+    </div>
     <div class="section-card">
       <div class="section-inner">
         <div class="section-head">
@@ -6228,8 +6250,112 @@ function playlistAccentVars(pl) {
   return '--pl-accent:' + c + ';--pl-accent-rim:' + c + '66;--pl-accent-soft:' + c + '1f';
 }
 
+// Smart mixes: rule-based playlists computed live from the vault. They aren't
+// persisted — they recompute on every render so they stay current as tracks
+// are imported and tagged. A mix can be snapshotted into a real playlist.
+function getSmartMixes() {
+  if (!tracks.length) return [];
+  var mixes = [];
+  var minSize = tracks.length >= 8 ? 3 : 2;
+
+  function build(id, name, desc, color, predicate) {
+    var ids = tracks.filter(predicate).map(function(t) { return t.id; });
+    if (ids.length >= minSize) mixes.push({ id: id, name: name, desc: desc, color: color, trackIds: ids });
+  }
+
+  var genreCounts = {}, moodCounts = {};
+  tracks.forEach(function(t) {
+    genreCounts[t.genre || 'Other'] = (genreCounts[t.genre || 'Other'] || 0) + 1;
+    moodCounts[t.mood || 'Other'] = (moodCounts[t.mood || 'Other'] || 0) + 1;
+  });
+  Object.keys(genreCounts).forEach(function(g) {
+    build('smart:genre:' + g, 'All ' + g, 'Every ' + g.toLowerCase() + ' record in the vault.', getGenreColor(g), function(t) { return (t.genre || 'Other') === g; });
+  });
+  Object.keys(moodCounts).forEach(function(m) {
+    build('smart:mood:' + m, m + ' sessions', 'Tracks leaning ' + m.toLowerCase() + '.', getMoodColor(m), function(t) { return (t.mood || 'Other') === m; });
+  });
+
+  build('smart:instrumental', 'Instrumentals', 'No-lyric and instrumental records for focus listening.', '#A794FF', function(t) {
+    return !hasLyrics(t) || /instrument/i.test(String(t.aiVocalStyle || ''));
+  });
+  build('smart:energy:high', 'High energy', 'The driving, high-energy end of the vault (AI-rated).', '#FF7C74', function(t) {
+    return lower(t.aiEnergy) === 'high';
+  });
+  build('smart:energy:low', 'Wind down', 'Low-energy, easy records for late nights (AI-rated).', '#79A6FF', function(t) {
+    return lower(t.aiEnergy) === 'low';
+  });
+
+  // Top recurring tags that aren't already a genre/mood mix.
+  var reserved = {};
+  Object.keys(genreCounts).forEach(function(g) { reserved[lower(g)] = 1; });
+  Object.keys(moodCounts).forEach(function(m) { reserved[lower(m)] = 1; });
+  tracks.forEach(function(t) { if (t.source) reserved[lower(t.source)] = 1; });
+  var tagCounts = {};
+  tracks.forEach(function(t) {
+    getTrackTags(t).forEach(function(tag) { tagCounts[tag] = (tagCounts[tag] || 0) + 1; });
+  });
+  Object.keys(tagCounts).filter(function(tag) { return !reserved[lower(tag)]; })
+    .sort(function(a, b) { return tagCounts[b] - tagCounts[a]; })
+    .slice(0, 4)
+    .forEach(function(tag) {
+      build('smart:tag:' + tag, tag, 'Everything tagged "' + tag + '".', 'var(--accent-dynamic)', function(t) {
+        return getTrackTags(t).some(function(x) { return lower(x) === lower(tag); });
+      });
+    });
+
+  mixes.sort(function(a, b) { return b.trackIds.length - a.trackIds.length; });
+  return mixes.slice(0, 12);
+}
+
+function findSmartMix(id) {
+  return getSmartMixes().filter(function(m) { return m.id === id; })[0] || null;
+}
+
+function playSmartMix(id) {
+  var m = findSmartMix(id);
+  if (!m || !m.trackIds.length) { showToast('That smart mix is empty now'); return; }
+  startPlayback(m.trackIds[0], m.trackIds.slice(), m.name);
+}
+
+function saveSmartMixAsPlaylist(id) {
+  var m = findSmartMix(id);
+  if (!m) return;
+  playlists.push({
+    id: 'pl-' + Date.now(),
+    name: m.name,
+    color: safePlaylistColor(m.color),
+    desc: m.desc + ' (saved from a smart mix)',
+    trackIds: m.trackIds.slice()
+  });
+  persistPlaylists();
+  renderPlaylists();
+  showToast('Saved "' + m.name + '" as a playlist');
+}
+
+function renderSmartMixes() {
+  var card = document.getElementById('smart-mix-card');
+  var grid = document.getElementById('smart-mix-grid');
+  if (!grid) return;
+  var mixes = getSmartMixes();
+  if (!mixes.length) { if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = '';
+  grid.innerHTML = mixes.map(function(m) {
+    var items = m.trackIds.map(getTrackById).filter(Boolean);
+    var dur = getCollectionDuration(items);
+    var plays = items.reduce(function(s, t) { return s + Number(t.plays || 0); }, 0);
+    return '<div class="smart-mix-card" style="--sm-accent:' + m.color + '">'
+      + '<div class="smart-mix-head"><span class="smart-mix-badge">Smart mix</span><span class="smart-mix-count">' + m.trackIds.length + ' tracks</span></div>'
+      + '<div class="smart-mix-name">' + esc(m.name) + '</div>'
+      + '<div class="smart-mix-desc">' + esc(m.desc) + '</div>'
+      + '<div class="pill-row" style="margin-top:.6rem"><span class="meta-pill">' + fmtTime(dur) + '</span><span class="meta-pill">' + fmtCompactNumber(plays) + ' plays</span></div>'
+      + '<div class="section-action-row" style="margin-top:.9rem"><button class="sec-action primary" onclick="playSmartMix(' + jsq(m.id) + ')">Play</button><button class="sec-action" onclick="saveSmartMixAsPlaylist(' + jsq(m.id) + ')">Save as playlist</button></div>'
+      + '</div>';
+  }).join('');
+}
+
 function renderPlaylists() {
   renderPlaylistHero();
+  renderSmartMixes();
   var el = document.getElementById('playlist-grid');
   if (!el) return;
   if (!playlists.length) {
