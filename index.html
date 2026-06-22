@@ -1127,6 +1127,116 @@ body.light .expand-item{background:none}
     radial-gradient(circle at 35% 80%, rgba(255,255,255,.1) 0 1px, transparent 1px);
   background-size:22px 22px, 30px 30px, 26px 26px;
 }
+.cover-art.cover-style-vinyl{
+  background:
+    radial-gradient(circle at 50% 50%, rgba(6,8,14,.86) 0 7%, rgba(255,255,255,.2) 7.5% 8.5%, rgba(6,8,14,.78) 9% 35%, transparent 35.5%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.16) 0 1px, transparent 1px 8px),
+    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 52%, var(--cover-c));
+}
+.cover-art.cover-style-vinyl .cover-grid{opacity:.04}
+.cover-art.cover-style-vinyl .cover-wave{
+  inset:auto auto 11% 10%;
+  width:42%;
+  height:42%;
+  border-radius:50%;
+  transform:none;
+  opacity:.5;
+}
+.cover-art.cover-style-poster{
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.1) 0 1px, transparent 1px 18px),
+    linear-gradient(180deg, rgba(255,255,255,.08) 0 1px, transparent 1px 18px),
+    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 48%, var(--cover-c));
+}
+.cover-art.cover-style-poster .cover-ring{border-radius:4px;transform:rotate(14deg);opacity:.34}
+.cover-art.cover-style-scope{
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255,255,255,.24), transparent 22%),
+    radial-gradient(circle at 78% 72%, rgba(255,255,255,.14), transparent 28%),
+    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 52%, var(--cover-c));
+}
+.cover-art.cover-style-scope .cover-wave{
+  inset:21% -18% auto auto;
+  height:58%;
+  border-radius:50%;
+  border-width:2px;
+  transform:rotate(18deg);
+  opacity:.42;
+}
+.cover-art.cover-style-prism{
+  background:
+    conic-gradient(from var(--cover-angle,135deg) at 38% 42%, var(--cover-a), var(--cover-b), var(--cover-c), var(--cover-a));
+}
+.cover-art.cover-style-prism .cover-grid{
+  opacity:.14;
+  background:
+    linear-gradient(35deg, transparent 0 46%, rgba(255,255,255,.28) 46% 48%, transparent 48%),
+    linear-gradient(145deg, transparent 0 54%, rgba(255,255,255,.22) 54% 56%, transparent 56%);
+  background-size:46px 46px;
+}
+.cover-art.cover-style-mono{
+  filter:saturate(.56) contrast(1.08);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.18), transparent 34%),
+    linear-gradient(var(--cover-angle,135deg), var(--cover-c), var(--cover-a) 54%, #11151f);
+}
+.cover-art.cover-style-mono .cover-mark{font-size:clamp(34px, 4vw, 58px)}
+.cover-art.cover-style-pulse{
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.16) 0 3px, transparent 3px 13px),
+    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 52%, var(--cover-c));
+}
+.cover-art.cover-style-pulse .cover-wave{
+  inset:auto -8% 8% -8%;
+  width:auto;
+  height:48%;
+  border-radius:0;
+  border-left:0;
+  border-right:0;
+  transform:none;
+  opacity:.28;
+}
+.cover-art.cover-style-tape{
+  background:
+    linear-gradient(180deg, rgba(6,8,14,.34) 0 16%, transparent 16% 76%, rgba(6,8,14,.38) 76%),
+    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 48%, var(--cover-c));
+}
+.cover-art.cover-style-tape .cover-ring{width:34%;height:34%;opacity:.5}
+.cover-art.cover-style-tape .cover-wave{
+  inset:18% 10% auto auto;
+  width:34%;
+  height:34%;
+  border-radius:50%;
+  transform:none;
+  opacity:.5;
+}
+.cover-style-picker{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(86px,1fr));
+  gap:.55rem;
+}
+.cover-style-option{
+  display:grid;
+  gap:.4rem;
+  padding:.5rem;
+  border-radius:16px;
+  border:1px solid var(--rim);
+  background:rgba(255,255,255,.035);
+  color:var(--text);
+  cursor:pointer;
+  text-align:left;
+}
+.cover-style-option.active{
+  border-color:rgba(255,255,255,.32);
+  background:rgba(255,255,255,.08);
+}
+.cover-style-label{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
 .cover-topline,
 .cover-bottomline{
   position:absolute;
@@ -2965,6 +3075,10 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
         <label class="form-label">Source</label>
         <select class="form-input" id="edit-source"></select>
       </div>
+      <div class="form-group">
+        <label class="form-label">Cover style</label>
+        <select class="form-input" id="edit-cover-style"></select>
+      </div>
     </div>
     <div class="form-group" style="margin-top:.8rem">
       <label class="form-label">Prompt / notes</label>
@@ -3273,6 +3387,7 @@ var _publicRoutePayload = null;
 var _publicRouteLoading = false;
 var _mediaSessionActionBound = false;
 var _mediaSessionArtworkCache = {};
+var _coverDemoActive = false;
 var PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2];
 var _playerPrefs = loadPlayerPrefs();
 var _shuffleMode = _playerPrefs.shuffle === true;
@@ -3283,7 +3398,7 @@ _audio.volume = (typeof _playerPrefs.volume === 'number' && _playerPrefs.volume 
 _audio.defaultPlaybackRate = _playbackRate;
 _audio.playbackRate = _playbackRate;
 var _aiConfig = loadLocalAIConfig();
-var AI_METADATA_VERSION = 1;
+var AI_METADATA_VERSION = 2;
 
 function lower(v) { return String(v || '').toLowerCase(); }
 function jsq(v) { return JSON.stringify(String(v || '')).replace(/"/g, '&quot;'); }
@@ -3424,6 +3539,164 @@ function getMoodColor(mood) {
   return map[mood] || '#f08b62';
 }
 
+var COVER_STYLES = [
+  { id:'aurora', name:'Aurora' },
+  { id:'vinyl', name:'Vinyl' },
+  { id:'poster', name:'Poster' },
+  { id:'scope', name:'Scope' },
+  { id:'prism', name:'Prism' },
+  { id:'mono', name:'Mono' },
+  { id:'pulse', name:'Pulse' },
+  { id:'tape', name:'Tape' }
+];
+
+function getCoverStyleIds() {
+  return COVER_STYLES.map(function(style) { return style.id; });
+}
+
+function getCoverStyleName(id) {
+  var match = COVER_STYLES.find(function(style) { return style.id === id; });
+  return match ? match.name : 'Aurora';
+}
+
+function getCoverStyle(track) {
+  var current = String(track && track.coverStyle || '').trim();
+  if (getCoverStyleIds().indexOf(current) !== -1) return current;
+  var base = [
+    track && track.title,
+    track && track.genre,
+    track && track.mood,
+    track && track.aiTheme,
+    track && track.aiEnergy,
+    track && track.source
+  ].join('|');
+  var ids = getCoverStyleIds();
+  return ids[hashString(base) % ids.length] || 'aurora';
+}
+
+function buildCoverStyleOptions(current) {
+  return COVER_STYLES.map(function(style) {
+    return '<option value="' + attr(style.id) + '"' + (style.id === current ? ' selected' : '') + '>' + esc(style.name) + '</option>';
+  }).join('');
+}
+
+function buildCoverStylePicker(item, onSelectCall) {
+  var current = getCoverStyle(item);
+  return '<div class="cover-style-picker">' + COVER_STYLES.map(function(style) {
+    var preview = Object.assign({}, item || {}, { coverStyle: style.id });
+    return ''
+      + '<button type="button" class="cover-style-option' + (style.id === current ? ' active' : '') + '" onclick="' + onSelectCall + '(' + jsq(style.id) + ')">'
+      +   buildCoverArt(preview, 'xs', false)
+      +   '<span class="cover-style-label">' + esc(style.name) + '</span>'
+      + '</button>';
+  }).join('') + '</div>';
+}
+
+function getNextCoverStyle(current) {
+  var ids = getCoverStyleIds();
+  var idx = ids.indexOf(current);
+  return ids[(idx + 1 + ids.length) % ids.length] || 'aurora';
+}
+
+function makeCoverDemoTracks() {
+  var demos = [
+    { title:'Neon Highway', genre:'Synthwave', mood:'Energetic', coverStyle:'prism', prompt:'neon synthwave night drive, chrome skyline, bright arps', aiTheme:'Night-drive escape', aiEnergy:'High', aiTags:['Neon','Night drive','Chrome'] },
+    { title:'Cassette Porchlight', genre:'Country', mood:'Warm', coverStyle:'tape', prompt:'warm country acoustic, family porch, home-recording feel', aiTheme:'Family devotion', aiEnergy:'Medium', aiTags:['Home','Porchlight','Acoustic'] },
+    { title:'Blue Room Static', genre:'Lo-fi', mood:'Chill', coverStyle:'tape', prompt:'lo-fi dusty cassette beat, soft keys, late-night room tone', aiTheme:'Bedroom haze', aiEnergy:'Low', aiTags:['Lo-fi','Cassette','Late night'] },
+    { title:'Glass Cathedral', genre:'Ambient', mood:'Dreamy', coverStyle:'scope', prompt:'cinematic ambient pads, ocean light, wide horizon', aiTheme:'Coastal reset', aiEnergy:'Low', aiTags:['Ocean','Cinematic','Wide'] },
+    { title:'Velvet Revolver Heart', genre:'R&B', mood:'Melancholic', coverStyle:'vinyl', prompt:'vintage soul and R&B, analog warmth, heartbreak vocal', aiTheme:'Heartbreak fallout', aiEnergy:'Medium', aiTags:['Vintage','Soul','Heartbreak'] },
+    { title:'Afterparty Voltage', genre:'Electronic', mood:'Intense', coverStyle:'pulse', prompt:'club drop, 808 kick, strobe lights, high-energy dance track', aiTheme:'Club voltage', aiEnergy:'High', aiTags:['Club','808','Strobe'] },
+    { title:'Blackout Hymn', genre:'Rock', mood:'Dark', coverStyle:'mono', prompt:'dark minimal rock, noir shadows, haunted vocal', aiTheme:'Noir devotion', aiEnergy:'Medium', aiTags:['Noir','Shadow','Minimal'] },
+    { title:'Radio Sunburst', genre:'Pop', mood:'Uplifting', coverStyle:'poster', prompt:'bold radio pop anthem, big hook, sunrise chorus', aiTheme:'Morning lift', aiEnergy:'High', aiTags:['Pop','Hook','Sunrise'] }
+  ];
+  return demos.map(function(item, index) {
+    return Object.assign({
+      id:'demo-cover-' + index,
+      source:'Suno',
+      lyrics:'[Verse]\nThis is a local SonicVault cover demo.\n[Chorus]\nNo audio is saved, no vault data is changed.',
+      audioURL:'',
+      duration:180 + (index * 9),
+      created:new Date().toISOString().split('T')[0],
+      plays:index,
+      shared:false,
+      fileName:'cover-demo-' + (index + 1) + '.mp3',
+      fileSize:0,
+      aiSummary:'A temporary local demo track for previewing SonicVault cover styles. It is memory-only and will disappear on reload.',
+      aiVocalStyle:'Preview lead',
+      aiEra:'Demo',
+      aiInstruments:['Synth'],
+      aiExplicit:false,
+      aiSource:'local',
+      aiMetadataVersion:AI_METADATA_VERSION,
+      aiGeneratedAt:new Date().toISOString()
+    }, item);
+  });
+}
+
+function startCoverDemo() {
+  _coverDemoActive = true;
+  _currentTrack = null;
+  _isPlaying = false;
+  tracks = makeCoverDemoTracks();
+  playlists = [];
+  window.tracks = tracks;
+  window.playlists = playlists;
+  invalidateFilterCache();
+  clearFilters();
+  renderTracks();
+  renderPlaylists();
+  updateNowPlaying();
+  renderRouteAwareView(true);
+  showToast('Loaded local cover demo. Nothing will be saved.');
+}
+
+function exitCoverDemo() {
+  _coverDemoActive = false;
+  tracks = load('tracks', []);
+  playlists = load('playlists', []);
+  window.tracks = tracks;
+  window.playlists = playlists;
+  invalidateFilterCache();
+  window.refreshAll();
+  showToast('Cover demo cleared');
+}
+
+function normalizeCoverStyle(value, fallbackTrack) {
+  var style = String(value || '').trim().toLowerCase();
+  if (getCoverStyleIds().indexOf(style) !== -1) return style;
+  return getCoverStyle(fallbackTrack || {});
+}
+
+function inferCoverStyle(input, metadata) {
+  var text = lower([
+    input && input.title,
+    input && input.prompt,
+    input && input.lyrics,
+    metadata && metadata.aiGenre,
+    metadata && metadata.aiMood,
+    metadata && metadata.aiTheme,
+    metadata && metadata.aiEnergy,
+    metadata && metadata.aiVocalStyle,
+    metadata && metadata.aiEra,
+    (metadata && metadata.aiTags || []).join(' ')
+  ].join(' '));
+  if (/\b(vinyl|analog|dusty|classic|retro|old soul|jazz|soul|r&b|blues)\b/.test(text)) return 'vinyl';
+  if (/\b(poster|anthem|radio|pop|headline|hook|stadium|arena)\b/.test(text)) return 'poster';
+  if (/\b(scope|cinematic|ambient|dream|moon|ocean|shore|sky|horizon|wide|film)\b/.test(text)) return 'scope';
+  if (/\b(prism|neon|synthwave|electronic|cyber|future|arcade|vhs|chrome|laser)\b/.test(text)) return 'prism';
+  if (/\b(mono|minimal|blackout|dark|shadow|noir|haunted|empty|alone)\b/.test(text)) return 'mono';
+  if (/\b(pulse|club|edm|dance|drop|808|trap|high energy|fast|rush)\b/.test(text)) return 'pulse';
+  if (/\b(tape|lo-fi|lofi|cassette|bedroom|demo|acoustic|folk|country|home)\b/.test(text)) return 'tape';
+  return getCoverStyle({
+    title: input && input.title,
+    genre: metadata && metadata.aiGenre || input && input.genre,
+    mood: metadata && metadata.aiMood || input && input.mood,
+    aiTheme: metadata && metadata.aiTheme,
+    aiEnergy: metadata && metadata.aiEnergy,
+    source: input && input.source || 'Suno'
+  });
+}
+
 function getTrackPalette(track) {
   var base = hashString((track && track.title || '') + '|' + (track && track.genre || '') + '|' + (track && track.mood || '') + '|' + (track && track.source || ''));
   var hue = (base % 360 + moodWeight(track && track.mood) + sourceWeight(track && track.source)) % 360;
@@ -3454,7 +3727,8 @@ function getQueueContextLabel() {
 }
 
 function buildMediaSessionArtwork(track, size) {
-  var key = (track && track.id || 'vault') + ':' + size;
+  var style = getCoverStyle(track || {});
+  var key = (track && track.id || 'vault') + ':' + style + ':' + size;
   if (_mediaSessionArtworkCache[key]) return _mediaSessionArtworkCache[key];
 
   var palette = getTrackPalette(track || {});
@@ -3478,13 +3752,29 @@ function buildMediaSessionArtwork(track, size) {
       ctx.fillStyle = 'rgba(255,255,255,0.08)';
       for (var i = 0; i < 5; i++) {
         ctx.beginPath();
-        ctx.arc(size * (0.18 + i * 0.17), size * (0.22 + (i % 2) * 0.12), size * (0.22 + i * 0.015), 0, Math.PI * 2);
+        ctx.arc(
+          size * (style === 'vinyl' ? 0.5 : (0.18 + i * 0.17)),
+          size * (style === 'vinyl' ? 0.5 : (0.22 + (i % 2) * 0.12)),
+          size * (style === 'vinyl' ? (0.1 + i * 0.07) : (0.22 + i * 0.015)),
+          0,
+          Math.PI * 2
+        );
         ctx.fill();
       }
 
       ctx.strokeStyle = 'rgba(255,255,255,0.2)';
       ctx.lineWidth = Math.max(2, size * 0.012);
-      ctx.strokeRect(size * 0.08, size * 0.08, size * 0.84, size * 0.84);
+      if (style === 'prism' || style === 'poster') {
+        ctx.beginPath();
+        ctx.moveTo(size * 0.12, size * 0.18);
+        ctx.lineTo(size * 0.84, size * 0.12);
+        ctx.lineTo(size * 0.72, size * 0.84);
+        ctx.lineTo(size * 0.18, size * 0.76);
+        ctx.closePath();
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(size * 0.08, size * 0.08, size * 0.84, size * 0.84);
+      }
 
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       ctx.font = '700 ' + Math.round(size * 0.26) + 'px sans-serif';
@@ -3800,7 +4090,7 @@ function normalizeAIMetadata(raw, input) {
   var text = getTrackMetadataText(input);
   var tags = sanitizeMetadataArray(raw && (raw.aiTags || raw.tags), 10);
   var instruments = sanitizeMetadataArray(raw && (raw.aiInstruments || raw.instruments), 6);
-  return {
+  var metadata = {
     aiGenre: String(raw && (raw.aiGenre || raw.genre) || '').trim() || 'Other',
     aiMood: String(raw && (raw.aiMood || raw.mood) || '').trim() || 'Dreamy',
     aiTheme: String(raw && (raw.aiTheme || raw.theme) || '').trim() || buildThemeFromTags(tags),
@@ -3815,6 +4105,16 @@ function normalizeAIMetadata(raw, input) {
     aiMetadataVersion: Number(raw && raw.aiMetadataVersion || AI_METADATA_VERSION),
     aiGeneratedAt: raw && raw.aiGeneratedAt || new Date().toISOString()
   };
+  metadata.coverStyle = normalizeCoverStyle(raw && (raw.coverStyle || raw.aiCoverStyle), {
+    title: input && input.title,
+    genre: metadata.aiGenre,
+    mood: metadata.aiMood,
+    aiTheme: metadata.aiTheme,
+    aiEnergy: metadata.aiEnergy,
+    source: input && input.source || 'Suno'
+  });
+  if (!raw || !(raw.coverStyle || raw.aiCoverStyle)) metadata.coverStyle = inferCoverStyle(input, metadata);
+  return metadata;
 }
 
 function getAIMetadataSourceLabel(item) {
@@ -3877,6 +4177,15 @@ function buildLocalMetadataSuggestion(input) {
     aiInstruments: instruments,
     aiTags: tags,
     aiSummary: summary,
+    coverStyle: inferCoverStyle(input, {
+      aiGenre: genre,
+      aiMood: mood,
+      aiTheme: theme,
+      aiEnergy: energy,
+      aiVocalStyle: vocalStyle,
+      aiEra: era,
+      aiTags: tags
+    }),
     aiExplicit: detectExplicit(text),
     aiSource: 'local'
   }, input);
@@ -3949,6 +4258,7 @@ function applyAIMetadataToDraft(item, metadata, forceManualFields) {
   item.aiSource = String(metadata.aiSource || '').trim();
   item.aiMetadataVersion = Number(metadata.aiMetadataVersion || AI_METADATA_VERSION);
   item.aiGeneratedAt = metadata.aiGeneratedAt || new Date().toISOString();
+  item.coverStyle = normalizeCoverStyle(metadata.coverStyle, item);
   if (forceManualFields || !item.genreEdited) item.genre = item.aiGenre || item.genre;
   if (forceManualFields || !item.moodEdited) item.mood = item.aiMood || item.mood;
   item.aiStatus = 'done';
@@ -4387,6 +4697,7 @@ function makeTrackSnapshot(track) {
     prompt: track.prompt || '',
     duration: Number(track.duration || 0),
     audioURL: track.audioURL || '',
+    coverStyle: getCoverStyle(track),
     peaks: getRealPeaksForTrack(track),
     plays: Number(track.plays || 0),
     created: track.created || '',
@@ -4456,13 +4767,14 @@ function buildPlaylistSharePayload(pl) {
 function buildCoverArt(track, size, includeWords) {
   if (!track) track = { title:'SonicVault', genre:'Other', mood:'Dreamy', source:'Vault' };
   var palette = getTrackPalette(track);
+  var style = getCoverStyle(track);
   var tags = getTrackTags(track);
   var top = track.source || 'Vault';
   var bottom = tags[0] || track.mood || track.genre || 'Curated';
   var sizeClass = size || 'md';
   var words = includeWords === false ? '' : '<div class="cover-mark">' + esc(getTrackMonogram(track.title)) + '</div>';
   return ''
-    + '<div class="cover-art cover-' + esc(sizeClass) + '" style="--cover-a:' + palette.a + ';--cover-b:' + palette.b + ';--cover-c:' + palette.c + ';--cover-angle:' + palette.angle + 'deg">'
+    + '<div class="cover-art cover-' + esc(sizeClass) + ' cover-style-' + esc(style) + '" style="--cover-a:' + palette.a + ';--cover-b:' + palette.b + ';--cover-c:' + palette.c + ';--cover-angle:' + palette.angle + 'deg">'
     +   '<div class="cover-grid"></div>'
     +   '<div class="cover-wave"></div>'
     +   '<div class="cover-ring"></div>'
@@ -5002,6 +5314,10 @@ function persistPlaylists() {
 // instead of every call site remembering to call invalidateFilterCache().
 function persistTracks() {
   window.tracks = tracks;
+  if (_coverDemoActive) {
+    invalidateFilterCache();
+    return;
+  }
   save('tracks', tracks);
   invalidateFilterCache();
 }
@@ -5902,6 +6218,7 @@ function buildTrackCard(track) {
     +         '<div class="track-actions">'
     +           '<button class="action-btn primary" onclick="event.stopPropagation();startPlayback(' + jsq(track.id) + ', ' + jsv(queueIds) + ', ' + jsq('Filtered shelf') + ')">' + (isPlaying ? 'Pause' : 'Play') + '</button>'
     +           '<button class="action-btn" onclick="event.stopPropagation();toggleExpand(' + jsq(track.id) + ')">' + (expanded ? 'Hide notes' : 'Open notes') + '</button>'
+    +           '<button class="icon-btn" onclick="event.stopPropagation();cycleTrackCover(' + jsq(track.id) + ')">Cover</button>'
     +           '<button class="icon-btn" onclick="event.stopPropagation();openEditTrack(' + jsq(track.id) + ')">Edit</button>'
     +           '<button class="icon-btn" onclick="event.stopPropagation();shareTrack(' + jsq(track.id) + ')">Share</button>'
     +           '<button class="icon-btn" onclick="event.stopPropagation();deleteTrack(' + jsq(track.id) + ')">Delete</button>'
@@ -5950,7 +6267,7 @@ function renderLibraryHome() {
   if (!el) return;
 
   if (!tracks.length) {
-    el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="empty-state"><strong>Start your private label.</strong>Upload your first Suno track or let the watcher auto-import from your downloads folder. SonicVault will build the cover system, the discovery rails, and the listening-first player on top of the same data model you already use.<div class="modal-actions" style="justify-content:center;margin-top:1rem"><button class="sec-action primary" onclick="switchView(\'upload\')">Import first track</button></div></div></div></div>';
+    el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="empty-state"><strong>Start your private label.</strong>Upload your first Suno track or let the watcher auto-import from your downloads folder. SonicVault will build the cover system, the discovery rails, and the listening-first player on top of the same data model you already use.<div class="modal-actions" style="justify-content:center;margin-top:1rem"><button class="sec-action primary" onclick="switchView(\'upload\')">Import first track</button><button class="sec-action" onclick="startCoverDemo()">Preview cover styles</button></div></div></div></div>';
     return;
   }
 
@@ -5972,6 +6289,7 @@ function renderLibraryHome() {
 
   el.innerHTML = ''
     + '<div class="library-home-stack">'
+    +   (_coverDemoActive ? '<div class="browse-summary has-filters"><div><strong>Cover demo mode</strong></div><div>These tracks are memory-only previews and will not be saved.</div><button class="browse-clear-pill" onclick="exitCoverDemo()">Exit demo</button></div>' : '')
     +   '<div class="hero-stage">'
     +     '<div class="hero-main"><div class="hero-grid">'
     +       '<div class="hero-copy">'
@@ -6102,6 +6420,7 @@ function openEditTrack(id) {
   document.getElementById('edit-genre').innerHTML = buildEditSelectOptions(EDIT_GENRES, track.genre || 'Other');
   document.getElementById('edit-mood').innerHTML = buildEditSelectOptions(EDIT_MOODS, track.mood || 'Chill');
   document.getElementById('edit-source').innerHTML = buildEditSelectOptions(EDIT_SOURCES, track.source || 'Suno');
+  document.getElementById('edit-cover-style').innerHTML = buildCoverStyleOptions(getCoverStyle(track));
   document.getElementById('edit-prompt').value = track.prompt || '';
   document.getElementById('edit-lyrics').value = getTrackLyrics(track);
   document.getElementById('edit-ai-chips').innerHTML = '';
@@ -6124,6 +6443,7 @@ function readEditDraftInput() {
 
 async function regenerateTrackMetadata() {
   if (!_editingTrackId) return;
+  var track = getTrackById(_editingTrackId);
   var input = readEditDraftInput();
   if (!input.title) { showToast('Add a title before generating metadata'); return; }
   var btn = document.getElementById('edit-ai-btn');
@@ -6135,8 +6455,10 @@ async function regenerateTrackMetadata() {
     var metadata = _aiConfig.endpoint ? await requestRemoteAIMetadata(input, fallback) : fallback;
     metadata.aiSource = _aiConfig.endpoint ? 'claude' : 'local';
     _editTrackAI = metadata;
+    var coverSelect = document.getElementById('edit-cover-style');
+    if (coverSelect && metadata.coverStyle) coverSelect.value = normalizeCoverStyle(metadata.coverStyle, track);
     statusEl.textContent = metadata.aiSummary || (_aiConfig.endpoint ? 'Claude metadata ready.' : 'Local suggestions ready.');
-    var chips = (metadata.aiTags || []).concat([metadata.aiMood, metadata.aiGenre, metadata.aiEnergy].filter(Boolean));
+    var chips = (metadata.aiTags || []).concat([metadata.aiMood, metadata.aiGenre, metadata.aiEnergy, getCoverStyleName(metadata.coverStyle)].filter(Boolean));
     document.getElementById('edit-ai-chips').innerHTML = chips.map(function(c) { return '<span class="ai-chip">' + esc(c) + '</span>'; }).join('');
     showToast(_aiConfig.endpoint ? 'Claude metadata generated' : 'Local metadata suggestions generated');
   } catch (e) {
@@ -6160,8 +6482,10 @@ function saveEditTrack() {
   track.genre = input.genre;
   track.mood = input.mood;
   track.source = document.getElementById('edit-source').value;
+  track.coverStyle = document.getElementById('edit-cover-style').value || getCoverStyle(track);
   track.prompt = input.prompt;
   track.lyrics = input.lyrics;
+  _mediaSessionArtworkCache = {};
   persistTracks();
   _editingTrackId = '';
   _editTrackAI = null;
@@ -6169,6 +6493,17 @@ function saveEditTrack() {
   renderTracks();
   if (_currentTrack && _currentTrack.id === track.id) updateNowPlaying();
   showToast('Track updated');
+}
+
+function cycleTrackCover(id) {
+  var track = getTrackById(id);
+  if (!track) return;
+  track.coverStyle = getNextCoverStyle(getCoverStyle(track));
+  _mediaSessionArtworkCache = {};
+  persistTracks();
+  renderTracks();
+  if (_currentTrack && _currentTrack.id === track.id) updateNowPlaying();
+  showToast('Cover style: ' + getCoverStyleName(track.coverStyle));
 }
 
 async function shareTrack(id) {
@@ -6529,7 +6864,7 @@ function getBatchDefaults() {
 
 function makeUploadDraft(file) {
   var defaults = getBatchDefaults();
-  return {
+  var draft = {
     id: 'up-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
     file: file,
     objectURL: URL.createObjectURL(file),
@@ -6562,6 +6897,8 @@ function makeUploadDraft(file) {
     genreEdited: false,
     moodEdited: false
   };
+  draft.coverStyle = getCoverStyle(draft);
+  return draft;
 }
 
 function probeUploadDraft(draft) {
@@ -6701,6 +7038,7 @@ function renderUploadEditor() {
     +     '<div class="form-group"><label class="form-label">Genre</label><select class="form-input" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('genre') + ', this.value)">' + buildSelectOptions(['Synthwave','Lo-fi','Electronic','Ambient','Hip Hop','Rock','Pop','Folk','Jazz','Classical','R&B','Chiptune','Metal','Country','Other'], item.genre) + '</select></div>'
     +     '<div class="form-group"><label class="form-label">Mood</label><select class="form-input" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('mood') + ', this.value)">' + buildSelectOptions(['Energetic','Chill','Intense','Dreamy','Warm','Playful','Melancholic','Uplifting','Dark'], item.mood) + '</select></div>'
     +     '<div class="form-group"><label class="form-label">Source</label><select class="form-input" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('source') + ', this.value)">' + buildSelectOptions(['Suno','Udio','Original','Other'], item.source) + '</select></div>'
+    +     '<div class="form-group"><label class="form-label">Cover style</label><select class="form-input" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('coverStyle') + ', this.value)">' + buildCoverStyleOptions(getCoverStyle(item)) + '</select></div>'
     +   '</div>'
     +   '<div class="form-group"><label class="form-label">Prompt / notes</label><textarea class="form-input" rows="6" placeholder="Optional notes for this specific release..." ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('prompt') + ', this.value)">' + esc(item.prompt || '') + '</textarea></div>'
     +   '<div class="form-group"><label class="form-label">Lyrics (required for manual uploads)</label><textarea class="form-input upload-lyrics-text" rows="10" placeholder="Paste the full lyric sheet you used before generating this song..." ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('lyrics') + ', this.value)">' + esc(item.lyrics || '') + '</textarea>' + (!hasLyrics(item) ? '<div class="lyrics-status">Lyrics are required before save.</div>' : '') + '</div>'
@@ -6892,6 +7230,7 @@ async function saveAllUploads() {
         genre: item.genre || 'Other',
         mood: item.mood || 'Dreamy',
         source: item.source || 'Suno',
+        coverStyle: getCoverStyle(item),
         prompt: item.prompt || '',
         lyrics: getTrackLyrics(item),
         audioURL: audioURL,

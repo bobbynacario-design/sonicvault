@@ -101,6 +101,28 @@ function generateWaveform() {
   return waveform;
 }
 
+function hashString(str) {
+  var hash = 0;
+  var text = String(str || '');
+  for (var i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function pickCoverStyle(track) {
+  var styles = ['aurora', 'vinyl', 'poster', 'scope', 'prism', 'mono', 'pulse', 'tape'];
+  var base = [
+    track && track.title,
+    track && track.genre,
+    track && track.mood,
+    track && track.source,
+    track && track.fileName
+  ].join('|');
+  return styles[hashString(base) % styles.length] || 'aurora';
+}
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -189,6 +211,7 @@ async function processFile(filePath) {
         genre:        'Other',
         mood:         'Energetic',
         source:       'Suno',
+        coverStyle:   pickCoverStyle({ title: title, genre: 'Other', mood: 'Energetic', source: 'Suno', fileName: filename }),
         prompt:       '',
         lyrics:       '',
         audioURL:     downloadURL,

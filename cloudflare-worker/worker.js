@@ -18,9 +18,11 @@ const SYSTEM_PROMPT = [
   "Return ONLY a raw JSON object — no markdown, no code fences, no commentary before or after.",
   "Do not omit keys. Do not add extra keys.",
   "The JSON must match this exact schema:",
-  '{ "aiGenre": "string", "aiMood": "string", "aiTheme": "string", "aiEnergy": "High/Medium/Low", "aiVocalStyle": "string", "aiEra": "string", "aiInstruments": ["array", "of", "strings"], "aiTags": ["array", "of", "strings"], "aiSummary": "A 2 sentence editorial summary", "aiExplicit": boolean }',
+  '{ "aiGenre": "string", "aiMood": "string", "aiTheme": "string", "aiEnergy": "High/Medium/Low", "aiVocalStyle": "string", "aiEra": "string", "aiInstruments": ["array", "of", "strings"], "aiTags": ["array", "of", "strings"], "aiSummary": "A 2 sentence editorial summary", "coverStyle": "aurora/vinyl/poster/scope/prism/mono/pulse/tape", "aiExplicit": boolean }',
   "Rules:",
   "- aiEnergy must be exactly one of: High, Medium, Low.",
+  "- coverStyle must be exactly one of: aurora, vinyl, poster, scope, prism, mono, pulse, tape.",
+  "- Pick coverStyle from the strongest visual or production cue: aurora for lush atmospheric color, vinyl for vintage/analog/soul/jazz/R&B, poster for pop anthems and bold hooks, scope for cinematic/ambient/ocean/dream songs, prism for neon/electronic/synthwave/future, mono for dark/minimal/noir, pulse for club/EDM/808/high-energy, tape for lo-fi/cassette/acoustic/folk/country/home-recording.",
   "- aiSummary must be exactly 2 sentences.",
   "- aiVocalStyle should read 'Instrumental' when no lyrics are provided.",
   "- aiInstruments must be a short array of strings.",
@@ -96,7 +98,10 @@ export default {
       prompt || "(none provided)",
       "",
       "Lyrics:",
-      lyrics || "(instrumental — no lyrics provided)"
+      lyrics || "(instrumental — no lyrics provided)",
+      "",
+      "Available SonicVault cover styles:",
+      "aurora, vinyl, poster, scope, prism, mono, pulse, tape"
     ].join("\n");
 
     const anthropicBody = {
@@ -296,6 +301,7 @@ function normalizeMetadata(data) {
       ? data.aiTags.map(cleanString).filter(Boolean)
       : [],
     aiSummary: cleanString(data.aiSummary),
+    coverStyle: cleanString(data.coverStyle).toLowerCase(),
     aiExplicit: Boolean(data.aiExplicit)
   };
 }
@@ -308,7 +314,8 @@ function validateMetadata(data) {
     "aiEnergy",
     "aiVocalStyle",
     "aiEra",
-    "aiSummary"
+    "aiSummary",
+    "coverStyle"
   ];
 
   for (const key of requiredStrings) {
@@ -319,6 +326,10 @@ function validateMetadata(data) {
 
   if (!["High", "Medium", "Low"].includes(data.aiEnergy)) {
     throw new Error('Invalid value for "aiEnergy".');
+  }
+
+  if (!["aurora", "vinyl", "poster", "scope", "prism", "mono", "pulse", "tape"].includes(data.coverStyle)) {
+    throw new Error('Invalid value for "coverStyle".');
   }
 
   if (!Array.isArray(data.aiInstruments)) {
