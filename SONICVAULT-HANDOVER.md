@@ -193,6 +193,7 @@ Applied via `body.light` class toggle. All component overrides use `body.light .
 - [x] Audio playback with waveform visualization
 - [x] REAL waveforms: peaks decoded from the actual audio (Web Audio API). Decoded at upload time from the in-memory file, on first play, and via a one-time background sweep (`sweepWaveformBackfill`) for older tracks. Stored in `appSettings.waveformCache[trackId]` (72 floats) and stamped on `track.peaks` so share payloads carry them. Legacy random `track.waveform` is ignored by the UI; the watcher's random waveform gets replaced on first play/sweep.
 - [x] Now-playing bar with seek/progress
+- [x] Expanded full-screen player polish (`#modal-now-playing`): animated waveform (`.player-wave.playing` pulses the playhead bar), a "now playing" cover treatment (`.cover-live` — breathing scale + accent glow + drifting ring), proportional lyric scroll-along (`updateLyricHighlight` dims non-current lines and highlights/scrolls the line nearest the playhead; lyrics are untimed so sync is approximate), and queue reordering (`moveQueueTrack` ▲▼ controls — mutates the live shuffle or canonical order; hidden on mobile). All animations respect `prefers-reduced-motion`.
 - [x] Auto-advance to next track
 - [x] Shuffle mode (Fisher-Yates over the active queue, current track pinned first)
 - [x] Repeat modes: off / queue / one

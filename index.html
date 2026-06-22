@@ -1161,6 +1161,14 @@ body.light .expand-item{background:none}
 .cover-sm{width:78px;height:78px;border-radius:18px}
 .cover-md{width:118px;height:118px}
 .cover-lg{width:100%;max-width:320px;aspect-ratio:1/1}
+/* "Now playing" cover: gentle breathing scale + pulsing accent glow, and the
+   generative ring/wave slowly drift to signal an active track. */
+@keyframes coverBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.014)}}
+@keyframes coverLiveGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 999px rgba(6,8,14,.12), 0 10px 30px -18px var(--accent-dynamic-soft)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 999px rgba(6,8,14,.12), 0 26px 70px -14px var(--accent-dynamic-soft)}}
+@keyframes coverDrift{to{transform:rotate(360deg)}}
+.cover-art.cover-live{animation:coverBreathe 6s ease-in-out infinite, coverLiveGlow 4.5s ease-in-out infinite}
+.cover-art.cover-live .cover-ring{animation:coverDrift 24s linear infinite;transform-origin:center}
+@media (prefers-reduced-motion:reduce){.cover-art.cover-live,.cover-art.cover-live .cover-ring{animation:none}}
 .cover-collage{
   display:grid;
   grid-template-columns:repeat(2,1fr);
@@ -2065,6 +2073,18 @@ body.light .player-modal{
 }
 .lyric-line + .lyric-line{margin-top:.12rem}
 .lyric-section-header + .lyric-line{margin-top:.4rem}
+/* Scroll-along: dim non-current lyric lines, highlight the line nearest the
+   playhead. Sync is proportional (untimed lyrics), so kept gentle. */
+.player-lyrics.synced .lyric-line{transition:color .3s ease, background .3s ease;color:var(--muted2)}
+.player-lyrics.synced .lyric-line.lyric-current{
+  color:var(--text);
+  font-weight:600;
+  background:var(--accent-dynamic-soft);
+  box-shadow:inset 2px 0 0 var(--accent-dynamic);
+  border-radius:8px;
+  padding:.12rem .55rem;
+  margin-left:-.55rem;
+}
 .player-ai-summary{
   color:var(--muted);
   font-size:14px;
@@ -2136,6 +2156,10 @@ body.light .player-modal{
   box-shadow:0 0 18px var(--accent-dynamic-soft);
 }
 .player-wave .pbar.current{transform:scaleY(1.04)}
+@keyframes wavePulseCurrent{0%,100%{transform:scaleY(1.05)}50%{transform:scaleY(1.32)}}
+.player-wave.playing .pbar.current{animation:wavePulseCurrent .9s ease-in-out infinite}
+.player-wave.playing .pbar.active{box-shadow:0 0 24px var(--accent-dynamic-soft)}
+@media (prefers-reduced-motion:reduce){.player-wave.playing .pbar.current{animation:none}}
 .player-progress-line{
   position:relative;
   height:12px;
@@ -2233,7 +2257,7 @@ body.light .player-btn.primary{background:#171420;color:#f7f2eb}
 .related-row{display:grid;gap:.7rem}
 .queue-item{
   display:grid;
-  grid-template-columns:auto 58px minmax(0,1fr) auto;
+  grid-template-columns:auto 58px minmax(0,1fr) auto auto;
   gap:.8rem;
   align-items:center;
   padding:.55rem .6rem;
@@ -2264,6 +2288,18 @@ body.light .queue-item:hover{background:rgba(0,0,0,.04)}
   text-transform:uppercase;
   color:var(--accent-dynamic);
 }
+.queue-reorder{display:flex;flex-direction:column;gap:3px}
+.queue-reorder button{
+  width:24px;height:18px;
+  display:flex;align-items:center;justify-content:center;
+  border:0;border-radius:6px;cursor:pointer;
+  background:rgba(255,255,255,.06);color:var(--muted);
+  font-size:9px;line-height:1;
+  transition:background .14s ease, color .14s ease, opacity .14s ease;
+}
+.queue-reorder button:hover:not(:disabled){background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+.queue-reorder button:disabled{opacity:.28;cursor:default}
+body.light .queue-reorder button{background:rgba(0,0,0,.05)}
 .playlist-chip{
   display:flex;
   align-items:center;
@@ -2520,6 +2556,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .playlist-modal-item{grid-template-columns:44px minmax(0,1fr) auto}
   .queue-item{grid-template-columns:auto 44px minmax(0,1fr)}
   .queue-state{grid-column:1 / -1}
+  .queue-reorder{display:none}
   .player-modal-shell{padding:1rem 1rem 2rem}
   .now-playing-bar{
     left:10px;
@@ -4426,6 +4463,22 @@ function getOrderedQueueTracks() {
   return ids.map(function(id) { return getTrackById(id); }).filter(Boolean);
 }
 
+// Reorder the live queue by one slot. Mutates whichever order is actually
+// driving playback (shuffle order when shuffled, canonical queue otherwise),
+// so next/prev follow the new sequence immediately.
+function moveQueueTrack(id, dir) {
+  var useShuffle = _shuffleMode && _shuffleOrder.length === _playQueueIds.length;
+  var arr = (useShuffle ? _shuffleOrder : _playQueueIds).slice();
+  var idx = arr.indexOf(id);
+  if (idx === -1) return;
+  var target = idx + dir;
+  if (target < 0 || target >= arr.length) return;
+  var tmp = arr[target]; arr[target] = arr[idx]; arr[idx] = tmp;
+  if (useShuffle) _shuffleOrder = arr; else _playQueueIds = arr;
+  if (_currentTrack) updateMediaSession();
+  updateExpandedPlayer();
+}
+
 function getNextTrack() {
   if (!_currentTrack) return null;
   var queue = getOrderedQueueTracks();
@@ -4701,6 +4754,8 @@ _audio.addEventListener('timeupdate', function() {
     var xpWave = document.getElementById('xp-wave');
     if (xpWave && document.getElementById('modal-now-playing').classList.contains('open')) {
       xpWave.innerHTML = renderExpandedWaveform(_currentTrack);
+      syncPlayerLiveState();
+      updateLyricHighlight(false);
       _lastWaveDraw = now;
     }
   }
@@ -4715,8 +4770,8 @@ _audio.addEventListener('loadedmetadata', function() {
 
 // Keep the mobile-nav pulse in sync with native audio play/pause events,
 // in addition to updateNowPlaying() which already runs on most state changes.
-_audio.addEventListener('play', function() { if (typeof updateMobileNavPulse === 'function') updateMobileNavPulse(); });
-_audio.addEventListener('pause', function() { if (typeof updateMobileNavPulse === 'function') updateMobileNavPulse(); });
+_audio.addEventListener('play', function() { if (typeof updateMobileNavPulse === 'function') updateMobileNavPulse(); syncPlayerLiveState(); });
+_audio.addEventListener('pause', function() { if (typeof updateMobileNavPulse === 'function') updateMobileNavPulse(); syncPlayerLiveState(); });
 
 _audio.addEventListener('ended', function() {
   _isPlaying = false;
@@ -4984,6 +5039,35 @@ function savePlaylistEdits(id) {
   showToast('Playlist updated');
 }
 
+// Toggles the "alive" animations on the expanded player's waveform and cover
+// based on whether audio is actually playing. Cheap; safe to call often.
+function syncPlayerLiveState() {
+  var wave = document.getElementById('xp-wave');
+  if (wave) wave.classList.toggle('playing', !!_isPlaying);
+  var coverEl = document.querySelector('#xp-cover .cover-art');
+  if (coverEl) coverEl.classList.toggle('cover-live', !!_isPlaying);
+}
+
+// Approximate lyric scroll-along. Lyrics from Suno are untimed, so the active
+// line is mapped proportionally from playback position across the content
+// lines. force=true re-applies even if the line index hasn't changed (used
+// when the lyric DOM was just rebuilt for a new track).
+var _lyricLineIdx = -1;
+function updateLyricHighlight(force) {
+  var container = document.getElementById('xp-lyrics');
+  if (!container || !container.classList.contains('synced')) return;
+  var lines = container.querySelectorAll('.lyric-line');
+  if (!lines.length || !_audio.duration) return;
+  var frac = Math.max(0, Math.min(1, _audio.currentTime / _audio.duration));
+  var idx = Math.min(lines.length - 1, Math.floor(frac * lines.length));
+  if (idx === _lyricLineIdx && !force) return;
+  _lyricLineIdx = idx;
+  for (var i = 0; i < lines.length; i++) lines[i].classList.toggle('lyric-current', i === idx);
+  var line = lines[idx];
+  // Scroll within the lyric box only — never the page.
+  container.scrollTop = line.offsetTop - (container.clientHeight / 2) + (line.offsetHeight / 2);
+}
+
 function renderExpandedWaveform(track) {
   var bars = getVisualWaveform(track, 72);
   var pct = _audio.duration ? (_audio.currentTime / _audio.duration) : 0;
@@ -5030,7 +5114,8 @@ function updateExpandedPlayer() {
   document.getElementById('xp-meta').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno') + ' / ' + fmtCompactNumber(_currentTrack.plays || 0) + ' plays';
   document.getElementById('xp-prompt').textContent = _currentTrack.prompt || promptFallback(_currentTrack);
   document.getElementById('xp-lyrics').innerHTML = hasLyrics(_currentTrack) ? formatLyricsHTML(getTrackLyrics(_currentTrack)) : 'Lyrics have not been added yet for this track.';
-  document.getElementById('xp-lyrics').className = 'player-lyrics' + (hasLyrics(_currentTrack) ? '' : ' empty');
+  document.getElementById('xp-lyrics').className = 'player-lyrics' + (hasLyrics(_currentTrack) ? ' synced' : ' empty');
+  _lyricLineIdx = -1;
   document.getElementById('xp-ai-summary').textContent = getTrackSummary(_currentTrack) || 'No AI summary yet. Generate metadata from the upload flow to add a richer editorial read on this track.';
   document.getElementById('xp-ai-tags').innerHTML = getTrackTags(_currentTrack).slice(0, 8).map(function(tag) {
     return '<span class="player-ai-pill">' + esc(tag) + '</span>';
@@ -5044,12 +5129,18 @@ function updateExpandedPlayer() {
   document.getElementById('xp-progress-fill').style.width = pct + '%';
   document.getElementById('xp-wave').innerHTML = renderExpandedWaveform(_currentTrack);
   document.getElementById('xp-play-btn').textContent = _isPlaying ? 'Pause' : 'Play';
+  syncPlayerLiveState();
+  updateLyricHighlight(true);
 
   var queueTracks = getOrderedQueueTracks();
   document.getElementById('xp-queue-copy').textContent = queueTracks.length ? _playQueueLabel + (_shuffleMode ? ' / Shuffle' : '') + ' / ' + queueTracks.length + ' track' + (queueTracks.length !== 1 ? 's' : '') : 'The active queue will show up here.';
   document.getElementById('xp-queue-list').innerHTML = queueTracks.length ? queueTracks.map(function(track, index) {
     var isActive = _currentTrack && _currentTrack.id === track.id;
-    return '<div class="queue-item' + (isActive ? ' active' : '') + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(_playQueueIds) + ', ' + jsq(_playQueueLabel) + ')"><div class="queue-num">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state">' + (isActive ? (_isPlaying ? 'Playing' : 'Paused') : 'Queued') + '</div></div>';
+    var reorder = '<div class="queue-reorder">'
+      + '<button title="Move up" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', -1)"' + (index === 0 ? ' disabled' : '') + '>&#9650;</button>'
+      + '<button title="Move down" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', 1)"' + (index === queueTracks.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
+      + '</div>';
+    return '<div class="queue-item' + (isActive ? ' active' : '') + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(_playQueueIds) + ', ' + jsq(_playQueueLabel) + ')"><div class="queue-num">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state">' + (isActive ? (_isPlaying ? 'Playing' : 'Paused') : 'Queued') + '</div>' + reorder + '</div>';
   }).join('') : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">No queue yet</strong>Play something to build the queue.</div>';
 
   document.getElementById('xp-playlist-list').innerHTML = playlists.length ? playlists.map(function(playlist) {
