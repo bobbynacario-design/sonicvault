@@ -1,15 +1,26 @@
 rules_version = '2';
 
-// Shared Firebase project: pokerhq-a67e4 — ONE ruleset for THREE apps.
-// Firestore keeps a single ruleset per project: deploying from ANY repo
-// replaces the rules for ALL apps (this has happened — a PokerHQ-only
-// deploy on 2026-06-11 locked SonicVault and Daily Briefer out).
+// ════════════════════════════════════════════════════════════════════════
+// CANONICAL FIRESTORE RULESET — SINGLE SOURCE OF TRUTH
 //
-// This file is the canonical merged ruleset. Keep these copies identical:
-//   - sonicvault/firestore.rules
-//   - pokerhq/deploy/firestore.rules
-//   - bobdailybriefing/firestore.rules
-// and always deploy the FULL file: firebase deploy --only firestore:rules
+// Firebase project: pokerhq-a67e4 (default database, shared by 3 apps:
+// PokerHQ, Bob's Daily Briefing, SonicVault). A shared database has ONE
+// ruleset, so any `firebase deploy --only firestore:rules` REPLACES the
+// rules for every app at once — a PokerHQ-only deploy on 2026-06-11 locked
+// SonicVault and Daily Briefer out.
+//
+// FIX (2026-06-22): rule ownership is now CENTRALIZED in this repo. Rules
+// are no longer copied across three repos.
+//   • THIS file (sonicvault/firestore.rules) is the ONLY place rules are
+//     edited, and this is the ONLY repo that deploys them.
+//     Deploy with: ./deploy-rules.ps1  (or firebase deploy --only firestore:rules)
+//   • The pokerhq and bobdailybriefing repos MUST NOT deploy Firestore rules.
+//     Remove the "firestore" block from their firebase.json so a stray
+//     `firebase deploy` there cannot touch rules. Any rules file still sitting
+//     in those repos is stale/reference-only — do not deploy it.
+//   • When ANY app's rules change (PokerHQ or Daily Briefer included), edit
+//     them HERE and deploy from HERE.
+// ════════════════════════════════════════════════════════════════════════
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -44,6 +55,24 @@ service cloud.firestore {
     // Bob's Daily Briefing — authenticated, uid-scoped
     // ─────────────────────────────────────────────────────────────
     match /briefings-bob/{docId} {
+      allow read: if request.auth != null
+        && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
+
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update: if request.auth != null
+        && (resource.data.uid == request.auth.uid || !('uid' in resource.data))
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if request.auth != null
+        && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Bob's Daily Briefing — deep-research reports, uid-scoped
+    // ─────────────────────────────────────────────────────────────
+    match /reports-bob/{docId} {
       allow read: if request.auth != null
         && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
 

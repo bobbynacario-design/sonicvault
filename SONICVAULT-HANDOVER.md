@@ -268,10 +268,16 @@ The Firebase Admin service account JSON (`pokerhq-a67e4-firebase-adminsdk-fbsvc-
   - `sonicvault-bob/tracks`
   - `sonicvault-bob/playlists`
   - `sonicvault-bob/settings`
-- DONE (2026-06-11): `firestore.rules` now carries the FULL project ruleset (Daily Briefer + PokerHQ + SonicVault) with the owner email set to `bobbynacario@gmail.com`, and was deployed via `firebase deploy --only firestore:rules`. Unauthenticated reads of `sonicvault-bob` return 403; public share collections remain world-readable.
-- The repo also has `firebase.json` + `.firebaserc` so future rule deploys are just `firebase deploy --only firestore:rules`.
+- `firestore.rules` carries the FULL project ruleset (Daily Briefer + PokerHQ + SonicVault) with the owner email set to `bobbynacario@gmail.com`. Unauthenticated reads of `sonicvault-bob` return 403; public share collections remain world-readable.
+- The repo has `firebase.json` + `.firebaserc` so rule deploys are just `firebase deploy --only firestore:rules` (or `./deploy-rules.ps1`).
 - IMPORTANT: because Firestore deploys ALL rules at once, `firestore.rules` here includes the PokerHQ and Daily Briefer blocks. Never trim it back to SonicVault-only rules.
-- THIS HAS ALREADY GONE WRONG ONCE (2026-06-11): a PokerHQ-only rules deploy from the pokerhq repo replaced the project ruleset and locked SonicVault (and Daily Briefer) out — the app showed "ERR Blocked: bobbynacario@gmail.com" even for the owner. The canonical merged ruleset now lives identically in `sonicvault/firestore.rules`, `pokerhq/deploy/firestore.rules`, and `bobdailybriefing/firestore.rules`. If you change rules for ANY app, update all three copies and deploy the full merged file.
+
+### Rule ownership is CENTRALIZED here (2026-06-22)
+Because the three apps share one Firestore database, they share one ruleset — any deploy replaces it for all of them. On 2026-06-11 a PokerHQ-only deploy from the pokerhq repo clobbered the project ruleset and locked SonicVault + Daily Briefer out ("ERR Blocked: bobbynacario@gmail.com"). To stop this for good, rule ownership now lives in ONE place instead of three identical copies:
+- **`sonicvault/firestore.rules` is the single source of truth.** It is the only file where any app's rules are edited and the only repo that deploys them. Deploy via `./deploy-rules.ps1`.
+- **The `pokerhq` and `bobdailybriefing` repos must NOT deploy Firestore rules.** Remove the `"firestore"` block from each of their `firebase.json` files so a stray `firebase deploy` there can't touch rules, and treat any leftover rules file in those repos as stale/reference-only.
+- When ANY app's rules change — PokerHQ or Daily Briefer included — edit them HERE and deploy from HERE.
+- (Enclave is a *separate* Firebase project and is unaffected by this ruleset.)
 - After this change, the web app must be signed in (Owner button, Google account `bobbynacario@gmail.com`) on each device to read/write the private vault. The watcher is unaffected (Admin SDK bypasses rules).
 
 ## Cloudinary Hardening
