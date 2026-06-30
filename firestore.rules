@@ -87,6 +87,22 @@ service cloud.firestore {
         && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
     }
 
+    // Bob's Daily Briefing — decision journal, uid-scoped
+    match /journal-bob/{docId} {
+      allow read: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+    }
+
     // ─────────────────────────────────────────────────────────────
     // SonicVault — private vault locked to owner; public share
     // catalogs are world-readable but owner-writable only.
