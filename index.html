@@ -23,7 +23,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -43,6 +43,17 @@ const USER_PATH = 'sonicvault-bob';
 const PUBLIC_TRACKS_PATH = 'sonicvault-public-tracks';
 const PUBLIC_PLAYLISTS_PATH = 'sonicvault-public-playlists';
 let _privateSyncStarted = false;
+
+// True until the first sync attempt resolves one way or the other. A fresh
+// device has an empty localStorage cache, so without this the library paints
+// the "Start your private label" empty state while the vault is still on the
+// wire — telling the owner their music is gone.
+window.svBootPending = true;
+function settleBoot() {
+  if (!window.svBootPending) return;
+  window.svBootPending = false;
+  if (window.refreshAll) window.refreshAll();
+}
 
 function getInitialRouteState() {
   var search = new URLSearchParams(window.location.search);
@@ -113,6 +124,23 @@ async function fbPublishShare(kind, id, data) {
   }
 }
 
+// Revoking a share has to delete the public document, not just flip the
+// private `shared` flag: the public doc is world-readable and carries the
+// prompt, a lyrics excerpt, and the Cloudinary URL. Leaving it behind means
+// the link keeps working after the owner thinks they took it down.
+async function fbUnpublishShare(kind, id) {
+  try {
+    setSyncStatus('syncing', 'Revoking');
+    await deleteDoc(doc(db, getPublicPath(kind), id));
+    setSyncStatus('ok', 'Share revoked');
+    return true;
+  } catch (e) {
+    setSyncStatus('error', 'Revoke failed');
+    console.error('fbUnpublishShare error:', e);
+    throw e;
+  }
+}
+
 async function fbLoadPublicRoute(kind, id) {
   var snap = await getDoc(doc(db, getPublicPath(kind), id));
   return snap.exists() ? snap.data() : null;
@@ -133,10 +161,12 @@ async function fbLoadAll() {
       localStorage.setItem('sv_' + k, JSON.stringify(val));
     }
     setSyncStatus('ok', 'Synced');
+    settleBoot();
     if (window.refreshAll) window.refreshAll();
   } catch (e) {
     setSyncStatus('error', 'Local only');
     console.error('fbLoadAll error:', e);
+    settleBoot();
   }
 }
 
@@ -185,6 +215,7 @@ async function fbSignOutOwner() {
 window.fbSave = fbSave;
 window.fbLoadAll = fbLoadAll;
 window.fbPublishShare = fbPublishShare;
+window.fbUnpublishShare = fbUnpublishShare;
 window.fbLoadPublicRoute = fbLoadPublicRoute;
 window.fbStartPrivateSync = startPrivateSync;
 window.fbSignIn = fbSignIn;
@@ -202,6 +233,7 @@ onAuthStateChanged(auth, function(user) {
   } else {
     if (_privateSyncStarted) stopPrivateSync();
     setSyncStatus('offline', user ? 'Sign in required' : 'Local only');
+    settleBoot();
   }
   if (window.refreshAll) window.refreshAll();
 });
@@ -335,6 +367,40 @@ button{border:none;background:none}
 :focus-visible{outline:2px solid var(--accent-dynamic);outline-offset:2px;border-radius:6px}
 button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--accent-dynamic);outline-offset:2px;border-radius:8px}
 input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent-dynamic);outline-offset:1px}
+/* Visually hidden but still read aloud — used for labels on inputs whose
+   purpose is only conveyed by a placeholder or an adjacent glyph. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+/* Cards used as buttons must look identical to their div originals. */
+[role="button"]{cursor:pointer}
+/* Loading placeholders. The sheen is decorative, so it is dropped entirely
+   under reduced-motion rather than slowed down. */
+.skel{
+  border-radius:12px;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,.045) 25%,
+    rgba(255,255,255,.10) 37%,
+    rgba(255,255,255,.045) 63%);
+  background-size:400% 100%;
+  animation:skel-sheen 1.5s ease-in-out infinite;
+}
+body.light .skel{
+  background:linear-gradient(90deg,
+    rgba(28,20,14,.05) 25%,
+    rgba(28,20,14,.10) 37%,
+    rgba(28,20,14,.05) 63%);
+  background-size:400% 100%;
+}
+@keyframes skel-sheen{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+.skel-eyebrow{height:11px;width:120px;margin-bottom:1rem}
+.skel-title{height:38px;width:100%;margin-bottom:.6rem}
+.skel-title.short{width:62%;margin-bottom:1.2rem}
+.skel-line{height:13px;width:100%;margin-bottom:.55rem}
+.skel-line.short{width:48%}
+.skel-tile{height:74px;border-radius:18px}
+.skel-cover{aspect-ratio:1;width:100%;border-radius:22px;margin-bottom:1rem}
+.skel-row{height:56px;border-radius:16px;margin-bottom:.6rem}
+.skel-card{height:280px;border-radius:26px}
 ::selection{background:var(--accent-dynamic-soft)}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -627,6 +693,20 @@ body.light .hero-main{
   background:var(--accent-dynamic-soft);
 }
 .meta-pill.warn{color:var(--danger)}
+/* A live public link is state the owner should never have to hunt for, so it
+   reads as a filled pill rather than another slash-separated metadata word. */
+.meta-pill.shared{
+  padding:.34rem .7rem;
+  border-radius:999px;
+  color:var(--success);
+  background:color-mix(in srgb, var(--success) 14%, transparent);
+}
+/* Destructive-adjacent: revoking a link is not the same weight as sharing. */
+.icon-btn.is-shared,.sec-action.is-shared{color:var(--success)}
+.icon-btn.is-shared:hover,.sec-action.is-shared:hover{
+  color:var(--danger);
+  background:color-mix(in srgb, var(--danger) 12%, transparent);
+}
 
 .hero-side{
   display:grid;
@@ -855,7 +935,24 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   transition:all .16s ease;
 }
 .filter-chip:hover{color:var(--text);border-color:var(--rim2)}
-.filter-chip.active{color:var(--accent-dynamic);border-color:var(--accent-ghost);background:var(--accent-dynamic-soft)}
+/* Active filters previously differed only by a low-contrast tint, which was
+   easy to miss in a row of a dozen chips. The leading dot makes the state
+   legible without colour alone carrying it. */
+.filter-chip.active{
+  color:var(--accent-dynamic);
+  border-color:var(--accent-ghost);
+  background:var(--accent-dynamic-soft);
+  font-weight:500;
+}
+.filter-chip.active::before{
+  content:'';
+  display:inline-block;
+  width:5px;height:5px;
+  margin-right:.45rem;
+  vertical-align:middle;
+  border-radius:999px;
+  background:var(--accent-dynamic);
+}
 .browse-summary{
   margin-top:1rem;
   padding:1rem 0 .8rem;
@@ -895,6 +992,23 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
   gap:1rem;
+}
+/* Spans the grid so the "show more" affordance reads as a shelf footer
+   rather than another card in the row. */
+.shelf-sentinel{
+  grid-column:1 / -1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:.55rem;
+  padding:1.6rem 1rem .4rem;
+}
+.shelf-sentinel-copy{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted2);
 }
 .track-card{
   position:relative;
@@ -990,7 +1104,19 @@ body.light .action-btn.primary{background:#171420;color:#f7f2eb}
   line-height:1.7;
 }
 .prompt-fragment strong{color:var(--text)}
-.track-tag-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.7}
+/* Was a single nowrap line: at 375px that clipped a 431px row down to 202px,
+   hiding more than half the discovery tags with no way to reveal them. Wrap
+   to two lines instead, which still bounds the card height. */
+.track-tag-row{
+  line-height:1.7;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  /* Two lines of tags, then clip. Was a single nowrap line, which at 375px
+     showed 202px of a 431px row — over half the discovery tags hidden with
+     no way to reveal them. Tags are capped at 6, so two lines fits them. */
+  max-height:calc(2 * 1.7em);
+  overflow:hidden;
+}
 .track-tag{
   display:inline;
   padding:0;
@@ -1781,14 +1907,43 @@ body.light .playlist-modal-item{background:rgba(0,0,0,.03)}
 .playlist-edit-list{display:grid;gap:.65rem}
 .playlist-edit-item{
   display:grid;
-  grid-template-columns:auto 54px minmax(0,1fr) auto;
+  grid-template-columns:auto auto 54px minmax(0,1fr) auto;
   gap:.75rem;
   align-items:center;
   padding:.72rem;
   border-radius:18px;
   border:1px solid var(--rim);
   background:rgba(255,255,255,.035);
+  /* The row is the drag source; the handle just advertises it. */
+  position:relative;
 }
+.playlist-drag-handle{
+  cursor:grab;
+  padding:0 .1rem;
+  font-family:var(--mono);
+  font-size:13px;
+  line-height:1;
+  letter-spacing:-1px;
+  color:var(--muted2);
+  transform:rotate(90deg);
+  user-select:none;
+}
+.playlist-edit-item:hover .playlist-drag-handle{color:var(--accent-dynamic)}
+.playlist-edit-item.dragging{opacity:.45;cursor:grabbing}
+/* Insertion line rather than a moving placeholder — no layout thrash while
+   dragging, and it reads unambiguously at the top vs bottom of a row. */
+.playlist-edit-item.drop-before::after,
+.playlist-edit-item.drop-after::after{
+  content:'';
+  position:absolute;
+  left:.5rem;right:.5rem;
+  height:2px;
+  border-radius:2px;
+  background:var(--accent-dynamic);
+  box-shadow:0 0 10px var(--accent-ghost);
+}
+.playlist-edit-item.drop-before::after{top:-2px}
+.playlist-edit-item.drop-after::after{bottom:-2px}
 .playlist-edit-index{
   width:28px;
   text-align:center;
@@ -2742,6 +2897,17 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .track-actions .action-btn,.track-actions .icon-btn,.section-action-row .sec-action,.modal-actions .sec-action{flex:1;justify-content:center;text-align:center}
   .spotlight-card{grid-template-columns:1fr}
   .snapshot-grid,.mood-grid,.source-grid{gap:.65rem}
+
+  /* Touch targets. Measured at 375px these were 31-36px tall — under the 44px
+     comfortable-touch floor, and the bottom nav was the worst offender
+     despite being the primary navigation. Padding-only bumps keep the type
+     scale and the pill silhouette exactly as designed. */
+  .mobile-tab{min-height:44px;display:flex;align-items:center;justify-content:center}
+  .action-btn,.icon-btn,.sec-action,.filter-chip,.prompt-chip{min-height:44px}
+  .action-btn,.icon-btn,.filter-chip,.prompt-chip{display:inline-flex;align-items:center;justify-content:center}
+  .np-btn{min-width:44px;min-height:44px}
+  .theme-toggle{min-height:44px;display:inline-flex;align-items:center}
+  .queue-reorder button,.playlist-seq-btn{min-height:44px;min-width:44px}
 }
 </style>
 </head>
@@ -2767,8 +2933,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
       <button class="theme-toggle" id="auth-toggle" onclick="toggleOwnerAuth()" title="Owner sign-in">Owner</button>
       <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light and dark">Moon</button>
       <button class="theme-toggle" id="shortcuts-toggle" onclick="openModal('modal-shortcuts')" title="Keyboard shortcuts (press ?)">Keys</button>
-      <div class="clock-nav" id="clock">--:--</div>
-      <div class="status-pill" id="sync-status">OFF Loading</div>
+      <div class="clock-nav" id="clock" aria-hidden="true">--:--</div>
+      <div class="status-pill" id="sync-status" role="status" aria-live="polite">OFF Loading</div>
     </div>
   </div>
 </nav>
@@ -2798,7 +2964,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
         <div class="search-shell">
           <div class="search-input-wrap">
             <div class="search-icon">FND</div>
-            <input type="text" id="search-input" placeholder="Search titles, prompts, lyrics, moods, or tags..." oninput="renderTracks()">
+            <label class="sr-only" for="search-input">Search the vault</label>
+            <input type="text" id="search-input" placeholder="Search titles, prompts, lyrics, moods, or tags..." oninput="onSearchInput()">
           </div>
           <div class="filter-row" id="sort-filter"></div>
         </div>
@@ -2865,8 +3032,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 
         <div class="upload-shell">
           <div class="upload-grid">
-            <div class="upload-drop" id="upload-drop" onclick="document.getElementById('file-picker').click()">
-              <div class="upload-mark">IN</div>
+            <div class="upload-drop" id="upload-drop" role="button" tabindex="0" aria-label="Choose audio files to import, or drop them here" aria-controls="file-picker" onclick="document.getElementById('file-picker').click()">
+              <div class="upload-mark" aria-hidden="true">IN</div>
               <div class="upload-title">Drop a batch of tracks into the vault.</div>
               <div class="upload-copy">MP3, WAV, and M4A are supported up to 100MB each. Queue multiple Suno exports at once, batch-apply metadata, then send the whole run through the same Cloudinary and Firestore flow the watcher already matches.</div>
               <div class="upload-foot">Batch import ready / Cloudinary backed / Firestore synced / Watcher compatible</div>
@@ -2990,9 +3157,9 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   <div class="page-stack" id="insights-view"></div>
 </div>
 
-<div class="modal-overlay" id="modal-playlist">
+<div class="modal-overlay" id="modal-playlist" role="dialog" aria-modal="true" aria-labelledby="modal-playlist-title">
   <div class="modal">
-    <div class="modal-title">New playlist</div>
+    <div class="modal-title" id="modal-playlist-title">New playlist</div>
     <div class="section-sub" style="margin-bottom:1rem">Name the mood, pick the accent, and choose the tracks that belong together.</div>
     <div class="form-grid">
       <div class="form-group">
@@ -3026,7 +3193,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-share">
+<div class="modal-overlay" id="modal-share" role="dialog" aria-modal="true" aria-labelledby="share-title">
   <div class="modal" style="max-width:520px">
     <div class="modal-title" id="share-title">Share</div>
     <div class="section-sub" id="share-subtitle">Share the listening link with your inner circle.</div>
@@ -3045,7 +3212,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-playlist-detail">
+<div class="modal-overlay" id="modal-playlist-detail" role="dialog" aria-modal="true" aria-label="Playlist detail">
   <div class="modal" style="max-width:860px">
     <div id="pld-body"></div>
     <div class="modal-actions">
@@ -3054,9 +3221,9 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-edit-track">
+<div class="modal-overlay" id="modal-edit-track" role="dialog" aria-modal="true" aria-labelledby="modal-edit-track-title">
   <div class="modal" style="max-width:720px">
-    <div class="modal-title">Edit track</div>
+    <div class="modal-title" id="modal-edit-track-title">Edit track</div>
     <div class="section-sub" style="margin-bottom:1rem">Clean up lyrics, fix metadata, and regenerate AI notes for tracks already in the vault — including watcher imports that arrived without a lyric sheet.</div>
     <div class="form-grid">
       <div class="form-group" style="grid-column:1 / -1">
@@ -3103,9 +3270,9 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-shortcuts">
+<div class="modal-overlay" id="modal-shortcuts" role="dialog" aria-modal="true" aria-labelledby="modal-shortcuts-title">
   <div class="modal" style="max-width:560px">
-    <div class="modal-title">Keyboard shortcuts</div>
+    <div class="modal-title" id="modal-shortcuts-title">Keyboard shortcuts</div>
     <div class="section-sub" style="margin-bottom:1rem">Shortcuts work anywhere except while typing in a field.</div>
     <div class="shortcut-list">
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>Space</kbd> / <kbd>K</kbd></span><span class="shortcut-desc">Play / pause</span></div>
@@ -3117,7 +3284,9 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>R</kbd></span><span class="shortcut-desc">Cycle repeat mode</span></div>
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>M</kbd></span><span class="shortcut-desc">Mute / unmute</span></div>
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>/</kbd></span><span class="shortcut-desc">Jump to search</span></div>
-      <div class="shortcut-row"><span class="shortcut-keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></span><span class="shortcut-desc">Home / Playlists / Import</span></div>
+      <div class="shortcut-row"><span class="shortcut-keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></span><span class="shortcut-desc">Home / Playlists / Import / Insights</span></div>
+      <div class="shortcut-row"><span class="shortcut-keys"><kbd>Tab</kbd></span><span class="shortcut-desc">Move between cards, rails, and controls</span></div>
+      <div class="shortcut-row"><span class="shortcut-keys"><kbd>Enter</kbd> / <kbd>Space</kbd></span><span class="shortcut-desc">Activate the focused card or button</span></div>
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>?</kbd></span><span class="shortcut-desc">Toggle this help</span></div>
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>Esc</kbd></span><span class="shortcut-desc">Close dialogs &amp; panels</span></div>
     </div>
@@ -3127,7 +3296,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   </div>
 </div>
 
-<div class="player-modal-overlay" id="modal-now-playing">
+<div class="player-modal-overlay" id="modal-now-playing" role="dialog" aria-modal="true" aria-label="Expanded player">
   <div class="player-modal" onclick="if(event.target===this) closeModal('modal-now-playing')">
     <div class="player-modal-shell">
       <div class="player-topbar">
@@ -3177,7 +3346,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
                 <span id="xp-current">0:00</span>
                 <span id="xp-total">0:00</span>
               </div>
-              <div class="player-wave-shell">
+              <!-- Pointer seek; keyboard seek is J/L and the arrow keys. -->
+              <div class="player-wave-shell" aria-hidden="true">
                 <div class="player-wave" id="xp-wave"></div>
                 <div class="player-progress-line" id="xp-progress-line" onclick="seekAudio(event, 'xp-progress-line')">
                   <div class="player-progress-fill" id="xp-progress-fill"></div>
@@ -3234,7 +3404,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   </div>
 </div>
 
-<div id="sv-toast"></div>
+<!-- Announced to screen readers: this is the app's only feedback channel for saves, upload results, and playback errors. -->
+<div id="sv-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <div class="mobile-nav" id="mobile-nav">
   <span class="mobile-nav-pulse" id="mobile-nav-pulse" aria-hidden="true"></span>
@@ -3244,8 +3415,11 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   <button class="mobile-tab" id="mob-insights" onclick="switchView('insights')">Insights</button>
 </div>
 
-<div class="now-playing-bar" id="now-playing" onclick="openExpandedPlayer(event)">
-  <div class="np-cover-wrap">
+<!-- The bar itself stays a pointer shortcut for opening the expanded player;
+     the keyboard path is the explicit Expand button in the controls group,
+     so the bar is not also a tab stop wrapping its own buttons. -->
+<div class="now-playing-bar" id="now-playing" role="region" aria-label="Now playing" onclick="openExpandedPlayer(event)">
+  <div class="np-cover-wrap" aria-hidden="true">
     <div id="np-art"></div>
   </div>
   <div class="np-main">
@@ -3259,16 +3433,19 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
       <span id="np-current">0:00</span>
       <span id="np-total">0:00</span>
     </div>
-    <div class="np-bar-wrap" id="np-bar-wrap" onclick="event.stopPropagation();seekAudio(event)">
+    <!-- Pointer seek. Keyboard seek is the global J/L and arrow shortcuts,
+         and the elapsed/total times above stay readable to screen readers. -->
+    <div class="np-bar-wrap" id="np-bar-wrap" aria-hidden="true" onclick="event.stopPropagation();seekAudio(event)">
       <div class="np-bar-fill" id="np-bar-fill"></div>
     </div>
   </div>
   <div class="np-controls">
-    <button class="np-btn mode-btn" id="np-shuffle-btn" title="Shuffle" onclick="event.stopPropagation();toggleShuffle()">Shuf</button>
-    <button class="np-btn" onclick="event.stopPropagation();playPrevious()">Prev</button>
-    <button class="np-btn primary" id="np-play-btn" onclick="event.stopPropagation();togglePlayback()">Play</button>
-    <button class="np-btn" onclick="event.stopPropagation();playNext()">Next</button>
-    <button class="np-btn mode-btn" id="np-repeat-btn" title="Repeat" onclick="event.stopPropagation();cycleRepeat()">Rep</button>
+    <button class="np-btn mode-btn" id="np-shuffle-btn" title="Shuffle" aria-label="Toggle shuffle" onclick="event.stopPropagation();toggleShuffle()">Shuf</button>
+    <button class="np-btn" aria-label="Previous track" onclick="event.stopPropagation();playPrevious()">Prev</button>
+    <button class="np-btn primary" id="np-play-btn" aria-label="Play or pause" onclick="event.stopPropagation();togglePlayback()">Play</button>
+    <button class="np-btn" aria-label="Next track" onclick="event.stopPropagation();playNext()">Next</button>
+    <button class="np-btn mode-btn" id="np-repeat-btn" title="Repeat" aria-label="Cycle repeat mode" onclick="event.stopPropagation();cycleRepeat()">Rep</button>
+    <button class="np-btn" id="np-expand-btn" title="Open the expanded player" aria-label="Open expanded player" onclick="event.stopPropagation();openExpandedPlayer()">Open</button>
   </div>
 </div>
 <script>
@@ -5230,8 +5407,7 @@ function startPlayback(id, queueIds, queueLabel) {
     track.plays = Number(track.plays || 0) + 1;
   }
   updateNowPlaying();
-  renderTracks();
-  renderLibraryHome();
+  renderTracks(); // already refreshes the hero — no second renderLibraryHome()
 }
 
 function playTrack(id) {
@@ -5263,8 +5439,10 @@ function playPrevious() {
 function openExpandedPlayer(event) {
   if (event && event.target && event.target.closest('.np-btn')) return;
   if (!_currentTrack) return;
-  document.getElementById('modal-now-playing').classList.add('open');
+  // Populate first, then open — openModal places focus on the dialog's first
+  // control, so the content it measures has to already be there.
   updateExpandedPlayer();
+  openModal('modal-now-playing');
 }
 
 function shareCurrentTrack() {
@@ -5381,6 +5559,78 @@ function movePlaylistTrack(id, fromIndex, direction) {
   persistPlaylists();
   renderPlaylists();
   viewPlaylist(id, true);
+}
+
+// ── Drag-to-reorder for the sequence editor ────────────────────────────
+// The Up/Down buttons stay the keyboard path; this is the pointer path.
+// Both land on the same reorder + persist, so the two never diverge.
+function reorderPlaylistTrack(id, fromIndex, toIndex) {
+  var pl = getPlaylistById(id);
+  if (!pl || !pl.trackIds) return;
+  if (fromIndex === toIndex || fromIndex < 0 || fromIndex >= pl.trackIds.length) return;
+  mergePlaylistEditDraft(pl);
+  var next = pl.trackIds.slice();
+  var moved = next.splice(fromIndex, 1)[0];
+  next.splice(Math.max(0, Math.min(next.length, toIndex)), 0, moved);
+  pl.trackIds = next;
+  persistPlaylists();
+  renderPlaylists();
+  viewPlaylist(id, true);
+  showToast('Moved to position ' + (Math.max(0, Math.min(pl.trackIds.length - 1, toIndex)) + 1));
+}
+
+var _dragPlaylistId = '';
+var _dragFromIndex = -1;
+
+function onSeqDragStart(e, playlistId, index) {
+  _dragPlaylistId = playlistId;
+  _dragFromIndex = index;
+  e.dataTransfer.effectAllowed = 'move';
+  // Firefox refuses to start a drag unless some data is set.
+  try { e.dataTransfer.setData('text/plain', String(index)); } catch (err) {}
+  e.currentTarget.classList.add('dragging');
+}
+
+function onSeqDragOver(e, playlistId, index) {
+  if (_dragPlaylistId !== playlistId || _dragFromIndex === -1) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  var row = e.currentTarget;
+  if (index === _dragFromIndex) { clearSeqDropMarkers(); return; }
+  var box = row.getBoundingClientRect();
+  var after = (e.clientY - box.top) > box.height / 2;
+  clearSeqDropMarkers();
+  row.classList.add(after ? 'drop-after' : 'drop-before');
+}
+
+function onSeqDrop(e, playlistId, index) {
+  if (_dragPlaylistId !== playlistId || _dragFromIndex === -1) return;
+  e.preventDefault();
+  var row = e.currentTarget;
+  var box = row.getBoundingClientRect();
+  var after = (e.clientY - box.top) > box.height / 2;
+  var target = index + (after ? 1 : 0);
+  // Removing the dragged row first shifts everything below it up by one.
+  if (target > _dragFromIndex) target -= 1;
+  var from = _dragFromIndex;
+  clearSeqDropMarkers();
+  _dragFromIndex = -1;
+  _dragPlaylistId = '';
+  reorderPlaylistTrack(playlistId, from, target);
+}
+
+function onSeqDragEnd() {
+  clearSeqDropMarkers();
+  _dragFromIndex = -1;
+  _dragPlaylistId = '';
+  var dragging = document.querySelector('.playlist-edit-item.dragging');
+  if (dragging) dragging.classList.remove('dragging');
+}
+
+function clearSeqDropMarkers() {
+  document.querySelectorAll('.playlist-edit-item.drop-before, .playlist-edit-item.drop-after').forEach(function(el) {
+    el.classList.remove('drop-before', 'drop-after');
+  });
 }
 
 function removePlaylistTrack(id, trackId) {
@@ -5521,7 +5771,7 @@ function updateExpandedPlayer() {
       + '<button title="Move up" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', -1)"' + (index === 0 ? ' disabled' : '') + '>&#9650;</button>'
       + '<button title="Move down" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', 1)"' + (index === queueTracks.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
       + '</div>';
-    return '<div class="queue-item' + (isActive ? ' active' : '') + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(_playQueueIds) + ', ' + jsq(_playQueueLabel) + ')"><div class="queue-num">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state">' + (isActive ? (_isPlaying ? 'Playing' : 'Paused') : 'Queued') + '</div>' + reorder + '</div>';
+    return '<div class="queue-item' + (isActive ? ' active' : '') + '" role="button" tabindex="0"' + (isActive ? ' aria-current="true"' : '') + ' aria-label="' + attr('Play ' + (track.title || 'track') + ', queue position ' + (index + 1)) + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(_playQueueIds) + ', ' + jsq(_playQueueLabel) + ')"><div class="queue-num" aria-hidden="true">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state">' + (isActive ? (_isPlaying ? 'Playing' : 'Paused') : 'Queued') + '</div>' + reorder + '</div>';
   }).join('') : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">No queue yet</strong>Play something to build the queue.</div>';
 
   document.getElementById('xp-playlist-list').innerHTML = playlists.length ? playlists.map(function(playlist) {
@@ -5531,7 +5781,7 @@ function updateExpandedPlayer() {
 
   var related = getSimilarTracks(_currentTrack, 4);
   document.getElementById('xp-related').innerHTML = related.length ? related.map(function(track) {
-    return '<div class="related-card" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(related.map(function(item) { return item.id; })) + ', ' + jsq('Similar vibe') + ')">' + buildCoverArt(track, 'sm', false) + '<div><div class="related-title">' + esc(track.title) + '</div><div class="related-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 72), 72) + '</div></div></div>';
+    return '<div class="related-card" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ' from Similar vibe') + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(related.map(function(item) { return item.id; })) + ', ' + jsq('Similar vibe') + ')">' + buildCoverArt(track, 'sm', false) + '<div><div class="related-title">' + esc(track.title) + '</div><div class="related-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 72), 72) + '</div></div></div>';
   }).join('') : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">Need more context</strong>Add more tracks to surface a stronger related row.</div>';
 }
 
@@ -5577,8 +5827,11 @@ function generateWaveform(n) {
   return bars;
 }
 
+// aria-hidden: this is a pointer shortcut for an action the card already
+// exposes through a labelled Play button, so exposing it again would just
+// add a second unlabelled tab stop per track.
 function renderWaveformHTML(trackId, waveform) {
-  var html = '<div class="track-waveform" id="waveform-' + esc(trackId) + '" onclick="event.stopPropagation();playTrack(' + jsq(trackId) + ')">';
+  var html = '<div class="track-waveform" aria-hidden="true" id="waveform-' + esc(trackId) + '" onclick="event.stopPropagation();playTrack(' + jsq(trackId) + ')">';
   waveform.forEach(function(v) {
     html += '<div class="wbar wbar-inactive" style="height:' + Math.round(v * 100) + '%"></div>';
   });
@@ -5656,11 +5909,24 @@ function switchView(view) {
   if (!skipRoute) window.scrollTo({ top:0, behavior:'smooth' });
 }
 
-function setGenreFilter(value) { _genreFilter = value; renderTracks(); }
-function setMoodFilter(value) { _moodFilter = value; renderTracks(); }
-function setSourceFilter(value) { _sourceFilter = value; renderTracks(); }
-function setTagFilter(value) { _tagFilter = _tagFilter === value ? '' : value; renderTracks(); }
-function setSortMode(value) { _sortMode = value; renderTracks(); }
+// Filter and sort changes only affect the browse shelf, never the hero.
+function setGenreFilter(value) { _genreFilter = value; renderTrackList(); }
+function setMoodFilter(value) { _moodFilter = value; renderTrackList(); }
+function setSourceFilter(value) { _sourceFilter = value; renderTrackList(); }
+function setTagFilter(value) { _tagFilter = _tagFilter === value ? '' : value; renderTrackList(); }
+function setSortMode(value) { _sortMode = value; renderTrackList(); }
+
+// Typing rebuilds only the shelf, and only after the user pauses. Previously
+// every keystroke re-rendered the hero plus the full grid (120ms at 300
+// tracks), so fast typing queued a full render per character.
+var _searchDebounce = null;
+function onSearchInput() {
+  if (_searchDebounce) clearTimeout(_searchDebounce);
+  _searchDebounce = setTimeout(function() {
+    _searchDebounce = null;
+    renderTrackList();
+  }, 140);
+}
 
 function clearFilters() {
   _genreFilter = 'All';
@@ -5671,27 +5937,28 @@ function clearFilters() {
   _expandedTrackId = '';
   var input = document.getElementById('search-input');
   if (input) input.value = '';
-  renderTracks();
+  if (_searchDebounce) { clearTimeout(_searchDebounce); _searchDebounce = null; }
+  renderTrackList();
 }
 
 function browseMood(value) {
   switchView('library');
   _moodFilter = value;
-  renderTracks();
+  renderTrackList();
   document.getElementById('browse-panel').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 function browseSource(value) {
   switchView('library');
   _sourceFilter = value;
-  renderTracks();
+  renderTrackList();
   document.getElementById('browse-panel').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 function browseTag(value) {
   switchView('library');
   _tagFilter = value;
-  renderTracks();
+  renderTrackList();
   document.getElementById('browse-panel').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
@@ -5834,12 +6101,12 @@ function renderInsights() {
   var maxPlay = mostPlayed.length ? Number(mostPlayed[0].plays || 0) : 1;
   var mostHtml = mostPlayed.length ? mostPlayed.map(function(t, i) {
     var w = Math.max(4, Math.round((Number(t.plays || 0) / maxPlay) * 100));
-    return '<div class="rank-row" onclick="playTrack(' + jsq(t.id) + ')"><div class="rank-num">' + (i + 1) + '</div>' + buildCoverArt(t, 'xs', false) + '<div class="rank-copy"><div class="rank-title">' + esc(t.title) + '</div><div class="rank-bar"><div class="rank-fill" style="width:' + w + '%;background:' + getGenreColor(t.genre || 'Other') + '"></div></div></div><div class="rank-val">' + fmtCompactNumber(t.plays || 0) + '</div></div>';
+    return '<div class="rank-row" role="button" tabindex="0" aria-label="' + attr('Play ' + (t.title || 'track') + ', ' + (t.plays || 0) + ' plays, rank ' + (i + 1)) + '" onclick="playTrack(' + jsq(t.id) + ')"><div class="rank-num" aria-hidden="true">' + (i + 1) + '</div>' + buildCoverArt(t, 'xs', false) + '<div class="rank-copy"><div class="rank-title">' + esc(t.title) + '</div><div class="rank-bar"><div class="rank-fill" style="width:' + w + '%;background:' + getGenreColor(t.genre || 'Other') + '"></div></div></div><div class="rank-val">' + fmtCompactNumber(t.plays || 0) + '</div></div>';
   }).join('') : '<div class="insight-empty-row">No plays logged yet — start listening to build this rail.</div>';
 
   var gems = getLeastPlayedTracks(6);
   var gemsHtml = gems.map(function(t) {
-    return '<div class="rank-row" onclick="playTrack(' + jsq(t.id) + ')">' + buildCoverArt(t, 'xs', false) + '<div class="rank-copy"><div class="rank-title">' + esc(t.title) + '</div><div class="rank-sub">' + esc(t.genre || 'Other') + ' / ' + esc(t.mood || 'Mood') + '</div></div><div class="rank-val">' + fmtCompactNumber(t.plays || 0) + ' plays</div></div>';
+    return '<div class="rank-row" role="button" tabindex="0" aria-label="' + attr('Play ' + (t.title || 'track') + ', ' + (t.plays || 0) + ' plays') + '" onclick="playTrack(' + jsq(t.id) + ')">' + buildCoverArt(t, 'xs', false) + '<div class="rank-copy"><div class="rank-title">' + esc(t.title) + '</div><div class="rank-sub">' + esc(t.genre || 'Other') + ' / ' + esc(t.mood || 'Mood') + '</div></div><div class="rank-val">' + fmtCompactNumber(t.plays || 0) + ' plays</div></div>';
   }).join('');
 
   el.innerHTML = ''
@@ -5995,7 +6262,7 @@ function renderPublicTrackPage(track) {
   var el = document.getElementById('public-page');
   if (!el) return;
   if (_publicRouteLoading && !track) {
-    el.innerHTML = '<div class="public-shell"><div class="public-list-card"><div class="public-empty"><strong>Loading shared track</strong>Pulling the public share page from SonicVault.</div></div></div>';
+    el.innerHTML = '<div class="public-shell" aria-busy="true" aria-label="Loading shared track"><div class="public-list-card"><div class="skel skel-cover" style="max-width:220px"></div><div class="skel skel-title"></div><div class="skel skel-title short"></div><div class="skel skel-line"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div><div class="skel skel-row" style="margin-top:1.2rem"></div><div class="skel skel-row"></div></div></div>';
     updatePageChrome('Loading track | SonicVault', null);
     return;
   }
@@ -6024,11 +6291,11 @@ function renderPublicTrackPage(track) {
     +   '<div class="public-context-grid">'
     +     '<div class="public-list-card"><div class="public-list-head"><div><div class="public-kicker">Editorial read</div><div class="public-list-title">Lyrics and summary</div><div class="public-list-copy">Shared pages keep the listening context intact without exposing your whole private metadata footprint.</div></div></div>' + (summary ? '<div class="player-ai-summary" style="margin-bottom:1rem">' + esc(summary) + '</div>' : '') + '<div class="player-copy-card" style="background:rgba(255,255,255,.02)"><div class="player-copy-kicker">Lyrics excerpt</div><div class="player-lyrics' + (lyricsExcerpt ? '' : ' empty') + '" style="max-height:220px">' + esc(lyricsExcerpt || 'Lyrics are not included on this shared page yet.') + '</div></div></div>'
     +     '<div class="public-list-card"><div class="public-list-head"><div><div class="public-kicker">Similar vibe</div><div class="public-list-title">Stay in this lane</div><div class="public-list-copy">Related tracks are pulled from genre, mood, prompt, lyrics, and AI metadata already living in the vault.</div></div></div><div class="public-related-grid">' + (related.length ? related.map(function(item) {
-          return '<div class="related-card" onclick="openSharedRoute(\'track\', ' + jsq(item.id) + ')">' + buildCoverArt(item, 'sm', false) + '<div><div class="related-title">' + esc(item.title) + '</div><div class="related-sub">' + esc(item.genre || 'Other') + ' / ' + esc(item.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(item, 76), 76) + '</div></div></div>';
+          return '<div class="related-card" role="button" tabindex="0" aria-label="' + attr('Open shared track ' + (item.title || 'track')) + '" onclick="openSharedRoute(\'track\', ' + jsq(item.id) + ')">' + buildCoverArt(item, 'sm', false) + '<div><div class="related-title">' + esc(item.title) + '</div><div class="related-sub">' + esc(item.genre || 'Other') + ' / ' + esc(item.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(item, 76), 76) + '</div></div></div>';
         }).join('') : '<div class="public-empty"><strong>No related tracks yet</strong>Add more music with mood and prompt metadata to strengthen similarity matching.</div>') + '</div></div>'
     +     '<div class="public-side-note"><div class="public-kicker">Playlist context</div><div class="public-list-title">Appears in curated mixes</div><div class="public-list-copy" style="margin-top:.45rem">' + esc(collections.length ? 'This track already anchors one or more mixtapes in the vault.' : 'This track is not in a playlist yet, so it is standing on its own as a shared single.') + '</div><div class="public-link-list" style="margin-top:1rem">' + (collections.length ? collections.map(function(pl) {
           var items = getPlaylistTracks(pl);
-          return '<div class="public-link-row" onclick="openSharedRoute(\'playlist\', ' + jsq(pl.id) + ')">' + buildPlaylistCover(pl, 'xs') + '<div class="public-link-main"><div class="public-link-title">' + esc(pl.name) + '</div><div class="public-link-sub">' + esc(pl.desc || items.length + ' track mix') + '</div></div><div class="public-row-action">Open mix</div></div>';
+          return '<div class="public-link-row" role="button" tabindex="0" aria-label="' + attr('Open shared playlist ' + (pl.name || 'playlist')) + '" onclick="openSharedRoute(\'playlist\', ' + jsq(pl.id) + ')">' + buildPlaylistCover(pl, 'xs') + '<div class="public-link-main"><div class="public-link-title">' + esc(pl.name) + '</div><div class="public-link-sub">' + esc(pl.desc || items.length + ' track mix') + '</div></div><div class="public-row-action">Open mix</div></div>';
         }).join('') : '<div class="public-empty"><strong>No playlist context</strong>Create a playlist from the vault if you want this shared track to sit inside a bigger narrative.</div>') + '</div></div>'
     +   '</div>'
     + '</div>';
@@ -6040,7 +6307,7 @@ function renderPublicPlaylistPage(pl) {
   var el = document.getElementById('public-page');
   if (!el) return;
   if (_publicRouteLoading && !pl) {
-    el.innerHTML = '<div class="public-shell"><div class="public-list-card"><div class="public-empty"><strong>Loading shared playlist</strong>Pulling the public share page from SonicVault.</div></div></div>';
+    el.innerHTML = '<div class="public-shell" aria-busy="true" aria-label="Loading shared playlist"><div class="public-list-card"><div class="skel skel-cover" style="max-width:220px"></div><div class="skel skel-title"></div><div class="skel skel-title short"></div><div class="skel skel-line"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div><div class="skel skel-row" style="margin-top:1.2rem"></div><div class="skel skel-row"></div></div></div>';
     updatePageChrome('Loading playlist | SonicVault', null);
     return;
   }
@@ -6063,10 +6330,10 @@ function renderPublicPlaylistPage(pl) {
     +   '</div></div>'
     +   '<div class="public-context-grid">'
     +     '<div class="public-list-card"><div class="public-list-head"><div><div class="public-kicker">Track list</div><div class="public-list-title">Front-to-back sequence</div><div class="public-list-copy">The share page keeps the playlist feel intact, with direct play access on every track in the mix.</div></div><div class="section-action-row"><button class="sec-action" onclick="viewPlaylist(' + jsq(pl.id) + ')">Open detail modal</button></div></div><div class="public-track-list">' + (items.length ? items.map(function(track, index) {
-          return '<div class="public-track-row" onclick="playPlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ')"><div class="public-track-index">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="public-track-main"><div class="public-track-name">' + esc(track.title) + '</div><div class="public-track-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 90), 90) + '</div></div><div class="public-track-time">' + fmtTime(track.duration || 0) + '</div><div class="public-row-action">' + ((_currentTrack && _currentTrack.id === track.id && _isPlaying) ? 'Playing' : 'Play') + '</div></div>';
+          return '<div class="public-track-row" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ', position ' + (index + 1) + ' of ' + (pl.name || 'playlist')) + '" onclick="playPlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ')"><div class="public-track-index" aria-hidden="true">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="public-track-main"><div class="public-track-name">' + esc(track.title) + '</div><div class="public-track-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 90), 90) + '</div></div><div class="public-track-time">' + fmtTime(track.duration || 0) + '</div><div class="public-row-action">' + ((_currentTrack && _currentTrack.id === track.id && _isPlaying) ? 'Playing' : 'Play') + '</div></div>';
         }).join('') : '<div class="public-empty"><strong>Empty playlist</strong>This shared playlist does not contain tracks yet.</div>') + '</div></div>'
     +     '<div class="public-side-note"><div class="public-kicker">Related context</div><div class="public-list-title">More from this lane</div><div class="public-list-copy" style="margin-top:.45rem">' + esc(related.length ? 'These tracks sit near the same mood, source, or genre profile as this playlist.' : 'Add more tracks nearby in tone if you want a stronger related shelf here.') + '</div><div class="public-related-grid" style="margin-top:1rem">' + (related.length ? related.map(function(track) {
-          return '<div class="related-card" onclick="openSharedRoute(\'track\', ' + jsq(track.id) + ')">' + buildCoverArt(track, 'sm', false) + '<div><div class="related-title">' + esc(track.title) + '</div><div class="related-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 76), 76) + '</div></div></div>';
+          return '<div class="related-card" role="button" tabindex="0" aria-label="' + attr('Open shared track ' + (track.title || 'track')) + '" onclick="openSharedRoute(\'track\', ' + jsq(track.id) + ')">' + buildCoverArt(track, 'sm', false) + '<div><div class="related-title">' + esc(track.title) + '</div><div class="related-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 76), 76) + '</div></div></div>';
         }).join('') : '<div class="public-empty"><strong>No nearby tracks yet</strong>More music in the vault will make playlist-adjacent discovery stronger.</div>') + '</div></div>'
     +   '</div>'
     + '</div>';
@@ -6174,9 +6441,20 @@ function renderBrowseSummary(filtered) {
     + clearBtn;
 }
 
+// Render a rail once: the id list is derived a single time instead of being
+// rebuilt inside the per-item map (which also re-sorted the whole library on
+// every iteration when the list came from getNewestTracks/getMostPlayed).
+function buildMiniRail(list, label, emptyHTML) {
+  if (!list.length) return emptyHTML || '';
+  var ids = list.map(function(item) { return item.id; });
+  return list.map(function(track) { return buildMiniTrackCard(track, label, ids); }).join('');
+}
+
 function buildMiniTrackCard(track, queueLabel, queueIds) {
   return ''
-    + '<div class="mini-track-card" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(queueIds || [track.id]) + ', ' + jsq(queueLabel || 'Curated shelf') + ')">'
+    + '<div class="mini-track-card" role="button" tabindex="0"'
+    +   ' aria-label="' + attr('Play ' + (track.title || 'track') + ' from ' + (queueLabel || 'Curated shelf')) + '"'
+    +   ' onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(queueIds || [track.id]) + ', ' + jsq(queueLabel || 'Curated shelf') + ')">'
     +   buildCoverArt(track, 'xs', false)
     +   '<div class="side-item-copy">'
     +     '<div class="mini-track-title">' + esc(track.title) + '</div>'
@@ -6186,12 +6464,16 @@ function buildMiniTrackCard(track, queueLabel, queueIds) {
     + '</div>';
 }
 
+// The queue is resolved lazily at click time (playTrack -> startPlayback
+// derives the filtered shelf itself). Building it per card called
+// getFilteredTracks() once per row — 301 calls and 90k id-string copies at
+// 300 tracks — and re-serialised the whole queue into every card's onclick,
+// which was 36% of the list HTML and grew quadratically with the library.
 function buildTrackCard(track) {
   var tags = getTrackTags(track);
   var waveform = getVisualWaveform(track, 48);
   var isPlaying = _currentTrack && _currentTrack.id === track.id && _isPlaying;
   var expanded = _expandedTrackId === track.id;
-  var queueIds = getFilteredTracks().map(function(item) { return item.id; });
   var prompt = track.prompt ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Prompt</div><div class="expand-value">' + esc(track.prompt) + '</div></div>' : '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Prompt</div><div class="expand-value">' + esc(promptFallback(track)) + '</div></div>';
   var lyrics = hasLyrics(track) ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Lyrics</div><div class="expand-value" style="white-space:pre-wrap">' + esc(getTrackLyrics(track)) + '</div></div>' : '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Lyrics</div><div class="expand-value">Missing lyrics. Watcher imports and older tracks stay playable &mdash; hit Edit to paste a lyric sheet and regenerate AI notes.</div></div>';
   var summary = getTrackSummary(track) ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">AI summary</div><div class="expand-value">' + esc(getTrackSummary(track)) + '</div></div>' : '';
@@ -6210,17 +6492,20 @@ function buildTrackCard(track) {
     +         '<span class="meta-pill">' + esc(track.mood || 'Mood') + '</span>'
     +         '<span class="meta-pill">' + fmtTime(track.duration || 0) + '</span>'
     +         (!hasLyrics(track) ? '<span class="meta-pill warn">Lyrics missing</span>' : '')
+    +         (track.shared ? '<span class="meta-pill shared">Public link live</span>' : '')
     +         (track.autoImported ? '<span class="meta-pill">Watcher import</span>' : '')
     +       '</div>'
     +       '<div class="track-tag-row">' + tags.slice(0, 6).map(function(tag) { return '<span class="track-tag">' + esc(tag) + '</span>'; }).join('') + '</div>'
     +       '<div class="track-meta-strip">'
     +         '<div class="track-stats"><span>' + fmtCompactNumber(track.plays || 0) + ' plays</span><span>' + esc(track.fileName || 'manual upload') + '</span></div>'
     +         '<div class="track-actions">'
-    +           '<button class="action-btn primary" onclick="event.stopPropagation();startPlayback(' + jsq(track.id) + ', ' + jsv(queueIds) + ', ' + jsq('Filtered shelf') + ')">' + (isPlaying ? 'Pause' : 'Play') + '</button>'
-    +           '<button class="action-btn" onclick="event.stopPropagation();toggleExpand(' + jsq(track.id) + ')">' + (expanded ? 'Hide notes' : 'Open notes') + '</button>'
+    +           '<button class="action-btn primary" onclick="event.stopPropagation();playTrack(' + jsq(track.id) + ')">' + (isPlaying ? 'Pause' : 'Play') + '</button>'
+    +           '<button class="action-btn js-notes-btn" aria-expanded="' + (expanded ? 'true' : 'false') + '" aria-controls="notes-' + esc(track.id) + '" onclick="event.stopPropagation();toggleExpand(' + jsq(track.id) + ')">' + (expanded ? 'Hide notes' : 'Open notes') + '</button>'
     +           '<button class="icon-btn" onclick="event.stopPropagation();cycleTrackCover(' + jsq(track.id) + ')">Cover</button>'
     +           '<button class="icon-btn" onclick="event.stopPropagation();openEditTrack(' + jsq(track.id) + ')">Edit</button>'
-    +           '<button class="icon-btn" onclick="event.stopPropagation();shareTrack(' + jsq(track.id) + ')">Share</button>'
+    +           (track.shared
+                  ? '<button class="icon-btn is-shared" title="This track has a live public link" onclick="event.stopPropagation();unshareTrack(' + jsq(track.id) + ')">Unshare</button>'
+                  : '<button class="icon-btn" onclick="event.stopPropagation();shareTrack(' + jsq(track.id) + ')">Share</button>')
     +           '<button class="icon-btn" onclick="event.stopPropagation();deleteTrack(' + jsq(track.id) + ')">Delete</button>'
     +         '</div>'
     +       '</div>'
@@ -6228,7 +6513,7 @@ function buildTrackCard(track) {
     +   '</div>'
     +   '<div class="track-footer">'
     +     renderWaveformHTML(track.id, waveform)
-    +     '<div class="track-expand"><div class="expand-grid">'
+    +     '<div class="track-expand" id="notes-' + esc(track.id) + '"><div class="expand-grid">'
     +       '<div class="expand-item"><div class="expand-label">Title</div><div class="expand-value">' + esc(track.title) + '</div></div>'
     +       '<div class="expand-item"><div class="expand-label">Source</div><div class="expand-value">' + esc(track.source || 'Suno') + '</div></div>'
     +       '<div class="expand-item"><div class="expand-label">Mood</div><div class="expand-value">' + esc(track.mood || 'Mood') + '</div></div>'
@@ -6262,9 +6547,40 @@ function buildSourceCards() {
   }).join('');
 }
 
+// Shape-matched placeholder for the hero, so the first paint of a syncing
+// vault reads as "loading" instead of "empty".
+function buildLibrarySkeleton() {
+  function block(cls) { return '<div class="skel ' + cls + '"></div>'; }
+  return ''
+    + '<div class="library-home-stack" aria-busy="true" aria-label="Loading your vault">'
+    +   '<div class="hero-stage">'
+    +     '<div class="hero-main"><div class="hero-grid">'
+    +       '<div class="hero-copy">'
+    +         block('skel-eyebrow') + block('skel-title') + block('skel-title short') + block('skel-line') + block('skel-line') + block('skel-line short')
+    +         '<div class="hero-summary">'
+    +           block('skel-tile') + block('skel-tile') + block('skel-tile') + block('skel-tile')
+    +         '</div>'
+    +       '</div>'
+    +       '<div class="spotlight-card">' + block('skel-cover') + block('skel-line') + block('skel-line short') + '</div>'
+    +     '</div></div>'
+    +     '<div class="hero-side"><div class="side-card">' + block('skel-line') + block('skel-line short') + '</div><div class="side-card">' + block('skel-line') + block('skel-line') + block('skel-line short') + '</div></div>'
+    +   '</div>'
+    +   '<div class="rail-grid">'
+    +     '<div class="rail-card">' + block('skel-line short') + block('skel-row') + block('skel-row') + block('skel-row') + '</div>'
+    +     '<div class="rail-card">' + block('skel-line short') + block('skel-row') + block('skel-row') + block('skel-row') + '</div>'
+    +     '<div class="rail-card">' + block('skel-line short') + block('skel-row') + block('skel-row') + block('skel-row') + '</div>'
+    +   '</div>'
+    + '</div>';
+}
+
 function renderLibraryHome() {
   var el = document.getElementById('library-home');
   if (!el) return;
+
+  if (!tracks.length && window.svBootPending) {
+    el.innerHTML = buildLibrarySkeleton();
+    return;
+  }
 
   if (!tracks.length) {
     el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="empty-state"><strong>Start your private label.</strong>Upload your first Suno track or let the watcher auto-import from your downloads folder. SonicVault will build the cover system, the discovery rails, and the listening-first player on top of the same data model you already use.<div class="modal-actions" style="justify-content:center;margin-top:1rem"><button class="sec-action primary" onclick="switchView(\'upload\')">Import first track</button><button class="sec-action" onclick="startCoverDemo()">Preview cover styles</button></div></div></div></div>';
@@ -6284,7 +6600,7 @@ function renderLibraryHome() {
   var sharedCount = tracks.filter(function(track) { return !!track.shared; }).length;
 
   var recentHtml = recentTracks.map(function(track) {
-    return '<div class="side-item" onclick="playTrack(' + jsq(track.id) + ')">' + buildCoverArt(track, 'xs', false) + '<div class="side-item-copy"><div class="side-item-title">' + esc(track.title) + '</div><div class="side-item-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + '</div></div></div>';
+    return '<div class="side-item" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track')) + '" onclick="playTrack(' + jsq(track.id) + ')">' + buildCoverArt(track, 'xs', false) + '<div class="side-item-copy"><div class="side-item-title">' + esc(track.title) + '</div><div class="side-item-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + '</div></div></div>';
   }).join('');
 
   el.innerHTML = ''
@@ -6319,9 +6635,9 @@ function renderLibraryHome() {
     +     '<div class="snapshot-card"><div class="snapshot-label">Current queue</div><div class="snapshot-value">' + (_playQueueIds.length || tracks.length) + '</div><div class="snapshot-sub">' + esc(_currentTrack ? _playQueueLabel : 'Vault shelf ready') + '</div></div>'
     +   '</div>'
     +   '<div class="rail-grid">'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Recent drops</div><div class="rail-title">Latest releases</div><div class="rail-copy">Newest additions with immediate play access.</div></div></div><div class="mini-track-list">' + getNewestTracks(3).map(function(track) { return buildMiniTrackCard(track, 'Recent drops', getNewestTracks(3).map(function(item) { return item.id; })); }).join('') + '</div></div>'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Hidden gems</div><div class="rail-title">Quietly brilliant</div><div class="rail-copy">Least-played tracks that deserve another listen.</div></div></div><div class="mini-track-list">' + hiddenGems.map(function(track) { return buildMiniTrackCard(track, 'Hidden gems', hiddenGems.map(function(item) { return item.id; })); }).join('') + '</div></div>'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Most played</div><div class="rail-title">Heavy rotation</div><div class="rail-copy">The records you have already promoted to repeat play.</div></div></div><div class="mini-track-list">' + mostPlayed.map(function(track) { return buildMiniTrackCard(track, 'Heavy rotation', mostPlayed.map(function(item) { return item.id; })); }).join('') + '</div></div>'
+    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Recent drops</div><div class="rail-title">Latest releases</div><div class="rail-copy">Newest additions with immediate play access.</div></div></div><div class="mini-track-list">' + buildMiniRail(recentTracks, 'Recent drops') + '</div></div>'
+    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Hidden gems</div><div class="rail-title">Quietly brilliant</div><div class="rail-copy">Least-played tracks that deserve another listen.</div></div></div><div class="mini-track-list">' + buildMiniRail(hiddenGems, 'Hidden gems') + '</div></div>'
+    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Most played</div><div class="rail-title">Heavy rotation</div><div class="rail-copy">The records you have already promoted to repeat play.</div></div></div><div class="mini-track-list">' + buildMiniRail(mostPlayed, 'Heavy rotation') + '</div></div>'
     +   '</div>'
     +   '<div class="rail-grid">'
     +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Mood rooms</div><div class="rail-title">Browse by feeling</div><div class="rail-copy">Jump into a mood-led room instead of scrolling a utility list.</div></div></div><div class="mood-grid">' + buildMoodCards() + '</div></div>'
@@ -6329,16 +6645,23 @@ function renderLibraryHome() {
     +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Discovery cues</div><div class="rail-title">Prompt, lyric, and AI tags</div><div class="rail-copy">Treat the Suno prompt, lyric sheet, and generated metadata as curation material, not hidden metadata.</div></div></div><div class="tag-cloud">' + promptTags.map(function(tag) { return '<button class="prompt-chip" onclick="browseTag(' + jsq(tag) + ')">' + esc(tag) + '</button>'; }).join('') + '</div></div>'
     +   '</div>'
     +   '<div class="rail-grid">'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Similar vibe</div><div class="rail-title">Stay in the same lane</div><div class="rail-copy">Tracks that echo the current featured record across prompt, lyrics, and AI metadata.</div></div></div><div class="mini-track-list">' + (similar.length ? similar.map(function(track) { return buildMiniTrackCard(track, 'Similar vibe', similar.map(function(item) { return item.id; })); }).join('') : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">More variety soon</strong>Add a few more tracks to unlock stronger similarity rails.</div>') + '</div></div>'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Recent imports</div><div class="rail-title">Watcher lane</div><div class="rail-copy">Auto-imports from the local Suno watcher, ready for cleanup and curation.</div></div></div><div class="mini-track-list">' + (imports.length ? imports.map(function(track) { return buildMiniTrackCard(track, 'Watcher lane', imports.map(function(item) { return item.id; })); }).join('') : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">Watcher is quiet</strong>No recent auto-imports yet.</div>') + '</div></div>'
+    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Similar vibe</div><div class="rail-title">Stay in the same lane</div><div class="rail-copy">Tracks that echo the current featured record across prompt, lyrics, and AI metadata.</div></div></div><div class="mini-track-list">' + buildMiniRail(similar, 'Similar vibe', '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">More variety soon</strong>Add a few more tracks to unlock stronger similarity rails.</div>') + '</div></div>'
+    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Recent imports</div><div class="rail-title">Watcher lane</div><div class="rail-copy">Auto-imports from the local Suno watcher, ready for cleanup and curation.</div></div></div><div class="mini-track-list">' + buildMiniRail(imports, 'Watcher lane', '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">Watcher is quiet</strong>No recent auto-imports yet.</div>') + '</div></div>'
     +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Featured playlist</div><div class="rail-title">' + esc(featuredPlaylist ? featuredPlaylist.name : 'No playlists yet') + '</div><div class="rail-copy">' + esc(featuredPlaylist ? trimText(featuredPlaylist.desc || 'A curated mix ready for a front-to-back listen.', 100) : 'Create a playlist to give your vault a stronger editorial spine.') + '</div></div></div>' + (featuredPlaylist ? buildPlaylistCover(featuredPlaylist, 'sm') + '<div class="section-action-row" style="margin-top:1rem"><button class="sec-action primary" onclick="playPlaylist(' + jsq(featuredPlaylist.id) + ')">Play mix</button><button class="sec-action" onclick="viewPlaylist(' + jsq(featuredPlaylist.id) + ')">Open playlist</button></div>' : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">Build your first mix</strong>Turn a group of tracks into a more intentional room.</div>') + '</div>'
     +   '</div>'
     + '</div>';
 }
 
+// Full library render: editorial hero + browse shelf. Use this when the
+// underlying data changed.
 function renderTracks() {
   renderLibraryHome();
+  renderTrackList();
+}
 
+// Browse-shelf only: filters, summary, and the card grid. Search and filter
+// changes go through here so a keystroke doesn't rebuild the whole hero.
+function renderTrackList() {
   var genres = {};
   var moods = {};
   var sources = {};
@@ -6360,26 +6683,103 @@ function renderTracks() {
   var el = document.getElementById('track-list');
   if (!el) return;
   if (!filtered.length) {
-    el.innerHTML = '<div class="empty-state"><strong>No tracks match this shelf.</strong>Try another mood, clear the prompt tag, or widen the search terms.</div>';
+    _shelfRendered = 0;
+    _shelfTracks = [];
+    el.innerHTML = (!tracks.length && window.svBootPending)
+      ? '<div class="skel skel-card"></div><div class="skel skel-card"></div>'
+      : '<div class="empty-state"><strong>No tracks match this shelf.</strong>Try another mood, clear the prompt tag, or widen the search terms.</div>';
     return;
   }
 
-  el.innerHTML = filtered.map(function(track) {
-    return buildTrackCard(track);
-  }).join('');
+  _shelfTracks = filtered;
+  _shelfRendered = 0;
+  el.innerHTML = '';
+  appendShelfPage(el);
+  observeShelfSentinel();
 
   if (_currentTrack && _isPlaying && _audio.duration) {
     updateWaveformProgress(_currentTrack.id, _audio.currentTime / _audio.duration);
   }
 }
 
+// ── Progressive shelf rendering ────────────────────────────────────────
+// A full 600-track shelf is ~70k DOM nodes and a ~150ms parse. Rendering a
+// page at a time keeps the first paint flat regardless of library size; the
+// rest streams in as the user scrolls, with an explicit button as the
+// fallback when IntersectionObserver is unavailable or the user prefers it.
+var SHELF_PAGE_SIZE = 60;
+var _shelfTracks = [];
+var _shelfRendered = 0;
+var _shelfObserver = null;
+
+function appendShelfPage(el) {
+  el = el || document.getElementById('track-list');
+  if (!el) return;
+  var sentinel = document.getElementById('shelf-sentinel');
+  if (sentinel) sentinel.remove();
+
+  var slice = _shelfTracks.slice(_shelfRendered, _shelfRendered + SHELF_PAGE_SIZE);
+  if (slice.length) {
+    el.insertAdjacentHTML('beforeend', slice.map(function(track) {
+      return buildTrackCard(track);
+    }).join(''));
+    _shelfRendered += slice.length;
+  }
+
+  var remaining = _shelfTracks.length - _shelfRendered;
+  if (remaining > 0) {
+    el.insertAdjacentHTML('beforeend',
+      '<div class="shelf-sentinel" id="shelf-sentinel">'
+      + '<button class="sec-action" onclick="appendShelfPage()">Show ' + Math.min(SHELF_PAGE_SIZE, remaining) + ' more</button>'
+      + '<div class="shelf-sentinel-copy">Showing ' + _shelfRendered + ' of ' + _shelfTracks.length + ' tracks in this shelf.</div>'
+      + '</div>');
+    observeShelfSentinel();
+  }
+}
+
+function observeShelfSentinel() {
+  if (typeof IntersectionObserver === 'undefined') return;
+  if (_shelfObserver) _shelfObserver.disconnect();
+  var sentinel = document.getElementById('shelf-sentinel');
+  if (!sentinel) return;
+  _shelfObserver = new IntersectionObserver(function(entries) {
+    if (entries.some(function(entry) { return entry.isIntersecting; })) {
+      appendShelfPage();
+    }
+  }, { rootMargin: '600px 0px' });
+  _shelfObserver.observe(sentinel);
+}
+
+// The notes markup is already in every card and `.expanded` is a pure CSS
+// state, so flip the class on the two affected cards instead of rebuilding
+// the entire list to open one row.
 function toggleExpand(id) {
-  _expandedTrackId = _expandedTrackId === id ? '' : id;
-  renderTracks();
+  var previous = _expandedTrackId;
+  _expandedTrackId = previous === id ? '' : id;
+
+  [previous, _expandedTrackId].forEach(function(cardId) {
+    if (!cardId) return;
+    var card = document.getElementById('card-' + cardId);
+    if (!card) return;
+    var open = cardId === _expandedTrackId;
+    card.classList.toggle('expanded', open);
+    var btn = card.querySelector('.js-notes-btn');
+    if (btn) {
+      btn.textContent = open ? 'Hide notes' : 'Open notes';
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+  });
 }
 
 function deleteTrack(id) {
-  if (!confirm('Delete this track from SonicVault?')) return;
+  var doomed = getTrackById(id);
+  var wasShared = !!(doomed && doomed.shared);
+  if (!confirm(wasShared
+      ? 'Delete this track and revoke its public link?'
+      : 'Delete this track from SonicVault?')) return;
+  // Take the public page down first — otherwise the shared URL keeps serving
+  // the prompt, lyrics excerpt, and audio after the track is gone locally.
+  if (wasShared) revokeShare('track', id);
   tracks = tracks.filter(function(track) { return track.id !== id; });
   playlists.forEach(function(pl) {
     pl.trackIds = (pl.trackIds || []).filter(function(trackId) { return trackId !== id; });
@@ -6520,6 +6920,43 @@ async function shareTrack(id) {
   }
 }
 
+// ── Revoking shares ────────────────────────────────────────────────────
+// Deleting the public doc is the part that actually takes the link down.
+// Both the explicit Unshare buttons and the delete paths route through here
+// so a removed track can never leave a live public page behind.
+async function revokeShare(kind, id) {
+  if (!window.fbUnpublishShare) return false;
+  try {
+    await window.fbUnpublishShare(kind, id);
+    return true;
+  } catch (e) {
+    console.error('Share revoke failed:', e);
+    return false;
+  }
+}
+
+async function unshareTrack(id) {
+  var track = getTrackById(id);
+  if (!track) return;
+  if (!confirm('Revoke the public link for "' + track.title + '"? Anyone holding the link will stop being able to open it.')) return;
+  track.shared = false;
+  persistTracks();
+  renderTracks();
+  var ok = await revokeShare('track', id);
+  showToast(ok ? 'Public link revoked' : 'Marked private, but the public page could not be deleted');
+}
+
+async function unsharePlaylist(id) {
+  var pl = getPlaylistById(id);
+  if (!pl) return;
+  if (!confirm('Revoke the public link for "' + pl.name + '"?')) return;
+  pl.shared = false;
+  persistPlaylists();
+  renderPlaylists();
+  var ok = await revokeShare('playlist', id);
+  showToast(ok ? 'Public link revoked' : 'Marked private, but the public page could not be deleted');
+}
+
 function copyShareLink() {
   var input = document.getElementById('share-link');
   if (navigator.clipboard) {
@@ -6552,7 +6989,7 @@ function renderPlaylistHero() {
   var featured = getFeaturedPlaylist();
   var tracksInFeatured = getPlaylistTracks(featured);
   el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="playlist-hero-grid"><div class="playlist-hero-main"><div class="section-kicker">Featured mixtape</div><div class="playlist-hero-card">' + buildPlaylistCover(featured, 'sm') + '<div><div class="section-title" style="font-size:42px">' + esc(featured.name) + '</div><div class="section-sub" style="margin-top:.65rem">' + esc(featured.desc || 'A curated sequence built from your vault.') + '</div><div class="pill-row" style="margin-top:.8rem"><span class="meta-pill highlight">' + tracksInFeatured.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(tracksInFeatured)) + '</span><span class="meta-pill">' + esc((tracksInFeatured[0] && tracksInFeatured[0].source) || 'Mixed') + '</span></div><div class="section-action-row" style="margin-top:1rem"><button class="sec-action primary" onclick="playPlaylist(' + jsq(featured.id) + ')">Play playlist</button><button class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open details</button><button class="sec-action" onclick="sharePlaylist(' + jsq(featured.id) + ')">Share</button></div></div></div></div><div class="side-card"><div class="side-kicker">Why playlists matter</div><div class="side-title">Mixtapes over folders.</div><div class="side-copy">The playlist page now treats sets like editorial releases: visual covers, clearer sequencing, and front-to-back play controls.</div><div class="playlist-track-list" style="margin-top:.9rem">' + tracksInFeatured.slice(0, 3).map(function(track, index) {
-    return '<div class="playlist-track-pill" style="cursor:pointer" onclick="playPlaylistTrack(' + jsq(featured.id) + ', ' + jsq(track.id) + ')"><div class="playlist-track-pill-main"><span class="playlist-track-order">' + (index + 1) + '</span><span>' + esc(track.title) + '</span></div><span>' + esc(track.mood || 'Mood') + '</span></div>';
+    return '<div class="playlist-track-pill" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ' from ' + (featured.name || 'playlist')) + '" style="cursor:pointer" onclick="playPlaylistTrack(' + jsq(featured.id) + ', ' + jsq(track.id) + ')"><div class="playlist-track-pill-main"><span class="playlist-track-order">' + (index + 1) + '</span><span>' + esc(track.title) + '</span></div><span>' + esc(track.mood || 'Mood') + '</span></div>';
   }).join('') + '</div></div></div></div></div>';
 }
 
@@ -6705,10 +7142,13 @@ function renderPlaylists() {
     var totalDuration = getCollectionDuration(items);
     return '<div class="playlist-card" style="' + playlistAccentVars(pl) + '" onclick="viewPlaylist(' + jsq(pl.id) + ')"><div class="playlist-card-top">' + buildPlaylistCover(pl, 'sm') + '<div><div class="section-kicker" style="margin-bottom:.35rem;color:var(--pl-accent)">Curated playlist</div><div class="playlist-name">' + esc(pl.name) + '</div><div class="playlist-desc">' + esc(pl.desc || 'An editorial mix from the vault.') + '</div><div class="pill-row" style="margin-top:.7rem"><span class="meta-pill highlight" style="color:var(--pl-accent);border-color:var(--pl-accent-rim);background:var(--pl-accent-soft)">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(totalDuration) + '</span><span class="meta-pill">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + ' plays</span></div></div></div><div class="playlist-track-list">' + (items.slice(0, 3).map(function(track, index) {
       return '<div class="playlist-track-pill"><div class="playlist-track-pill-main"><span class="playlist-track-order">' + (index + 1) + '</span><span>' + esc(track.title) + '</span></div><span>' + esc(track.mood || 'Mood') + '</span></div>';
-    }).join('') || '<div class="playlist-track-pill"><span>Empty playlist</span><span>Ready for curation</span></div>') + '</div><div class="section-action-row"><button class="sec-action primary" onclick="event.stopPropagation();playPlaylist(' + jsq(pl.id) + ')">Play</button><button class="sec-action" onclick="event.stopPropagation();sharePlaylist(' + jsq(pl.id) + ')">Share</button><button class="sec-action" onclick="event.stopPropagation();deletePlaylist(' + jsq(pl.id) + ')">Delete</button></div></div>';
+    }).join('') || '<div class="playlist-track-pill"><span>Empty playlist</span><span>Ready for curation</span></div>') + '</div><div class="section-action-row"><button class="sec-action primary" onclick="event.stopPropagation();playPlaylist(' + jsq(pl.id) + ')">Play</button><button class="sec-action" onclick="event.stopPropagation();viewPlaylist(' + jsq(pl.id) + ')">Open</button>' + (pl.shared ? '<button class="sec-action is-shared" title="This playlist has a live public link" onclick="event.stopPropagation();unsharePlaylist(' + jsq(pl.id) + ')">Unshare</button>' : '<button class="sec-action" onclick="event.stopPropagation();sharePlaylist(' + jsq(pl.id) + ')">Share</button>') + '<button class="sec-action" onclick="event.stopPropagation();deletePlaylist(' + jsq(pl.id) + ')">Delete</button></div></div>';
   }).join('');
 
-  html += '<div class="playlist-card" onclick="openModal(\'modal-playlist\')"><div class="section-kicker">New room</div><div class="playlist-name">Create another playlist</div><div class="playlist-desc">Turn a cluster of tracks into a stronger editorial sequence.</div><div class="section-action-row"><button class="sec-action primary">Start playlist</button></div></div>';
+  // The card stays clickable for pointers, but the keyboard path is the real
+  // button inside it — a focusable card wrapping focusable buttons would be a
+  // duplicate tab stop for the same action.
+  html += '<div class="playlist-card playlist-card-new" onclick="openModal(\'modal-playlist\')"><div class="section-kicker">New room</div><div class="playlist-name">Create another playlist</div><div class="playlist-desc">Turn a cluster of tracks into a stronger editorial sequence.</div><div class="section-action-row"><button class="sec-action primary" onclick="event.stopPropagation();openModal(\'modal-playlist\')">Start playlist</button></div></div>';
   el.innerHTML = html;
 }
 
@@ -6752,7 +7192,10 @@ function addPlaylist() {
 }
 
 function deletePlaylist(id) {
-  if (!confirm('Delete this playlist?')) return;
+  var doomed = getPlaylistById(id);
+  var wasShared = !!(doomed && doomed.shared);
+  if (!confirm(wasShared ? 'Delete this playlist and revoke its public link?' : 'Delete this playlist?')) return;
+  if (wasShared) revokeShare('playlist', id);
   playlists = playlists.filter(function(pl) { return pl.id !== id; });
   if (_editingPlaylistId === id) _editingPlaylistId = '';
   persistPlaylists();
@@ -6769,7 +7212,7 @@ function viewPlaylist(id) {
   var colorOptions = PLAYLIST_COLOR_OPTIONS;
   var actionRow = '<button class="sec-action primary" onclick="playPlaylist(' + jsq(pl.id) + ');closeModal(\'modal-playlist-detail\')">Play all</button>';
   if (isPrivatePlaylist) {
-    actionRow += '<button class="sec-action" onclick="shufflePlaylistMix(' + jsq(pl.id) + ')">Shuffle this mix</button><button class="sec-action" onclick="duplicatePlaylist(' + jsq(pl.id) + ')">Duplicate</button><button class="sec-action" onclick="' + (isEditing ? 'savePlaylistEdits(' + jsq(pl.id) + ')' : 'setPlaylistEditMode(' + jsq(pl.id) + ', true)') + '">' + (isEditing ? 'Save edits' : 'Edit mix') + '</button><button class="sec-action" onclick="sharePlaylist(' + jsq(pl.id) + ')">Share playlist</button>';
+    actionRow += '<button class="sec-action" onclick="shufflePlaylistMix(' + jsq(pl.id) + ')">Shuffle this mix</button><button class="sec-action" onclick="duplicatePlaylist(' + jsq(pl.id) + ')">Duplicate</button><button class="sec-action" onclick="' + (isEditing ? 'savePlaylistEdits(' + jsq(pl.id) + ')' : 'setPlaylistEditMode(' + jsq(pl.id) + ', true)') + '">' + (isEditing ? 'Save edits' : 'Edit mix') + '</button>' + (pl.shared ? '<button class="sec-action is-shared" onclick="unsharePlaylist(' + jsq(pl.id) + ')">Revoke public link</button>' : '<button class="sec-action" onclick="sharePlaylist(' + jsq(pl.id) + ')">Share playlist</button>');
   } else {
     actionRow += '<button class="sec-action" onclick="openShareLinkModal(' + jsq('Share \"' + pl.name + '\"') + ', ' + jsq('Send the playlist link for a front-to-back listen.') + ', ' + jsq(buildShareURL('playlist', pl.id)) + ')">Copy share link</button>';
   }
@@ -6780,9 +7223,15 @@ function viewPlaylist(id) {
     if (!items.length) {
       html += '<div class="empty-state"><strong>Empty mix.</strong>Add tracks from the library or expanded player, then arrange the order here.</div>';
     } else {
-      html += '<div class="playlist-edit-card"><div class="section-kicker">Sequence editor</div><div class="section-sub" style="margin-bottom:1rem">This order is used everywhere SonicVault treats this as a mixtape: playlist page, detail modal, and playback queue.</div><div class="playlist-edit-list">';
+      html += '<div class="playlist-edit-card"><div class="section-kicker">Sequence editor</div><div class="section-sub" style="margin-bottom:1rem">Drag a row to reorder it, or use Up and Down to move it from the keyboard. This order is used everywhere SonicVault treats this as a mixtape: playlist page, detail modal, and playback queue.</div><div class="playlist-edit-list">';
       items.forEach(function(track, index) {
-        html += '<div class="playlist-edit-item"><div class="playlist-edit-index">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="playlist-edit-copy"><div class="playlist-edit-title">' + esc(track.title) + '</div><div class="playlist-edit-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="playlist-seq-actions"><button class="playlist-seq-btn" onclick="movePlaylistTrack(' + jsq(pl.id) + ', ' + index + ', -1)"' + (index === 0 ? ' disabled' : '') + '>Up</button><button class="playlist-seq-btn" onclick="movePlaylistTrack(' + jsq(pl.id) + ', ' + index + ', 1)"' + (index === items.length - 1 ? ' disabled' : '') + '>Down</button><button class="playlist-seq-btn" onclick="removePlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ')">Remove</button></div></div>';
+        html += '<div class="playlist-edit-item" draggable="true"'
+          + ' ondragstart="onSeqDragStart(event, ' + jsq(pl.id) + ', ' + index + ')"'
+          + ' ondragover="onSeqDragOver(event, ' + jsq(pl.id) + ', ' + index + ')"'
+          + ' ondrop="onSeqDrop(event, ' + jsq(pl.id) + ', ' + index + ')"'
+          + ' ondragend="onSeqDragEnd()">'
+          + '<div class="playlist-drag-handle" aria-hidden="true" title="Drag to reorder">::</div>'
+          + '<div class="playlist-edit-index">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="playlist-edit-copy"><div class="playlist-edit-title">' + esc(track.title) + '</div><div class="playlist-edit-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="playlist-seq-actions"><button class="playlist-seq-btn" onclick="movePlaylistTrack(' + jsq(pl.id) + ', ' + index + ', -1)"' + (index === 0 ? ' disabled' : '') + '>Up</button><button class="playlist-seq-btn" onclick="movePlaylistTrack(' + jsq(pl.id) + ', ' + index + ', 1)"' + (index === items.length - 1 ? ' disabled' : '') + '>Down</button><button class="playlist-seq-btn" onclick="removePlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ')">Remove</button></div></div>';
       });
       html += '</div></div>';
     }
@@ -6792,7 +7241,7 @@ function viewPlaylist(id) {
     } else {
       html += '<div class="playlist-modal-list">';
       items.forEach(function(track, index) {
-        html += '<div class="playlist-modal-item" onclick="playPlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ');closeModal(\'modal-playlist-detail\')"><div class="mini-track-meta">#' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div><div class="playlist-picker-title">' + esc(track.title) + '</div><div class="playlist-picker-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 86), 86) + '</div></div><div class="mini-track-meta">' + fmtTime(track.duration || 0) + '</div></div>';
+        html += '<div class="playlist-modal-item" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ', position ' + (index + 1)) + '" onclick="playPlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ');closeModal(\'modal-playlist-detail\')"><div class="mini-track-meta" aria-hidden="true">#' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div><div class="playlist-picker-title">' + esc(track.title) + '</div><div class="playlist-picker-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 86), 86) + '</div></div><div class="mini-track-meta">' + fmtTime(track.duration || 0) + '</div></div>';
       });
       html += '</div>';
     }
@@ -7006,7 +7455,12 @@ function renderUploadQueue() {
       +     (!hasLyrics(item) ? '<div class="upload-queue-alert">Lyrics required before this manual upload can be saved.</div>' : '')
       +     '<div class="upload-queue-progress"><div class="upload-queue-progress-fill" style="width:' + Math.round(item.progress || 0) + '%"></div></div>'
       +   '</div>'
-      +   '<div class="upload-queue-actions"><div class="upload-queue-status">#' + (index + 1) + '</div><button class="queue-remove-btn" ' + (_isSavingUploads ? 'disabled' : '') + ' onclick="event.stopPropagation();removePendingUpload(' + jsq(item.id) + ')">Remove</button></div>'
+      // The row stays clickable for pointers. Keyboard users get an explicit
+      // Edit button rather than a focusable row wrapping a text input.
+      +   '<div class="upload-queue-actions"><div class="upload-queue-status">#' + (index + 1) + '</div>'
+      +     '<button class="queue-remove-btn" aria-pressed="' + (_uploadFocusId === item.id ? 'true' : 'false') + '" onclick="event.stopPropagation();setUploadFocus(' + jsq(item.id) + ')">' + (_uploadFocusId === item.id ? 'Editing' : 'Edit') + '</button>'
+      +     '<button class="queue-remove-btn" ' + (_isSavingUploads ? 'disabled' : '') + ' onclick="event.stopPropagation();removePendingUpload(' + jsq(item.id) + ')">Remove</button>'
+      +   '</div>'
       + '</div>';
   }).join('');
 }
@@ -7319,18 +7773,84 @@ if (dropZone) {
   });
 }
 
+// ── Dialog focus management ────────────────────────────────────────────
+// Dialogs are plain divs (not <dialog>), so focus containment is manual:
+// remember what opened the dialog, move focus inside, keep Tab from escaping
+// to the page behind, and hand focus back on close.
+var FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [role="button"][tabindex="0"]';
+var _modalReturnFocus = {};
+
+function getVisibleFocusable(root) {
+  return Array.prototype.filter.call(root.querySelectorAll(FOCUSABLE_SELECTOR), function(el) {
+    return el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement;
+  });
+}
+
 function openModal(id) {
-  document.getElementById(id).classList.add('open');
+  var overlay = document.getElementById(id);
+  if (!overlay) return;
   if (id === 'modal-playlist') populatePlaylistCheckboxes();
+  if (!overlay.classList.contains('open')) {
+    _modalReturnFocus[id] = document.activeElement;
+  }
+  overlay.classList.add('open');
+  // Synchronous on purpose: querying offsetWidth forces layout, so the
+  // dialog's focusables are measurable immediately. Deferring to
+  // requestAnimationFrame would silently skip focus placement whenever the
+  // tab is backgrounded, since rAF does not fire on unrendered pages.
+  focusFirstIn(overlay);
+}
+
+function focusFirstIn(overlay) {
+  var focusable = getVisibleFocusable(overlay);
+  if (focusable.length) {
+    focusable[0].focus();
+    return true;
+  }
+  overlay.setAttribute('tabindex', '-1');
+  overlay.focus();
+  return false;
 }
 
 function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
+  var overlay = document.getElementById(id);
+  if (!overlay || !overlay.classList.contains('open')) return;
+  overlay.classList.remove('open');
+  var returnTo = _modalReturnFocus[id];
+  delete _modalReturnFocus[id];
+  if (returnTo && returnTo.focus && document.contains(returnTo)) {
+    returnTo.focus();
+    return;
+  }
+  // The opener is often gone by now: acting in a dialog (adding a track,
+  // saving an edit) re-renders the grid that contained the button that
+  // opened it. Land on the current view's nav tab rather than dropping
+  // focus to <body>, which would restart tabbing from the top of the page.
+  var fallback = document.getElementById('gtab-' + _activeView) || document.querySelector('.group-tab.active');
+  if (fallback && fallback.focus) fallback.focus();
 }
 
-document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+// Tab containment. Runs on capture so it wins before anything else reacts.
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Tab') return;
+  var overlay = getOpenOverlay();
+  if (!overlay) return;
+  var focusable = getVisibleFocusable(overlay);
+  if (!focusable.length) { e.preventDefault(); return; }
+  var first = focusable[0];
+  var last = focusable[focusable.length - 1];
+  if (e.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}, true);
+
+document.querySelectorAll('.modal-overlay, .player-modal-overlay').forEach(function(overlay) {
   overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) overlay.classList.remove('open');
+    if (e.target === overlay) closeModal(overlay.id);
   });
 });
 
@@ -7391,6 +7911,23 @@ function keyboardSeek(delta) {
   updateMediaSessionPosition();
 }
 
+// Cards and rails are <div onclick> for layout reasons (they wrap cover art
+// and multi-line copy). Those carry role="button" + tabindex="0" in the
+// markup; this gives them the Enter/Space activation a real button gets.
+// Registered BEFORE the shortcut handler so Space activates the focused card
+// instead of toggling playback.
+document.addEventListener('keydown', function(e) {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+  var el = e.target;
+  if (!el || !el.getAttribute || el.getAttribute('role') !== 'button') return;
+  var tag = (el.tagName || '').toUpperCase();
+  if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  el.click();
+});
+
 document.addEventListener('keydown', function(e) {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
 
@@ -7401,7 +7938,7 @@ document.addEventListener('keydown', function(e) {
   // Escape always works: close the open dialog, else collapse an open track.
   if (e.key === 'Escape') {
     var overlay = getOpenOverlay();
-    if (overlay) { overlay.classList.remove('open'); e.preventDefault(); return; }
+    if (overlay) { closeModal(overlay.id); e.preventDefault(); return; }
     if (_expandedTrackId) { toggleExpand(_expandedTrackId); e.preventDefault(); }
     if (typing && target.blur) target.blur();
     return;
@@ -7413,8 +7950,9 @@ document.addEventListener('keydown', function(e) {
   // behind it.
   if (getOpenOverlay()) return;
 
-  // Let buttons/links handle their own activation keys.
-  if ((tag === 'BUTTON' || tag === 'A') && (e.key === ' ' || e.key === 'Enter')) return;
+  // Let buttons/links/card-buttons handle their own activation keys.
+  if ((tag === 'BUTTON' || tag === 'A' || target.getAttribute && target.getAttribute('role') === 'button')
+      && (e.key === ' ' || e.key === 'Enter')) return;
 
   switch (e.key) {
     case ' ':
@@ -7461,6 +7999,8 @@ document.addEventListener('keydown', function(e) {
       switchView('playlists'); e.preventDefault(); break;
     case '3':
       switchView('upload'); e.preventDefault(); break;
+    case '4':
+      switchView('insights'); e.preventDefault(); break;
     case '?':
       openModal('modal-shortcuts'); e.preventDefault(); break;
   }

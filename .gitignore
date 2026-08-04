@@ -6,3 +6,9 @@ serviceAccount.json
 .env.*
 .codex-index-inline-check.js
 index.generated.html
+
+# Local tooling, not project config
+.claude/
+# Wrangler's build/auth cache — cache/wrangler-account.json holds the
+# Cloudflare account id. Bare pattern so it matches at any depth.
+.wrangler/
