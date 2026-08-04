@@ -1067,6 +1067,124 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
   gap:1rem;
 }
+/* ── Compact list view ──────────────────────────────────────────────
+   The default browse surface. A row is ~60px against a card's ~330px, so a
+   screen shows roughly ten times as many tracks. */
+.track-list-view{display:flex;flex-direction:column;gap:2px}
+.track-row-wrap{border-radius:12px}
+.track-row{
+  display:grid;
+  grid-template-columns:30px 40px minmax(0,1fr) 56px 54px auto;
+  align-items:center;
+  gap:.85rem;
+  padding:.42rem .7rem;
+  border-radius:12px;
+  cursor:pointer;
+  transition:background .14s ease;
+}
+.track-row:hover,.track-row-wrap.expanded .track-row{background:rgba(255,255,255,.05)}
+body.light .track-row:hover,body.light .track-row-wrap.expanded .track-row{background:rgba(0,0,0,.04)}
+.track-row.current .row-title{color:var(--accent-dynamic)}
+.track-row .cover-art{width:40px;height:40px;border-radius:9px}
+.row-index{
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--muted2);
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+}
+/* Three bars standing in for a playing indicator, so the row does not need
+   an icon font or an inline SVG per track. */
+.row-eq{display:inline-block;width:9px;height:11px;background:
+  linear-gradient(var(--accent-dynamic),var(--accent-dynamic)) 0 100%/2px 60% no-repeat,
+  linear-gradient(var(--accent-dynamic),var(--accent-dynamic)) 50% 100%/2px 100% no-repeat,
+  linear-gradient(var(--accent-dynamic),var(--accent-dynamic)) 100% 100%/2px 40% no-repeat}
+.row-main{min-width:0}
+.row-title{
+  font-size:14px;
+  font-weight:500;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.row-sub{
+  font-size:12px;
+  color:var(--muted2);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  margin-top:.1rem;
+}
+.row-shared{color:var(--success)}
+.row-warn{color:var(--danger)}
+.row-plays,.row-time{
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--muted2);
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+}
+/* Actions stay out of the way until the row is touched, so a long list reads
+   as content rather than as rows of buttons. */
+.row-actions{display:flex;gap:.3rem;align-items:center;opacity:0;transition:opacity .14s ease}
+.track-row:hover .row-actions,
+.track-row:focus-within .row-actions,
+.track-row-wrap.expanded .row-actions{opacity:1}
+.track-row-wrap .track-expand{display:none;padding:.2rem .7rem 1rem 1.55rem}
+.track-row-wrap.expanded .track-expand{display:grid;gap:.85rem}
+@media (hover:none){.row-actions{opacity:1}}
+@media (max-width:640px){
+  /* Five visible children once .row-plays is hidden — declaring four columns
+     wrapped the actions onto a second implicit row and doubled row height. */
+  .track-row{grid-template-columns:26px 40px minmax(0,1fr) auto auto;gap:.55rem}
+  .row-plays{display:none}
+  /* No hover on a phone, so actions cannot be hover-revealed. */
+  .row-actions{opacity:1}
+  .view-switch-btn{min-height:44px}
+}
+
+.view-switch{display:inline-flex;gap:2px;margin-left:auto;padding:3px;border-radius:999px;background:var(--panel-soft);border:1px solid var(--rim)}
+.view-switch-btn{
+  padding:.34rem .72rem;
+  border-radius:999px;
+  cursor:pointer;
+  color:var(--muted2);
+  font-size:12px;
+  font-weight:500;
+  transition:all .14s ease;
+}
+.view-switch-btn:hover{color:var(--text)}
+.view-switch-btn.active{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+
+/* ── Resume strip ───────────────────────────────────────────────────── */
+.resume-strip{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:1rem;
+  padding:.9rem 1.1rem;
+  border-radius:22px;
+  border:1px solid var(--rim);
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+}
+.resume-kicker{
+  font-family:var(--mono);
+  font-size:9.5px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--accent-dynamic);
+  margin-bottom:.2rem;
+}
+.resume-title{font-family:var(--display);font-size:26px;line-height:1.05;letter-spacing:-.01em}
+.resume-meta{font-size:12.5px;color:var(--muted2);margin-top:.22rem}
+.resume-actions{display:flex;gap:.5rem;flex-wrap:wrap}
+@media (max-width:640px){
+  .resume-strip{grid-template-columns:auto minmax(0,1fr);gap:.8rem}
+  .resume-actions{grid-column:1 / -1}
+  .resume-actions .sec-action{flex:1;justify-content:center}
+  .resume-title{font-size:21px}
+}
+
 /* Spans the grid so the "show more" affordance reads as a shelf footer
    rather than another card in the row. */
 .shelf-sentinel{
@@ -3109,9 +3227,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
       <div class="section-inner">
         <div class="section-head">
           <div>
-            <div class="section-kicker">Browse the vault</div>
-            <div class="section-title">Editorial shelves, not raw files</div>
-            <div class="section-sub">Search by title, prompt, lyrics, genre, mood, source, or follow the curated rails below into the deeper collection.</div>
+            <div class="section-title">Library</div>
           </div>
           <div class="section-action-row">
             <button class="sec-action" onclick="clearFilters()">Clear filters</button>
@@ -3137,6 +3253,10 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
                   aria-expanded="false" aria-controls="filter-stack"
                   onclick="toggleFilterPanel()">Filters</button>
           <div class="active-filter-chips" id="active-filter-chips"></div>
+          <div class="view-switch" role="group" aria-label="Library view">
+            <button class="view-switch-btn" id="view-list" onclick="setShelfView('list')">List</button>
+            <button class="view-switch-btn" id="view-cards" onclick="setShelfView('cards')">Cards</button>
+          </div>
         </div>
 
         <div class="filter-stack" id="filter-stack" hidden>
@@ -3161,9 +3281,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
       <div class="section-inner">
         <div class="section-head">
           <div>
-            <div class="section-kicker">Smart mixes</div>
-            <div class="section-title">Auto-curated from your tags</div>
-            <div class="section-sub">Rule-based mixes that rebuild themselves as the vault grows — driven by genre, mood, energy, and the AI tags Claude assigns. Play them live or snapshot one into a regular playlist.</div>
+            <div class="section-title">Smart mixes</div>
           </div>
         </div>
         <div class="smart-mix-grid" id="smart-mix-grid"></div>
@@ -3173,9 +3291,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
       <div class="section-inner">
         <div class="section-head">
           <div>
-            <div class="section-kicker">Mixtapes</div>
-            <div class="section-title">Curated sets with a point of view</div>
-            <div class="section-sub">Every playlist should feel like a room with its own tone, not just a bucket of tracks.</div>
+            <div class="section-title">Playlists</div>
           </div>
           <div class="section-action-row">
             <button class="sec-action primary" onclick="openModal('modal-playlist')">New playlist</button>
@@ -3193,9 +3309,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
       <div class="section-inner">
         <div class="section-head">
           <div>
-            <div class="section-kicker">Import studio</div>
-            <div class="section-title">Bring in a new record, then shape its identity</div>
-            <div class="section-sub">Cloudinary stays the audio source, Firestore keeps the metadata, and the watcher flow remains untouched for auto-imports.</div>
+            <div class="section-title">Import</div>
           </div>
         </div>
 
@@ -3203,9 +3317,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
           <div class="upload-grid">
             <div class="upload-drop" id="upload-drop" role="button" tabindex="0" aria-label="Choose audio files to import, or drop them here" aria-controls="file-picker" onclick="document.getElementById('file-picker').click()">
               <div class="upload-mark" aria-hidden="true">IN</div>
-              <div class="upload-title">Drop a batch of tracks into the vault.</div>
-              <div class="upload-copy">MP3, WAV, and M4A are supported up to 100MB each. Queue multiple Suno exports at once, batch-apply metadata, then send the whole run through the same Cloudinary and Firestore flow the watcher already matches.</div>
-              <div class="upload-foot">Batch import ready / Cloudinary backed / Firestore synced / Watcher compatible</div>
+              <div class="upload-title">Drop tracks here</div>
+              <div class="upload-copy">MP3, WAV, or M4A &middot; up to 100MB each</div>
               <input type="file" id="file-picker" accept="audio/*" multiple onchange="handleFileUpload(this.files)">
             </div>
 
@@ -3218,8 +3331,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
           <div class="upload-grid">
             <div id="upload-progress" class="upload-info-card" style="display:none">
               <div class="section-kicker">Uploading</div>
-              <div class="section-title" style="font-size:26px;margin-bottom:.35rem">Sending the batch to Cloudinary</div>
-              <div id="upload-progress-copy" class="upload-progress-copy">The queue uploads one file at a time, then writes the same watcher-compatible metadata into the vault.</div>
+              <div class="section-title" style="font-size:26px;margin-bottom:.35rem">Uploading</div>
+              <div id="upload-progress-copy" class="upload-progress-copy">One file at a time.</div>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:.55rem">
                 <span>Progress</span>
                 <span id="upload-progress-pct">0%</span>
@@ -3232,8 +3345,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 
             <div class="upload-form-card" id="upload-form" style="display:none">
               <div class="section-kicker">Batch studio</div>
-              <div class="section-title" style="font-size:26px;margin-bottom:.35rem">Queue releases, then send them together</div>
-              <div class="section-sub" style="margin-bottom:1rem">Batch-apply the common metadata once, then fine-tune titles, lyrics, and notes per track before you hit save.</div>
+              <div class="section-title" style="font-size:26px;margin-bottom:.9rem">Pending batch</div>
 
               <div class="upload-batch-toolbar">
                 <div class="form-grid">
@@ -3272,7 +3384,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
               <div class="upload-ai-panel">
                 <div>
                   <div class="section-kicker">Lyrics + AI metadata</div>
-                  <div class="section-sub">Lyrics are required for new manual uploads. Point the AI endpoint at your SonicVault Claude worker for richer generated metadata; if you leave it blank, SonicVault can still suggest structure locally.</div>
+                  <div class="section-sub">Lyrics are required for manual uploads. Leave the endpoint blank to tag locally instead.</div>
                 </div>
                 <div class="form-grid">
                   <div class="form-group" style="grid-column:1 / -1">
@@ -3329,7 +3441,6 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 <div class="modal-overlay" id="modal-playlist" role="dialog" aria-modal="true" aria-labelledby="modal-playlist-title">
   <div class="modal">
     <div class="modal-title" id="modal-playlist-title">New playlist</div>
-    <div class="section-sub" style="margin-bottom:1rem">Name the mood, pick the accent, and choose the tracks that belong together.</div>
     <div class="form-grid">
       <div class="form-group">
         <label class="form-label">Playlist name</label>
@@ -3393,7 +3504,6 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 <div class="modal-overlay" id="modal-edit-track" role="dialog" aria-modal="true" aria-labelledby="modal-edit-track-title">
   <div class="modal" style="max-width:720px">
     <div class="modal-title" id="modal-edit-track-title">Edit track</div>
-    <div class="section-sub" style="margin-bottom:1rem">Clean up lyrics, fix metadata, and regenerate AI notes for tracks already in the vault — including watcher imports that arrived without a lyric sheet.</div>
     <div class="form-grid">
       <div class="form-group" style="grid-column:1 / -1">
         <label class="form-label">Title</label>
@@ -3557,14 +3667,12 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
           <div class="player-side-card">
             <div class="section-kicker">Add to playlist</div>
             <div class="section-title" style="font-size:30px">Slot this track into a mixtape</div>
-            <div class="section-sub" style="margin-bottom:1rem">Quick-add the current track to an existing playlist without leaving the listening state.</div>
             <div class="playlist-chip-list" id="xp-playlist-list"></div>
           </div>
 
           <div class="player-side-card">
             <div class="section-kicker">Similar vibe</div>
             <div class="section-title" style="font-size:30px">Stay in the same lane</div>
-            <div class="section-sub" style="margin-bottom:1rem">Related records are matched from genre, mood, source, prompt language, lyrics, and the AI metadata already living in your collection.</div>
             <div class="related-row" id="xp-related"></div>
           </div>
         </div>
@@ -6155,7 +6263,18 @@ function toggleFilterPanel(force) {
   renderFilterBar();
 }
 
+function renderViewSwitch() {
+  ['list', 'cards'].forEach(function(view) {
+    var btn = document.getElementById('view-' + view);
+    if (!btn) return;
+    var on = _shelfView === view;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
 function renderFilterBar() {
+  renderViewSwitch();
   var btn = document.getElementById('filter-toggle');
   var wrap = document.getElementById('active-filter-chips');
   var active = getActiveFilters();
@@ -6681,15 +6800,29 @@ function buildMiniTrackCard(track, queueLabel, queueIds) {
 // getFilteredTracks() once per row — 301 calls and 90k id-string copies at
 // 300 tracks — and re-serialised the whole queue into every card's onclick,
 // which was 36% of the list HTML and grew quadratically with the library.
+// Shared by the card grid and the row list so the notes panel cannot drift
+// between the two views.
+function buildTrackNotes(track) {
+  var prompt = '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Prompt</div><div class="expand-value">' + esc(track.prompt || promptFallback(track)) + '</div></div>';
+  var lyrics = hasLyrics(track)
+    ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Lyrics</div><div class="expand-value" style="white-space:pre-wrap">' + esc(getTrackLyrics(track)) + '</div></div>'
+    : '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Lyrics</div><div class="expand-value">No lyrics yet &mdash; use Edit details to paste a lyric sheet.</div></div>';
+  var summary = getTrackSummary(track) ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">AI summary</div><div class="expand-value">' + esc(getTrackSummary(track)) + '</div></div>' : '';
+  var aiFacts = [track.aiTheme, track.aiEnergy, track.aiVocalStyle, track.aiEra].filter(Boolean).join(' / ');
+  return '<div class="track-expand" id="notes-' + esc(track.id) + '"><div class="expand-grid">'
+    + '<div class="expand-item"><div class="expand-label">Source</div><div class="expand-value">' + esc(track.source || 'Suno') + '</div></div>'
+    + '<div class="expand-item"><div class="expand-label">Added</div><div class="expand-value">' + esc(track.created || 'Undated') + '</div></div>'
+    + '<div class="expand-item"><div class="expand-label">File</div><div class="expand-value">' + esc(track.fileName || 'Manual upload') + (track.fileSize ? ' &middot; ' + (track.fileSize / 1024 / 1024).toFixed(1) + ' MB' : '') + '</div></div>'
+    + (aiFacts ? '<div class="expand-item"><div class="expand-label">AI metadata</div><div class="expand-value">' + esc(aiFacts) + '</div></div>' : '')
+    + prompt + summary + lyrics
+    + '</div></div>';
+}
+
 function buildTrackCard(track) {
   var tags = getTrackTags(track);
   var waveform = getVisualWaveform(track, 48);
   var isPlaying = _currentTrack && _currentTrack.id === track.id && _isPlaying;
   var expanded = _expandedTrackId === track.id;
-  var prompt = track.prompt ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Prompt</div><div class="expand-value">' + esc(track.prompt) + '</div></div>' : '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Prompt</div><div class="expand-value">' + esc(promptFallback(track)) + '</div></div>';
-  var lyrics = hasLyrics(track) ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Lyrics</div><div class="expand-value" style="white-space:pre-wrap">' + esc(getTrackLyrics(track)) + '</div></div>' : '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Lyrics</div><div class="expand-value">Missing lyrics. Watcher imports and older tracks stay playable &mdash; hit Edit to paste a lyric sheet and regenerate AI notes.</div></div>';
-  var summary = getTrackSummary(track) ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">AI summary</div><div class="expand-value">' + esc(getTrackSummary(track)) + '</div></div>' : '';
-  var aiFacts = [track.aiTheme, track.aiEnergy, track.aiVocalStyle, track.aiEra].filter(Boolean).join(' / ');
 
   return ''
     + '<div class="track-card' + (isPlaying ? ' playing' : '') + (expanded ? ' expanded' : '') + '" id="card-' + esc(track.id) + '">'
@@ -6739,16 +6872,7 @@ function buildTrackCard(track) {
     +   '</div>'
     +   '<div class="track-footer">'
     +     renderWaveformHTML(track.id, waveform)
-    +     '<div class="track-expand" id="notes-' + esc(track.id) + '"><div class="expand-grid">'
-    +       '<div class="expand-item"><div class="expand-label">Title</div><div class="expand-value">' + esc(track.title) + '</div></div>'
-    +       '<div class="expand-item"><div class="expand-label">Source</div><div class="expand-value">' + esc(track.source || 'Suno') + '</div></div>'
-    +       '<div class="expand-item"><div class="expand-label">Mood</div><div class="expand-value">' + esc(track.mood || 'Mood') + '</div></div>'
-    +       '<div class="expand-item"><div class="expand-label">File</div><div class="expand-value">' + esc(track.fileName || 'Manual upload') + (track.fileSize ? ' &middot; ' + (track.fileSize / 1024 / 1024).toFixed(1) + ' MB' : '') + '</div></div>'
-    +       (aiFacts ? '<div class="expand-item"><div class="expand-label">AI metadata</div><div class="expand-value">' + esc(aiFacts) + '</div></div>' : '')
-    +       prompt
-    +       summary
-    +       lyrics
-    +     '</div></div>'
+    +     buildTrackNotes(track)
     +   '</div>'
     + '</div>';
 }
@@ -6815,65 +6939,35 @@ function renderLibraryHome() {
 
   var featuredTrack = getFeaturedTrack();
   var continueTrack = getContinueTrack() || featuredTrack;
-  var featuredPlaylist = getFeaturedPlaylist();
-  var recentTracks = getNewestTracks(3);
-  var hiddenGems = getLeastPlayedTracks(3);
-  var mostPlayed = getMostPlayedTracks(3);
-  var similar = getSimilarTracks(featuredTrack, 3);
-  var imports = getAutoImportedTracks(3);
-  var totalDuration = getCollectionDuration(tracks);
-  var promptTags = getTopPromptTags(10);
-  var sharedCount = tracks.filter(function(track) { return !!track.shared; }).length;
+  var recentTracks = getNewestTracks(4);
+  var hiddenGems = getLeastPlayedTracks(4);
+  var mostPlayed = getMostPlayedTracks(4);
 
-  var recentHtml = recentTracks.map(function(track) {
-    return '<div class="side-item" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track')) + '" onclick="playTrack(' + jsq(track.id) + ')">' + buildCoverArt(track, 'xs', false) + '<div class="side-item-copy"><div class="side-item-title">' + esc(track.title) + '</div><div class="side-item-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + '</div></div></div>';
-  }).join('');
-
+  // The old home opened with a marketing hero, four stat tiles, a spotlight
+  // card, two side cards, a four-card snapshot grid, and nine rails before a
+  // single library track appeared. The stat tiles and snapshot grid restated
+  // the Insights page, and the Mood / Source / Discovery-tag rails were the
+  // mood, source, and tag filters under different names. What is left is a
+  // resume strip and three rails that are genuinely shortcuts, not restatements.
   el.innerHTML = ''
     + '<div class="library-home-stack">'
     +   (_coverDemoActive ? '<div class="browse-summary has-filters"><div><strong>Cover demo mode</strong></div><div>These tracks are memory-only previews and will not be saved.</div><button class="browse-clear-pill" onclick="exitCoverDemo()">Exit demo</button></div>' : '')
-    +   '<div class="hero-stage">'
-    +     '<div class="hero-main"><div class="hero-grid">'
-    +       '<div class="hero-copy">'
-    +         '<div><div class="eyebrow">Private AI label</div><div class="hero-title">A listening room for your best generated records.</div><div class="hero-description">SonicVault now opens like an editorial music vault: featured listening, recent drops, prompt-first discovery, mood-led browsing, and a richer now-playing surface built on the same Firestore plus Cloudinary backbone.</div></div>'
-    +         '<div><div class="section-action-row">'
-    +           '<button class="sec-action primary" onclick="playTrack(' + jsq(featuredTrack.id) + ')">Play featured track</button>'
-    +           (featuredPlaylist ? '<button class="sec-action" onclick="viewPlaylist(' + jsq(featuredPlaylist.id) + ')">Open featured playlist</button>' : '<button class="sec-action" onclick="switchView(\'upload\')">Import a new release</button>')
-    +           '<button class="sec-action" onclick="browseTag(' + jsq(promptTags[0] || (featuredTrack.genre || 'Other')) + ')">Browse a prompt vibe</button>'
-    +         '</div><div class="hero-summary">'
-    +           '<div class="hero-summary-card"><div class="hero-summary-label">Collection</div><div class="hero-summary-value">' + tracks.length + '</div><div class="hero-summary-copy">Tracks in the vault</div></div>'
-    +           '<div class="hero-summary-card"><div class="hero-summary-label">Runtime</div><div class="hero-summary-value">' + Math.floor(totalDuration / 60) + 'm</div><div class="hero-summary-copy">Across every shelf</div></div>'
-    +           '<div class="hero-summary-card"><div class="hero-summary-label">Playlists</div><div class="hero-summary-value">' + playlists.length + '</div><div class="hero-summary-copy">Curated mixtapes</div></div>'
-    +           '<div class="hero-summary-card"><div class="hero-summary-label">Shared</div><div class="hero-summary-value">' + sharedCount + '</div><div class="hero-summary-copy">Links sent out</div></div>'
-    +         '</div></div>'
-    +       '</div>'
-    +       '<div class="spotlight-card">'
-    +         buildCoverArt(featuredTrack, 'lg', true)
-    +         '<div class="spotlight-meta"><div class="spotlight-label">Featured track</div><div class="spotlight-title">' + esc(featuredTrack.title) + '</div><div class="spotlight-sub">' + esc(getTrackPromptExcerpt(featuredTrack, 180)) + '</div><div class="pill-row"><span class="meta-pill highlight">' + esc(featuredTrack.genre || 'Other') + '</span><span class="meta-pill">' + esc(featuredTrack.mood || 'Mood') + '</span><span class="meta-pill">' + esc(featuredTrack.source || 'Suno') + '</span></div><div class="section-action-row"><button class="sec-action primary" onclick="playTrack(' + jsq(featuredTrack.id) + ')">Start listening</button><button class="sec-action" onclick="shareTrack(' + jsq(featuredTrack.id) + ')">Share track</button></div></div>'
-    +       '</div>'
-    +     '</div></div>'
-    +     '<div class="hero-side"><div class="side-card"><div class="side-kicker">Continue listening</div><div class="side-title">' + esc(continueTrack ? continueTrack.title : 'No history yet') + '</div><div class="side-copy">' + esc(continueTrack ? getTrackPromptExcerpt(continueTrack, 86) : 'Start playback to build your continue-listening rail.') + '</div>' + (continueTrack ? '<div class="section-action-row" style="margin-top:.85rem"><button class="sec-action primary" onclick="playTrack(' + jsq(continueTrack.id) + ')">Resume</button><button class="sec-action" onclick="toggleExpand(' + jsq(continueTrack.id) + ');switchView(\'library\')">Open notes</button></div>' : '') + '</div><div class="side-card"><div class="side-kicker">Recent drops</div><div class="side-title">Fresh arrivals</div><div class="side-list">' + recentHtml + '</div></div></div>'
-    +   '</div>'
-    +   '<div class="snapshot-grid">'
-    +     '<div class="snapshot-card"><div class="snapshot-label">Most played</div><div class="snapshot-value">' + esc((mostPlayed[0] && mostPlayed[0].title) ? trimText(mostPlayed[0].title, 16) : 'None') + '</div><div class="snapshot-sub">' + (mostPlayed[0] ? fmtCompactNumber(mostPlayed[0].plays || 0) + ' listens so far' : 'Give a track some repeat spins') + '</div></div>'
-    +     '<div class="snapshot-card"><div class="snapshot-label">Discovery tags</div><div class="snapshot-value">' + promptTags.length + '</div><div class="snapshot-sub">Prompt, lyric, and AI cues surfaced for browsing</div></div>'
-    +     '<div class="snapshot-card"><div class="snapshot-label">Watcher imports</div><div class="snapshot-value">' + tracks.filter(function(track) { return !!track.autoImported; }).length + '</div><div class="snapshot-sub">Auto-pulled from the local watcher flow</div></div>'
-    +     '<div class="snapshot-card"><div class="snapshot-label">Current queue</div><div class="snapshot-value">' + (_playQueueIds.length || tracks.length) + '</div><div class="snapshot-sub">' + esc(_currentTrack ? _playQueueLabel : 'Vault shelf ready') + '</div></div>'
+    +   '<div class="resume-strip">'
+    +     buildCoverArt(continueTrack, 'sm', true)
+    +     '<div class="resume-copy">'
+    +       '<div class="resume-kicker">' + (getContinueTrack() ? 'Continue listening' : 'Featured') + '</div>'
+    +       '<div class="resume-title">' + esc(continueTrack.title) + '</div>'
+    +       '<div class="resume-meta">' + esc(continueTrack.genre || 'Other') + ' &middot; ' + esc(continueTrack.mood || 'Mood') + ' &middot; ' + fmtTime(continueTrack.duration || 0) + '</div>'
+    +     '</div>'
+    +     '<div class="resume-actions">'
+    +       '<button class="sec-action primary" onclick="playTrack(' + jsq(continueTrack.id) + ')">Play</button>'
+    +       '<button class="sec-action" onclick="switchView(\'upload\')">Import</button>'
+    +     '</div>'
     +   '</div>'
     +   '<div class="rail-grid">'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Recent drops</div><div class="rail-title">Latest releases</div><div class="rail-copy">Newest additions with immediate play access.</div></div></div><div class="mini-track-list">' + buildMiniRail(recentTracks, 'Recent drops') + '</div></div>'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Hidden gems</div><div class="rail-title">Quietly brilliant</div><div class="rail-copy">Least-played tracks that deserve another listen.</div></div></div><div class="mini-track-list">' + buildMiniRail(hiddenGems, 'Hidden gems') + '</div></div>'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Most played</div><div class="rail-title">Heavy rotation</div><div class="rail-copy">The records you have already promoted to repeat play.</div></div></div><div class="mini-track-list">' + buildMiniRail(mostPlayed, 'Heavy rotation') + '</div></div>'
-    +   '</div>'
-    +   '<div class="rail-grid">'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Mood rooms</div><div class="rail-title">Browse by feeling</div><div class="rail-copy">Jump into a mood-led room instead of scrolling a utility list.</div></div></div><div class="mood-grid">' + buildMoodCards() + '</div></div>'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Source rooms</div><div class="rail-title">Browse by source</div><div class="rail-copy">Separate the Suno flow from other origins without losing cohesion.</div></div></div><div class="source-grid">' + buildSourceCards() + '</div></div>'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Discovery cues</div><div class="rail-title">Prompt, lyric, and AI tags</div><div class="rail-copy">Treat the Suno prompt, lyric sheet, and generated metadata as curation material, not hidden metadata.</div></div></div><div class="tag-cloud">' + promptTags.map(function(tag) { return '<button class="prompt-chip" onclick="browseTag(' + jsq(tag) + ')">' + esc(tag) + '</button>'; }).join('') + '</div></div>'
-    +   '</div>'
-    +   '<div class="rail-grid">'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Similar vibe</div><div class="rail-title">Stay in the same lane</div><div class="rail-copy">Tracks that echo the current featured record across prompt, lyrics, and AI metadata.</div></div></div><div class="mini-track-list">' + buildMiniRail(similar, 'Similar vibe', '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">More variety soon</strong>Add a few more tracks to unlock stronger similarity rails.</div>') + '</div></div>'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Recent imports</div><div class="rail-title">Watcher lane</div><div class="rail-copy">Auto-imports from the local Suno watcher, ready for cleanup and curation.</div></div></div><div class="mini-track-list">' + buildMiniRail(imports, 'Watcher lane', '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">Watcher is quiet</strong>No recent auto-imports yet.</div>') + '</div></div>'
-    +     '<div class="rail-card"><div class="rail-head"><div><div class="section-kicker">Featured playlist</div><div class="rail-title">' + esc(featuredPlaylist ? featuredPlaylist.name : 'No playlists yet') + '</div><div class="rail-copy">' + esc(featuredPlaylist ? trimText(featuredPlaylist.desc || 'A curated mix ready for a front-to-back listen.', 100) : 'Create a playlist to give your vault a stronger editorial spine.') + '</div></div></div>' + (featuredPlaylist ? buildPlaylistCover(featuredPlaylist, 'sm') + '<div class="section-action-row" style="margin-top:1rem"><button class="sec-action primary" onclick="playPlaylist(' + jsq(featuredPlaylist.id) + ')">Play mix</button><button class="sec-action" onclick="viewPlaylist(' + jsq(featuredPlaylist.id) + ')">Open playlist</button></div>' : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">Build your first mix</strong>Turn a group of tracks into a more intentional room.</div>') + '</div>'
+    +     '<div class="rail-card"><div class="rail-title">Recently added</div><div class="mini-track-list">' + buildMiniRail(recentTracks, 'Recently added') + '</div></div>'
+    +     '<div class="rail-card"><div class="rail-title">Most played</div><div class="mini-track-list">' + buildMiniRail(mostPlayed, 'Most played') + '</div></div>'
+    +     '<div class="rail-card"><div class="rail-title">Rarely played</div><div class="mini-track-list">' + buildMiniRail(hiddenGems, 'Rarely played') + '</div></div>'
     +   '</div>'
     + '</div>';
 }
@@ -6920,6 +7014,7 @@ function renderTrackList() {
 
   _shelfTracks = filtered;
   _shelfRendered = 0;
+  el.className = _shelfView === 'list' ? 'track-list-view' : 'track-grid';
   el.innerHTML = '';
   appendShelfPage(el);
   observeShelfSentinel();
@@ -6939,16 +7034,77 @@ var _shelfTracks = [];
 var _shelfRendered = 0;
 var _shelfObserver = null;
 
+// ── List vs card view ──────────────────────────────────────────────────
+// Cards present every track as an album release: two per row, each with
+// cover, description, pills, tags, stats, buttons, and a waveform. That is
+// unusable as a browse surface past a few dozen tracks, so a compact row
+// list is the default and the card grid stays available as a toggle.
+// Device-local like the player prefs — a view preference is not vault data.
+var _shelfView = (function() {
+  try { return localStorage.getItem('sv_shelf_view') === 'cards' ? 'cards' : 'list'; }
+  catch (e) { return 'list'; }
+})();
+
+function setShelfView(view) {
+  _shelfView = view === 'cards' ? 'cards' : 'list';
+  try { localStorage.setItem('sv_shelf_view', _shelfView); } catch (e) {}
+  renderTrackList();
+}
+
+function buildTrackRow(track, index) {
+  var isPlaying = _currentTrack && _currentTrack.id === track.id && _isPlaying;
+  var isCurrent = _currentTrack && _currentTrack.id === track.id;
+  var expanded = _expandedTrackId === track.id;
+  return ''
+    + '<div class="track-row-wrap' + (expanded ? ' expanded' : '') + '" id="card-' + esc(track.id) + '">'
+    + '<div class="track-row' + (isCurrent ? ' current' : '') + '"'
+    +   (isCurrent ? ' aria-current="true"' : '')
+    +   ' role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track')) + '"'
+    +   ' onclick="playTrack(' + jsq(track.id) + ')">'
+    +   '<div class="row-index" aria-hidden="true">' + (isPlaying ? '<span class="row-eq"></span>' : (index + 1)) + '</div>'
+    +   buildCoverArt(track, 'xs', false)
+    +   '<div class="row-main">'
+    +     '<div class="row-title">' + esc(track.title) + '</div>'
+    +     '<div class="row-sub">' + esc(track.genre || 'Other') + ' &middot; ' + esc(track.mood || 'Mood')
+    +       (track.shared ? ' &middot; <span class="row-shared">Public link</span>' : '')
+    +       (!hasLyrics(track) ? ' &middot; <span class="row-warn">No lyrics</span>' : '')
+    +     '</div>'
+    +   '</div>'
+    +   '<div class="row-plays">' + fmtCompactNumber(track.plays || 0) + '</div>'
+    +   '<div class="row-time">' + fmtTime(track.duration || 0) + '</div>'
+    +   '<div class="row-actions">'
+    +     '<button class="icon-btn js-notes-btn" aria-expanded="' + (expanded ? 'true' : 'false') + '" aria-controls="notes-' + esc(track.id) + '" onclick="event.stopPropagation();toggleExpand(' + jsq(track.id) + ')" aria-label="' + attr('Notes for ' + (track.title || 'track')) + '">Notes</button>'
+    +     '<div class="card-menu-wrap">'
+    +       '<button class="icon-btn card-menu-btn" id="menubtn-' + esc(track.id) + '"'
+    +         ' aria-haspopup="menu" aria-expanded="false"'
+    +         ' aria-label="' + attr('More actions for ' + (track.title || 'this track')) + '"'
+    +         ' onclick="toggleCardMenu(' + jsq(track.id) + ', event)">&#8943;</button>'
+    +       '<div class="card-menu" id="menu-' + esc(track.id) + '" role="menu" aria-label="Track actions">'
+    +         '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();cycleTrackCover(' + jsq(track.id) + ')">Change cover</button>'
+    +         '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();openEditTrack(' + jsq(track.id) + ')">Edit details</button>'
+    +         (track.shared
+                ? '<button role="menuitem" class="is-shared" onclick="event.stopPropagation();closeAllCardMenus();unshareTrack(' + jsq(track.id) + ')">Revoke public link</button>'
+                : '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();shareTrack(' + jsq(track.id) + ')">Share&hellip;</button>')
+    +         '<button role="menuitem" class="is-danger" onclick="event.stopPropagation();closeAllCardMenus();deleteTrack(' + jsq(track.id) + ')">Delete track</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>'
+    + buildTrackNotes(track)
+    + '</div>';
+}
+
 function appendShelfPage(el) {
   el = el || document.getElementById('track-list');
   if (!el) return;
   var sentinel = document.getElementById('shelf-sentinel');
   if (sentinel) sentinel.remove();
 
+  var offset = _shelfRendered;
   var slice = _shelfTracks.slice(_shelfRendered, _shelfRendered + SHELF_PAGE_SIZE);
   if (slice.length) {
-    el.insertAdjacentHTML('beforeend', slice.map(function(track) {
-      return buildTrackCard(track);
+    el.insertAdjacentHTML('beforeend', slice.map(function(track, i) {
+      return _shelfView === 'list' ? buildTrackRow(track, offset + i) : buildTrackCard(track);
     }).join(''));
     _shelfRendered += slice.length;
   }
@@ -7025,7 +7181,10 @@ function toggleExpand(id) {
     card.classList.toggle('expanded', open);
     var btn = card.querySelector('.js-notes-btn');
     if (btn) {
-      btn.textContent = open ? 'Hide notes' : 'Open notes';
+      // Rows have a narrow actions column; cards have room for a verb.
+      btn.textContent = card.classList.contains('track-row-wrap')
+        ? 'Notes'
+        : (open ? 'Hide notes' : 'Open notes');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
   });
