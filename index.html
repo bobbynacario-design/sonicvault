@@ -291,6 +291,7 @@ if (initialRoute.mode === 'app') {
   --sans:'Space Grotesk','DM Sans',sans-serif;
   --mono:'DM Mono',monospace;
   --player-height:118px;
+  --sidebar-width:236px;
 }
 body.light{
   --bg:#f1ece2;
@@ -3119,6 +3120,72 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .page{padding-bottom:calc(var(--player-height) + 5.4rem)}
 }
 
+/* ── App shell ──────────────────────────────────────────────────────────
+   Exact complement of the max-width:1000px query above, so there is never
+   a width with both layouts active or neither. Below 1001px the document
+   scrolls as a whole, .nav is a sticky top bar, and the bottom mobile nav
+   drives navigation -- untouched by anything below. At and above it, .nav
+   becomes a fixed-height left sidebar and #app-main becomes its own
+   scrolling pane, so the sidebar and the docked player never move while
+   the content underneath does -- the piece that actually reads as an
+   app shell rather than a single long page. */
+@media (min-width:1001px){
+  body{overflow:hidden}
+  .app-shell{display:flex;align-items:stretch;height:100vh}
+  .nav{
+    position:static;
+    top:auto;
+    flex:none;
+    width:var(--sidebar-width);
+    height:100vh;
+    overflow-y:auto;
+    border-bottom:none;
+    border-right:1px solid var(--rim);
+    backdrop-filter:none;
+    background:var(--bg2);
+  }
+  body.light .nav{background:var(--bg2)}
+  .nav-row{
+    flex-direction:column;
+    align-items:stretch;
+    height:100%;
+    max-width:none;
+    margin:0;
+    padding:1.3rem 1.05rem;
+    gap:0;
+  }
+  .nav-left{flex-direction:column;align-items:stretch;gap:1.7rem;min-height:0}
+  .nav-brand-wrap{padding:0 .1rem}
+  .nav-groups{flex-direction:column;flex-wrap:nowrap;gap:.2rem;width:100%}
+  .group-tab{width:100%;text-align:left;justify-content:flex-start;padding:.62rem .8rem}
+  /* nav-right carries the sync/theme/keys controls. In the top bar these
+     sat inline after the tabs; in the sidebar they anchor to the bottom so
+     the tabs stay pinned under the brand regardless of viewport height. */
+  .nav-right{
+    flex-direction:column;
+    align-items:stretch;
+    gap:.4rem;
+    margin-top:auto;
+    padding-top:1rem;
+    border-top:1px solid var(--rim);
+  }
+  .theme-toggle{width:100%;text-align:center}
+  .clock-nav{display:block;text-align:center;opacity:.6}
+  .status-pill{justify-content:center;padding:.3rem 0}
+
+  .app-main{
+    flex:1;
+    min-width:0;
+    height:100vh;
+    overflow-y:auto;
+    overflow-x:hidden;
+  }
+  /* The player bar and toast are fixed to the viewport, not to #app-main,
+     so they stay docked regardless of the content pane's scroll position
+     -- they just need to start clear of the sidebar. */
+  .now-playing-bar{left:calc(var(--sidebar-width) + 14px)}
+}
+
 @media (max-width:900px){
   .nav-row{padding:.9rem 1rem}
   .nav-left{flex-direction:column;align-items:flex-start}
@@ -3188,7 +3255,13 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 </style>
 </head>
 <body>
-<nav class="nav">
+<!-- App shell: sidebar + independently scrolling content pane, above the
+     1000px breakpoint where the bottom mobile nav takes over. Below it,
+     .app-shell/.app-main are plain block elements and the document scrolls
+     exactly as it did before this existed -- see the min-width:1001px
+     block in <style> for the actual shell layout. -->
+<div class="app-shell">
+<nav class="nav" id="sidebar">
   <div class="nav-row">
     <div class="nav-left">
       <div class="nav-brand-wrap">
@@ -3215,6 +3288,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   </div>
 </nav>
 
+<div class="app-main" id="app-main" role="main">
 <div class="page" id="page-public">
   <div class="page-stack" id="public-page"></div>
 </div>
@@ -3437,6 +3511,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 <div class="page" id="page-insights">
   <div class="page-stack" id="insights-view"></div>
 </div>
+</div><!-- /app-main -->
+</div><!-- /app-shell -->
 
 <div class="modal-overlay" id="modal-playlist" role="dialog" aria-modal="true" aria-labelledby="modal-playlist-title">
   <div class="modal">
@@ -5110,6 +5186,17 @@ function setActivePage(pageId) {
   if (target) target.classList.add('active');
 }
 
+// Above the app-shell breakpoint, #app-main is its own scroll container and
+// window.scrollTo no longer touches the visible content. Below it, the
+// document itself scrolls and #app-main is inert. Scrolling both costs
+// nothing -- whichever one isn't the active container is just a no-op.
+function scrollContentToTop(smooth) {
+  var behavior = smooth ? 'smooth' : 'auto';
+  var main = document.getElementById('app-main');
+  if (main) main.scrollTo({ top:0, behavior:behavior });
+  window.scrollTo({ top:0, behavior:behavior });
+}
+
 function syncNavState(view, isPublic) {
   document.body.classList.toggle('public-route', !!isPublic);
   document.querySelectorAll('.group-tab').forEach(function(tab) { tab.classList.remove('active'); });
@@ -6183,7 +6270,7 @@ function switchView(view) {
   if (view === 'upload') renderPendingPreview();
   if (view === 'insights') renderInsights();
   updatePageChrome(null, _currentTrack || null);
-  if (!skipRoute) window.scrollTo({ top:0, behavior:'smooth' });
+  if (!skipRoute) scrollContentToTop(true);
 }
 
 // Filter and sort changes only affect the browse shelf, never the hero.
@@ -6692,7 +6779,7 @@ function renderRouteAwareView(skipScroll) {
     switchView(_activeView || 'library', true);
     updatePageChrome(null, _currentTrack || null);
   }
-  if (!skipScroll) window.scrollTo({ top:0, behavior:'smooth' });
+  if (!skipScroll) scrollContentToTop(true);
 }
 
 // Cached filtered/sorted tracks. Invalidated when filter state, search,
