@@ -452,11 +452,11 @@ body.light .nav{background:linear-gradient(180deg, rgba(241,236,226,.88), rgba(2
   border:1px solid transparent;
   color:var(--muted);
   cursor:pointer;
-  font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.12em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:13px;
+  letter-spacing:normal;
   transition:all .2s ease;
+  font-weight:500;
 }
 .group-tab:hover{color:var(--text);background:var(--panel-soft);border-color:var(--rim)}
 .group-tab.active{
@@ -538,11 +538,11 @@ body.light .section-card{background:linear-gradient(180deg, rgba(255,255,255,.78
   background:rgba(255,255,255,.05);
   color:var(--muted);
   cursor:pointer;
-  font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.11em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:12.5px;
+  letter-spacing:normal;
   transition:all .18s ease;
+  font-weight:500;
 }
 .sec-action:hover{color:var(--text);background:var(--accent-dynamic-soft)}
 body.light .sec-action{background:rgba(0,0,0,.05)}
@@ -679,11 +679,11 @@ body.light .hero-main{
   padding:0;
   border:none;
   background:none;
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.1em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:12px;
+  letter-spacing:normal;
   color:var(--muted);
+  font-weight:500;
 }
 .meta-pill:not(.highlight):not(.warn) + .meta-pill:not(.highlight):not(.warn)::before{content:'/';color:var(--muted2);margin-right:.55rem;opacity:.6}
 .meta-pill.highlight{
@@ -873,11 +873,11 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   background:rgba(255,255,255,.03);
   color:var(--muted);
   cursor:pointer;
-  font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.08em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:12.5px;
+  letter-spacing:normal;
   transition:all .18s ease;
+  font-weight:500;
 }
 .prompt-chip:hover{border-color:var(--accent-ghost);background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 
@@ -928,11 +928,11 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   background:rgba(255,255,255,.02);
   color:var(--muted2);
   cursor:pointer;
-  font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.08em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:12.5px;
+  letter-spacing:normal;
   transition:all .16s ease;
+  font-weight:500;
 }
 .filter-chip:hover{color:var(--text);border-color:var(--rim2)}
 /* Active filters previously differed only by a low-contrast tint, which was
@@ -1064,11 +1064,11 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   display:flex;
   gap:.8rem;
   flex-wrap:wrap;
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.08em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:12px;
+  letter-spacing:normal;
   color:var(--muted2);
+  font-weight:500;
 }
 .track-actions{
   display:flex;
@@ -1076,6 +1076,42 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   gap:.45rem;
   flex-wrap:wrap;
 }
+.card-menu-wrap{position:relative}
+.card-menu-btn{
+  min-width:34px;
+  font-size:15px;
+  line-height:1;
+  letter-spacing:0;
+}
+.card-menu{
+  display:none;
+  position:absolute;
+  right:0;
+  bottom:calc(100% + .4rem);
+  z-index:30;
+  min-width:186px;
+  padding:.35rem;
+  border-radius:16px;
+  border:1px solid var(--rim2);
+  background:var(--panel-strong);
+  backdrop-filter:blur(18px);
+  box-shadow:var(--shadow);
+}
+.card-menu.open{display:grid;gap:.1rem}
+.card-menu button{
+  width:100%;
+  text-align:left;
+  padding:.6rem .7rem;
+  border-radius:11px;
+  cursor:pointer;
+  color:var(--muted);
+  font-size:13px;
+  transition:background .14s ease,color .14s ease;
+}
+.card-menu button:hover{background:var(--accent-dynamic-soft);color:var(--text)}
+.card-menu button.is-shared{color:var(--success)}
+.card-menu button.is-danger{color:var(--danger)}
+.card-menu button.is-danger:hover{background:color-mix(in srgb, var(--danger) 12%, transparent);color:var(--danger)}
 .action-btn,.icon-btn{
   padding:.56rem .8rem;
   border-radius:999px;
@@ -1084,10 +1120,10 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   color:var(--muted);
   cursor:pointer;
   transition:all .18s ease;
-  font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.08em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:12.5px;
+  letter-spacing:normal;
+  font-weight:500;
 }
 .action-btn:hover,.icon-btn:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 body.light .action-btn,body.light .icon-btn{background:rgba(0,0,0,.05)}
@@ -1122,11 +1158,11 @@ body.light .action-btn.primary{background:#171420;color:#f7f2eb}
   padding:0;
   border:none;
   background:none;
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.1em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:11.5px;
+  letter-spacing:normal;
   color:var(--muted2);
+  font-weight:500;
 }
 .track-tag + .track-tag::before{content:'\00B7';margin:0 .55rem;opacity:.7}
 .track-footer{
@@ -1372,12 +1408,33 @@ body.light .expand-item{background:none}
   display:flex;
   align-items:center;
   justify-content:space-between;
+  /* Long pairs like CHILL + SYNTHWAVE ran out of width at the smaller cover
+     sizes and collided into "CHILLSYNTHWAVE". Guarantee a gap and let each
+     side ellipsis instead of growing into its neighbour. */
+  gap:.6rem;
   font-family:var(--mono);
   font-size:9px;
   letter-spacing:.18em;
   text-transform:uppercase;
   color:rgba(255,255,255,.86);
 }
+.cover-topline > span,
+.cover-bottomline > span{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+/* Only the 320px lg cover has room for a label on each side. Below that,
+   two labels either collide or ellipsis into noise ("CHI…", "ENER…"), and
+   they duplicate the genre/mood pills sitting right next to the cover
+   anyway — so the smaller covers keep the primary label only. */
+.cover-xs .cover-topline > span:last-child,
+.cover-xs .cover-bottomline > span:last-child,
+.cover-sm .cover-topline > span:last-child,
+.cover-sm .cover-bottomline > span:last-child,
+.cover-md .cover-topline > span:last-child,
+.cover-md .cover-bottomline > span:last-child{display:none}
 .cover-topline{top:12px}
 .cover-bottomline{bottom:12px}
 .cover-mark{
@@ -1975,10 +2032,10 @@ body.light .playlist-modal-item{background:rgba(0,0,0,.03)}
   background:rgba(255,255,255,.03);
   color:var(--muted);
   cursor:pointer;
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.1em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:11.5px;
+  letter-spacing:normal;
+  font-weight:500;
 }
 .playlist-seq-btn:hover{border-color:var(--accent-ghost);background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 .playlist-seq-btn[disabled]{opacity:.35;pointer-events:none}
@@ -2455,11 +2512,11 @@ body.light .player-modal{
   background:rgba(255,255,255,.05);
   color:var(--muted);
   cursor:pointer;
-  font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.12em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:12.5px;
+  letter-spacing:normal;
   transition:all .18s ease;
+  font-weight:500;
 }
 .player-btn:hover{color:var(--accent-dynamic);background:var(--accent-dynamic-soft)}
 body.light .player-btn{background:rgba(0,0,0,.05)}
@@ -2547,11 +2604,11 @@ body.light .queue-item:hover{background:rgba(0,0,0,.04)}
 .queue-title{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .queue-sub{font-size:11px;color:var(--muted2);margin-top:.2rem}
 .queue-state{
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.12em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:11.5px;
+  letter-spacing:normal;
   color:var(--accent-dynamic);
+  font-weight:500;
 }
 .queue-reorder{display:flex;flex-direction:column;gap:3px}
 .queue-reorder button{
@@ -2682,11 +2739,11 @@ body.light .mobile-nav{background:rgba(255,255,255,.9)}
   border-radius:999px;
   color:var(--muted2);
   cursor:pointer;
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.12em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:12px;
+  letter-spacing:normal;
   transition:all .16s ease;
+  font-weight:500;
 }
 .mobile-tab.active{color:var(--accent-dynamic);background:var(--accent-dynamic-soft)}
 
@@ -2782,8 +2839,9 @@ body.light .now-playing-bar{
   color:var(--muted);
   cursor:pointer;
   transition:all .18s ease;
-  font-family:var(--mono);
-  font-size:12px;
+  font-family:var(--sans);
+  font-size:12.5px;
+  font-weight:500;
 }
 .np-btn:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 body.light .np-btn{background:rgba(0,0,0,.05)}
@@ -2903,8 +2961,12 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
      despite being the primary navigation. Padding-only bumps keep the type
      scale and the pill silhouette exactly as designed. */
   .mobile-tab{min-height:44px;display:flex;align-items:center;justify-content:center}
-  .action-btn,.icon-btn,.sec-action,.filter-chip,.prompt-chip{min-height:44px}
+  /* min-width matters as much as min-height: short sentence-case labels like
+     "All" and the "..." overflow trigger are narrow enough to miss the 44px
+     floor on width alone. */
+  .action-btn,.icon-btn,.sec-action,.filter-chip,.prompt-chip{min-height:44px;min-width:44px}
   .action-btn,.icon-btn,.filter-chip,.prompt-chip{display:inline-flex;align-items:center;justify-content:center}
+  .card-menu-btn{min-width:44px}
   .np-btn{min-width:44px;min-height:44px}
   .theme-toggle{min-height:44px;display:inline-flex;align-items:center}
   .queue-reorder button,.playlist-seq-btn{min-height:44px;min-width:44px}
@@ -6498,15 +6560,27 @@ function buildTrackCard(track) {
     +       '<div class="track-tag-row">' + tags.slice(0, 6).map(function(tag) { return '<span class="track-tag">' + esc(tag) + '</span>'; }).join('') + '</div>'
     +       '<div class="track-meta-strip">'
     +         '<div class="track-stats"><span>' + fmtCompactNumber(track.plays || 0) + ' plays</span><span>' + esc(track.fileName || 'manual upload') + '</span></div>'
+    // Play and Notes are the everyday actions and stay on the card. Cover,
+    // Edit, Share, and Delete move into an overflow menu — six equal-weight
+    // buttons per card wrapped onto two rows and made every card read as a
+    // control panel rather than a record.
     +         '<div class="track-actions">'
     +           '<button class="action-btn primary" onclick="event.stopPropagation();playTrack(' + jsq(track.id) + ')">' + (isPlaying ? 'Pause' : 'Play') + '</button>'
-    +           '<button class="action-btn js-notes-btn" aria-expanded="' + (expanded ? 'true' : 'false') + '" aria-controls="notes-' + esc(track.id) + '" onclick="event.stopPropagation();toggleExpand(' + jsq(track.id) + ')">' + (expanded ? 'Hide notes' : 'Open notes') + '</button>'
-    +           '<button class="icon-btn" onclick="event.stopPropagation();cycleTrackCover(' + jsq(track.id) + ')">Cover</button>'
-    +           '<button class="icon-btn" onclick="event.stopPropagation();openEditTrack(' + jsq(track.id) + ')">Edit</button>'
-    +           (track.shared
-                  ? '<button class="icon-btn is-shared" title="This track has a live public link" onclick="event.stopPropagation();unshareTrack(' + jsq(track.id) + ')">Unshare</button>'
-                  : '<button class="icon-btn" onclick="event.stopPropagation();shareTrack(' + jsq(track.id) + ')">Share</button>')
-    +           '<button class="icon-btn" onclick="event.stopPropagation();deleteTrack(' + jsq(track.id) + ')">Delete</button>'
+    +           '<button class="action-btn js-notes-btn" aria-expanded="' + (expanded ? 'true' : 'false') + '" aria-controls="notes-' + esc(track.id) + '" onclick="event.stopPropagation();toggleExpand(' + jsq(track.id) + ')">' + (expanded ? 'Hide notes' : 'Notes') + '</button>'
+    +           '<div class="card-menu-wrap">'
+    +             '<button class="icon-btn card-menu-btn" id="menubtn-' + esc(track.id) + '"'
+    +               ' aria-haspopup="menu" aria-expanded="false"'
+    +               ' aria-label="' + attr('More actions for ' + (track.title || 'this track')) + '"'
+    +               ' onclick="toggleCardMenu(' + jsq(track.id) + ', event)">&#8943;</button>'
+    +             '<div class="card-menu" id="menu-' + esc(track.id) + '" role="menu" aria-label="Track actions">'
+    +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();cycleTrackCover(' + jsq(track.id) + ')">Change cover</button>'
+    +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();openEditTrack(' + jsq(track.id) + ')">Edit details</button>'
+    +               (track.shared
+                      ? '<button role="menuitem" class="is-shared" onclick="event.stopPropagation();closeAllCardMenus();unshareTrack(' + jsq(track.id) + ')">Revoke public link</button>'
+                      : '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();shareTrack(' + jsq(track.id) + ')">Share&hellip;</button>')
+    +               '<button role="menuitem" class="is-danger" onclick="event.stopPropagation();closeAllCardMenus();deleteTrack(' + jsq(track.id) + ')">Delete track</button>'
+    +             '</div>'
+    +           '</div>'
     +         '</div>'
     +       '</div>'
     +     '</div>'
@@ -6749,6 +6823,39 @@ function observeShelfSentinel() {
   }, { rootMargin: '600px 0px' });
   _shelfObserver.observe(sentinel);
 }
+
+// ── Card overflow menu ─────────────────────────────────────────────────
+function closeAllCardMenus() {
+  document.querySelectorAll('.card-menu.open').forEach(function(menu) {
+    menu.classList.remove('open');
+  });
+  document.querySelectorAll('.card-menu-btn[aria-expanded="true"]').forEach(function(btn) {
+    btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function toggleCardMenu(id, event) {
+  if (event) event.stopPropagation();
+  var menu = document.getElementById('menu-' + id);
+  var btn = document.getElementById('menubtn-' + id);
+  if (!menu) return;
+  var wasOpen = menu.classList.contains('open');
+  closeAllCardMenus();
+  if (wasOpen) {
+    if (btn) btn.focus();
+    return;
+  }
+  menu.classList.add('open');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  var first = menu.querySelector('button');
+  if (first) first.focus();
+}
+
+// Any click outside an open menu dismisses it.
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.closest && e.target.closest('.card-menu-wrap')) return;
+  closeAllCardMenus();
+});
 
 // The notes markup is already in every card and `.expanded` is a pure CSS
 // state, so flip the class on the two affected cards instead of rebuilding
@@ -7935,8 +8042,17 @@ document.addEventListener('keydown', function(e) {
   var tag = (target.tagName || '').toUpperCase();
   var typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
 
-  // Escape always works: close the open dialog, else collapse an open track.
+  // Escape always works: dismiss an open card menu first, then the open
+  // dialog, then collapse an expanded track.
   if (e.key === 'Escape') {
+    var openMenu = document.querySelector('.card-menu.open');
+    if (openMenu) {
+      var owner = document.getElementById(openMenu.id.replace('menu-', 'menubtn-'));
+      closeAllCardMenus();
+      if (owner) owner.focus();
+      e.preventDefault();
+      return;
+    }
     var overlay = getOpenOverlay();
     if (overlay) { closeModal(overlay.id); e.preventDefault(); return; }
     if (_expandedTrackId) { toggleExpand(_expandedTrackId); e.preventDefault(); }
