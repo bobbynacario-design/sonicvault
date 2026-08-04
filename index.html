@@ -446,6 +446,13 @@ body.light .nav{background:linear-gradient(180deg, rgba(241,236,226,.88), rgba(2
 .nav-brand-title{font-family:var(--display);font-size:23px;letter-spacing:.05em;line-height:1}
 .nav-brand-sub{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted2)}
 .nav-groups{display:flex;gap:.42rem;flex-wrap:wrap}
+/* Sentence-case tabs are wider than the old mono caps, which pushed
+   "Insights" onto a second line. The brand tagline is the least useful thing
+   in the row, so it yields the space first. */
+@media (max-width:1200px){
+  .nav-brand-sub{display:none}
+  .group-tab{padding:.55rem .78rem}
+}
 .group-tab{
   padding:.62rem .95rem;
   border-radius:999px;
@@ -466,20 +473,45 @@ body.light .nav{background:linear-gradient(180deg, rgba(241,236,226,.88), rgba(2
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
 }
 .nav-right{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;justify-content:flex-end}
-.theme-toggle,.status-pill{
-  padding:.58rem .82rem;
+/* Controls and status used to look identical -- five equal-weight pills in
+   the top-right competing with each other. Controls keep the pill; status
+   (sync state, clock) drops to quiet borderless text so the eye skips it. */
+.theme-toggle{
+  padding:.55rem .85rem;
   border-radius:999px;
   border:1px solid var(--rim);
   background:var(--panel-soft);
   color:var(--muted);
-  font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.1em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:12.5px;
+  font-weight:500;
+  cursor:pointer;
+  transition:all .18s ease;
 }
-.theme-toggle{cursor:pointer;transition:all .18s ease}
 .theme-toggle:hover{color:var(--text);border-color:var(--rim2)}
-.clock-nav{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted2);text-transform:uppercase}
+.status-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+  padding:0;
+  border:none;
+  background:none;
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted2);
+}
+.status-pill::before{
+  content:'';
+  width:6px;height:6px;
+  border-radius:999px;
+  background:currentColor;
+  flex:none;
+}
+.clock-nav{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--muted2);text-transform:uppercase;opacity:.7}
+/* The clock is decoration; it is the first thing to go when space is tight. */
+@media (max-width:1100px){.clock-nav{display:none}}
 
 .page{
   display:none;
@@ -919,7 +951,49 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   font-family:var(--mono);
   font-size:13px;
 }
-.filter-stack{display:grid;gap:.7rem;margin-top:1rem}
+.filter-bar{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  flex-wrap:wrap;
+  margin-top:.9rem;
+}
+.filter-toggle.has-active{color:var(--accent-dynamic);border-color:var(--accent-ghost);background:var(--accent-dynamic-soft)}
+.active-filter-chips{display:flex;gap:.4rem;flex-wrap:wrap}
+.active-filter-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:.45rem;
+  padding:.42rem .7rem;
+  border-radius:999px;
+  border:1px solid var(--accent-ghost);
+  background:var(--accent-dynamic-soft);
+  color:var(--accent-dynamic);
+  font-size:12px;
+  font-weight:500;
+  cursor:pointer;
+  transition:all .16s ease;
+}
+.active-filter-chip:hover{border-color:var(--accent-dynamic);background:var(--accent-dynamic-deep)}
+.active-filter-chip span{opacity:.75;font-size:14px;line-height:1}
+.active-filter-chip.clear-all{border-style:dashed;color:var(--muted);background:none}
+.active-filter-chip.clear-all:hover{color:var(--text);border-color:var(--rim2)}
+/* Each chip row gets a label now that the whole block is behind a toggle —
+   without one, four unlabelled rows of chips are a guessing game. */
+.filter-stack{display:grid;gap:.85rem;margin-top:.9rem;padding-top:.9rem;border-top:1px solid var(--rim)}
+.filter-group{display:grid;grid-template-columns:64px minmax(0,1fr);gap:.65rem;align-items:start}
+.filter-group-label{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted2);
+  padding-top:.62rem;
+}
+@media (max-width:640px){
+  .filter-group{grid-template-columns:1fr;gap:.35rem}
+  .filter-group-label{padding-top:0}
+}
 .filter-row{display:flex;gap:.45rem;flex-wrap:wrap}
 .filter-chip{
   padding:.5rem .78rem;
@@ -1414,7 +1488,10 @@ body.light .expand-item{background:none}
   gap:.6rem;
   font-family:var(--mono);
   font-size:9px;
-  letter-spacing:.18em;
+  /* .18em tracking pushed the longest mood ("Melancholic") past the width of
+     a shrunken fluid cover. .12em still reads as a tracked-out label and
+     fits every genre/mood value in the vocabulary. */
+  letter-spacing:.12em;
   text-transform:uppercase;
   color:rgba(255,255,255,.86);
 }
@@ -1429,12 +1506,20 @@ body.light .expand-item{background:none}
    two labels either collide or ellipsis into noise ("CHI…", "ENER…"), and
    they duplicate the genre/mood pills sitting right next to the cover
    anyway — so the smaller covers keep the primary label only. */
-.cover-xs .cover-topline > span:last-child,
-.cover-xs .cover-bottomline > span:last-child,
+/* 54px thumbnails cannot legibly hold a 9px tracked-out label at all — even
+   a single word truncates. They get artwork and monogram only. */
+.cover-xs .cover-topline,
+.cover-xs .cover-bottomline{display:none}
 .cover-sm .cover-topline > span:last-child,
 .cover-sm .cover-bottomline > span:last-child,
 .cover-md .cover-topline > span:last-child,
 .cover-md .cover-bottomline > span:last-child{display:none}
+/* cover-lg is fluid (max-width:320px) so it shrinks well below the width two
+   labels need — drop the secondary once the column gets narrow. */
+@media (max-width:1000px){
+  .cover-lg .cover-topline > span:last-child,
+  .cover-lg .cover-bottomline > span:last-child{display:none}
+}
 .cover-topline{top:12px}
 .cover-bottomline{bottom:12px}
 .cover-mark{
@@ -2905,6 +2990,17 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .np-progress-area{grid-column:1 / -1}
   .np-controls{grid-column:2 / -1;justify-content:flex-start}
 }
+/* Four sentence-case tabs plus the brand plus three controls need ~1000px.
+   Below that, hand navigation to the bottom bar that already exists rather
+   than let the top row wrap onto two lines. Must sit AFTER the base
+   .mobile-nav{display:none} to win on source order, and kept separate from
+   the 900px block so it does not drag those layout rules up with it. */
+@media (max-width:1000px){
+  .nav-groups{display:none}
+  .mobile-nav{display:flex}
+  .page{padding-bottom:calc(var(--player-height) + 5.4rem)}
+}
+
 @media (max-width:900px){
   .nav-row{padding:.9rem 1rem}
   .nav-left{flex-direction:column;align-items:flex-start}
@@ -3032,11 +3128,22 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
           <div class="filter-row" id="sort-filter"></div>
         </div>
 
-        <div class="filter-stack">
-          <div class="filter-row" id="genre-filter"></div>
-          <div class="filter-row" id="mood-filter"></div>
-          <div class="filter-row" id="source-filter"></div>
-          <div class="filter-row" id="tag-filter"></div>
+        <!-- Four rows of chips used to sit permanently between the search box
+             and the first track. They are collapsed behind one disclosure now;
+             whatever is actually applied stays visible as removable chips so
+             nothing is hidden state. -->
+        <div class="filter-bar">
+          <button class="sec-action filter-toggle" id="filter-toggle"
+                  aria-expanded="false" aria-controls="filter-stack"
+                  onclick="toggleFilterPanel()">Filters</button>
+          <div class="active-filter-chips" id="active-filter-chips"></div>
+        </div>
+
+        <div class="filter-stack" id="filter-stack" hidden>
+          <div class="filter-group"><span class="filter-group-label">Genre</span><div class="filter-row" id="genre-filter"></div></div>
+          <div class="filter-group"><span class="filter-group-label">Mood</span><div class="filter-row" id="mood-filter"></div></div>
+          <div class="filter-group"><span class="filter-group-label">Source</span><div class="filter-row" id="source-filter"></div></div>
+          <div class="filter-group"><span class="filter-group-label">Tags</span><div class="filter-row" id="tag-filter"></div></div>
         </div>
 
         <div class="browse-summary" id="browse-summary"></div>
@@ -6024,6 +6131,49 @@ function browseTag(value) {
   document.getElementById('browse-panel').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
+// ── Filter disclosure ──────────────────────────────────────────────────
+// The chip rows are collapsed by default. Everything currently applied is
+// mirrored as a removable chip next to the toggle, so collapsing never
+// hides state — it only hides the *choices*.
+var _filterPanelOpen = false;
+
+function getActiveFilters() {
+  var active = [];
+  if (_genreFilter !== 'All') active.push({ label:'Genre: ' + _genreFilter, clear:'setGenreFilter(\'All\')' });
+  if (_moodFilter !== 'All') active.push({ label:'Mood: ' + _moodFilter, clear:'setMoodFilter(\'All\')' });
+  if (_sourceFilter !== 'All') active.push({ label:'Source: ' + _sourceFilter, clear:'setSourceFilter(\'All\')' });
+  if (_tagFilter) active.push({ label:'Tag: ' + _tagFilter, clear:'setTagFilter(' + jsq(_tagFilter) + ')' });
+  return active;
+}
+
+function toggleFilterPanel(force) {
+  _filterPanelOpen = typeof force === 'boolean' ? force : !_filterPanelOpen;
+  var panel = document.getElementById('filter-stack');
+  var btn = document.getElementById('filter-toggle');
+  if (panel) panel.hidden = !_filterPanelOpen;
+  if (btn) btn.setAttribute('aria-expanded', _filterPanelOpen ? 'true' : 'false');
+  renderFilterBar();
+}
+
+function renderFilterBar() {
+  var btn = document.getElementById('filter-toggle');
+  var wrap = document.getElementById('active-filter-chips');
+  var active = getActiveFilters();
+  if (btn) {
+    btn.textContent = _filterPanelOpen
+      ? 'Hide filters'
+      : (active.length ? 'Filters (' + active.length + ')' : 'Filters');
+    btn.classList.toggle('has-active', active.length > 0);
+  }
+  if (!wrap) return;
+  wrap.innerHTML = active.map(function(f) {
+    return '<button class="active-filter-chip" onclick="' + f.clear + '" aria-label="' + attr('Remove filter ' + f.label) + '">'
+      + esc(f.label) + '<span aria-hidden="true">&times;</span></button>';
+  }).join('') + (active.length > 1
+    ? '<button class="active-filter-chip clear-all" onclick="clearFilters()">Clear all</button>'
+    : '');
+}
+
 function renderFilterRow(items, current, setterName, allLabel, elementId) {
   var el = document.getElementById(elementId);
   if (!el) return;
@@ -6559,7 +6709,9 @@ function buildTrackCard(track) {
     +       '</div>'
     +       '<div class="track-tag-row">' + tags.slice(0, 6).map(function(tag) { return '<span class="track-tag">' + esc(tag) + '</span>'; }).join('') + '</div>'
     +       '<div class="track-meta-strip">'
-    +         '<div class="track-stats"><span>' + fmtCompactNumber(track.plays || 0) + ' plays</span><span>' + esc(track.fileName || 'manual upload') + '</span></div>'
+    // The source filename is provenance, not something you scan a shelf by.
+    // It lives in the notes panel now instead of on the card face.
+    +         '<div class="track-stats"><span>' + fmtCompactNumber(track.plays || 0) + ' play' + (Number(track.plays || 0) === 1 ? '' : 's') + '</span></div>'
     // Play and Notes are the everyday actions and stay on the card. Cover,
     // Edit, Share, and Delete move into an overflow menu — six equal-weight
     // buttons per card wrapped onto two rows and made every card read as a
@@ -6591,7 +6743,7 @@ function buildTrackCard(track) {
     +       '<div class="expand-item"><div class="expand-label">Title</div><div class="expand-value">' + esc(track.title) + '</div></div>'
     +       '<div class="expand-item"><div class="expand-label">Source</div><div class="expand-value">' + esc(track.source || 'Suno') + '</div></div>'
     +       '<div class="expand-item"><div class="expand-label">Mood</div><div class="expand-value">' + esc(track.mood || 'Mood') + '</div></div>'
-    +       '<div class="expand-item"><div class="expand-label">File size</div><div class="expand-value">' + (track.fileSize ? (track.fileSize / 1024 / 1024).toFixed(1) + ' MB' : 'Unknown') + '</div></div>'
+    +       '<div class="expand-item"><div class="expand-label">File</div><div class="expand-value">' + esc(track.fileName || 'Manual upload') + (track.fileSize ? ' &middot; ' + (track.fileSize / 1024 / 1024).toFixed(1) + ' MB' : '') + '</div></div>'
     +       (aiFacts ? '<div class="expand-item"><div class="expand-label">AI metadata</div><div class="expand-value">' + esc(aiFacts) + '</div></div>' : '')
     +       prompt
     +       summary
@@ -6750,6 +6902,7 @@ function renderTrackList() {
   renderFilterRow(Object.keys(sources).sort(), _sourceFilter, 'setSourceFilter', 'All', 'source-filter');
   renderTagFilter();
   renderSortFilter();
+  renderFilterBar();
 
   var filtered = getFilteredTracks();
   renderBrowseSummary(filtered);
