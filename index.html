@@ -944,7 +944,7 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   background:var(--accent-dynamic-soft);
   font-weight:500;
 }
-.filter-chip.active::before{
+.filter-chip.active:not(.default-chip)::before{
   content:'';
   display:inline-block;
   width:5px;height:5px;
@@ -5965,7 +5965,7 @@ function browseTag(value) {
 function renderFilterRow(items, current, setterName, allLabel, elementId) {
   var el = document.getElementById(elementId);
   if (!el) return;
-  var html = '<button class="filter-chip ' + (current === allLabel ? 'active' : '') + '" onclick="' + setterName + '(' + jsq(allLabel) + ')">' + esc(allLabel) + '</button>';
+  var html = '<button class="filter-chip default-chip ' + (current === allLabel ? 'active' : '') + '" onclick="' + setterName + '(' + jsq(allLabel) + ')">' + esc(allLabel) + '</button>';
   items.forEach(function(item) {
     html += '<button class="filter-chip ' + (current === item ? 'active' : '') + '" onclick="' + setterName + '(' + jsq(item) + ')">' + esc(item) + '</button>';
   });
@@ -5980,7 +5980,7 @@ function renderTagFilter() {
     el.innerHTML = '<span class="filter-chip active">No discovery tags yet</span>';
     return;
   }
-  var html = '<button class="filter-chip ' + (!_tagFilter ? 'active' : '') + '" onclick="setTagFilter(' + jsq('') + ')">All tags</button>';
+  var html = '<button class="filter-chip default-chip ' + (!_tagFilter ? 'active' : '') + '" onclick="setTagFilter(' + jsq('') + ')">All tags</button>';
   tags.forEach(function(tag) {
     html += '<button class="filter-chip ' + (_tagFilter === tag ? 'active' : '') + '" onclick="setTagFilter(' + jsq(tag) + ')">' + esc(tag) + '</button>';
   });
@@ -5997,7 +5997,7 @@ function renderSortFilter() {
     { id:'title', label:'A to Z' }
   ];
   el.innerHTML = modes.map(function(mode) {
-    return '<button class="filter-chip ' + (_sortMode === mode.id ? 'active' : '') + '" onclick="setSortMode(' + jsq(mode.id) + ')">' + esc(mode.label) + '</button>';
+    return '<button class="filter-chip ' + (mode.id === 'newest' ? 'default-chip ' : '') + (_sortMode === mode.id ? 'active' : '') + '" onclick="setSortMode(' + jsq(mode.id) + ')">' + esc(mode.label) + '</button>';
   }).join('');
 }
 
