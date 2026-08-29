@@ -4277,7 +4277,7 @@ window.svApplyRemoteTracks = function(remoteList) {
     if (track && track.id && hasPendingTrackWrite(track.id)) byId[track.id] = track;
   });
   var next = Object.keys(byId).map(function(id) { return byId[id]; });
-  next.sort(function(a, b) { return trackTimestamp(b) - trackTimestamp(a); });
+  next.sort(compareNewestFirst);
   window.tracks = next;
   tracks = next;
   try { localStorage.setItem('sv_tracks', JSON.stringify(tracks)); } catch (e) {}
@@ -4486,8 +4486,22 @@ function trackTimestamp(track) {
     var parsed = Date.parse(track.created);
     if (!isNaN(parsed)) return parsed;
   }
+  return trackIdTimestamp(track);
+}
+
+// `created` is date-only, so every track imported on the same day ties. The
+// array order used to break that tie -- the watcher prepended, so the newest
+// import sorted first. Per-track documents arrive in document-id order
+// instead, which would have flipped same-day imports to oldest-first. Track
+// ids carry their own epoch, so use that as the tiebreaker explicitly rather
+// than depending on the order the snapshot happens to arrive in.
+function trackIdTimestamp(track) {
   var match = String(track && track.id || '').match(/^t-(\d+)/);
   return match ? parseInt(match[1], 10) : 0;
+}
+
+function compareNewestFirst(a, b) {
+  return (trackTimestamp(b) - trackTimestamp(a)) || (trackIdTimestamp(b) - trackIdTimestamp(a));
 }
 
 function playlistTimestamp(pl) {
@@ -7080,25 +7094,25 @@ function renderSortFilter() {
 
 function getMostPlayedTracks(limit) {
   return tracks.slice().sort(function(a, b) {
-    return Number(b.plays || 0) - Number(a.plays || 0) || trackTimestamp(b) - trackTimestamp(a);
+    return Number(b.plays || 0) - Number(a.plays || 0) || compareNewestFirst(a, b);
   }).slice(0, limit || 4);
 }
 
 function getLeastPlayedTracks(limit) {
   return tracks.slice().sort(function(a, b) {
-    return Number(a.plays || 0) - Number(b.plays || 0) || trackTimestamp(b) - trackTimestamp(a);
+    return Number(a.plays || 0) - Number(b.plays || 0) || compareNewestFirst(a, b);
   }).slice(0, limit || 4);
 }
 
 function getNewestTracks(limit) {
   return tracks.slice().sort(function(a, b) {
-    return trackTimestamp(b) - trackTimestamp(a);
+    return compareNewestFirst(a, b);
   }).slice(0, limit || 4);
 }
 
 function getAutoImportedTracks(limit) {
   return tracks.filter(function(track) { return !!track.autoImported; }).sort(function(a, b) {
-    return trackTimestamp(b) - trackTimestamp(a);
+    return compareNewestFirst(a, b);
   }).slice(0, limit || 4);
 }
 
@@ -7501,13 +7515,13 @@ function getFilteredTracks() {
   });
 
   if (_sortMode === 'most-played') {
-    filtered.sort(function(a, b) { return Number(b.plays || 0) - Number(a.plays || 0) || trackTimestamp(b) - trackTimestamp(a); });
+    filtered.sort(function(a, b) { return Number(b.plays || 0) - Number(a.plays || 0) || compareNewestFirst(a, b); });
   } else if (_sortMode === 'least-played') {
-    filtered.sort(function(a, b) { return Number(a.plays || 0) - Number(b.plays || 0) || trackTimestamp(b) - trackTimestamp(a); });
+    filtered.sort(function(a, b) { return Number(a.plays || 0) - Number(b.plays || 0) || compareNewestFirst(a, b); });
   } else if (_sortMode === 'title') {
     filtered.sort(function(a, b) { return String(a.title || '').localeCompare(String(b.title || '')); });
   } else {
-    filtered.sort(function(a, b) { return trackTimestamp(b) - trackTimestamp(a); });
+    filtered.sort(function(a, b) { return compareNewestFirst(a, b); });
   }
 
   _filterCache.key = cacheKey;
@@ -8363,7 +8377,7 @@ function populatePlaylistCheckboxes() {
     return;
   }
   el.innerHTML = tracks.slice().sort(function(a, b) {
-    return trackTimestamp(b) - trackTimestamp(a);
+    return compareNewestFirst(a, b);
   }).map(function(track) {
     return '<label class="playlist-picker-item"><input type="checkbox" value="' + esc(track.id) + '" class="pl-track-cb">' + buildCoverArt(track, 'xs', false) + '<div class="playlist-picker-copy"><div class="playlist-picker-title">' + esc(track.title) + '</div><div class="playlist-picker-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div></label>';
   }).join('');
