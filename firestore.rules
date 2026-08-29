@@ -111,6 +111,12 @@ service cloud.firestore {
     match /sonicvault-bob/{docId} {
       allow read, write, delete: if isSonicVaultOwner();
     }
+    // One document per track. Same owner-only posture as the vault document
+    // it replaced -- listing is owner-only too, so the catalog is not
+    // enumerable by anyone holding a public share link.
+    match /sonicvault-bob-tracks/{trackId} {
+      allow read, write, delete: if isSonicVaultOwner();
+    }
     match /sonicvault-public-tracks/{docId} {
       allow read: if true;
       allow create, update, delete: if isSonicVaultOwner();

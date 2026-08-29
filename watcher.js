@@ -4,6 +4,7 @@
 const WATCH_FOLDER       = process.env.SUNO_WATCH_FOLDER || 'C:\\Users\\BobbyNacario\\Downloads\\Suno';
 const FILE_EXTENSIONS    = ['.mp3', '.wav', '.m4a'];
 const COLLECTION         = 'sonicvault-bob';
+const TRACKS_COLLECTION  = 'sonicvault-bob-tracks';
 const DEBOUNCE_MS        = 2000;  // wait for file to finish writing
 const SIZE_STABLE_MS     = 1500;  // re-check after this delay to confirm size is stable
 const MAX_FILE_SIZE      = 200 * 1024 * 1024;  // 200MB
@@ -237,21 +238,12 @@ async function processFile(filePath) {
         aiGeneratedAt: ''
       };
 
-      // Load existing tracks from Firestore, prepend new track, save back
-      var docRef   = db.collection(COLLECTION).doc('tracks');
-      var docSnap  = await docRef.get();
-      var existing = [];
-
-      if (docSnap.exists) {
-        try { existing = JSON.parse(docSnap.data().value) || []; } catch (e) { existing = []; }
-      }
-
-      var updated = [track].concat(existing);
-
-      await docRef.set({
-        value:   JSON.stringify(updated),
-        updated: admin.firestore.FieldValue.serverTimestamp()
-      });
+      // One document per track. The previous read-modify-write of a single
+      // `tracks` document raced the web app: an import landing during a
+      // play-count save silently clobbered one side or the other. Writing
+      // this track's own document touches nothing else, so there is no race
+      // left to lose -- and no shared 1MiB ceiling to grow into.
+      await db.collection(TRACKS_COLLECTION).doc(trackId).set(track);
 
       log('Track "' + title + '" added to SonicVault ✓');
 

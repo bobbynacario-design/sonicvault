@@ -23,7 +23,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, collection, setDoc, getDoc, getDocs, deleteDoc, writeBatch, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -40,6 +40,10 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const USER_PATH = 'sonicvault-bob';
+// One document per track. The old single `tracks` document held the whole
+// library as one JSON string: ~1,286 bytes per track against a hard 1MiB
+// ceiling, rewritten in full on every play.
+const TRACKS_PATH = 'sonicvault-bob-tracks';
 const PUBLIC_TRACKS_PATH = 'sonicvault-public-tracks';
 const PUBLIC_PLAYLISTS_PATH = 'sonicvault-public-playlists';
 let _privateSyncStarted = false;
@@ -109,6 +113,75 @@ async function fbSave(key, data) {
   }
 }
 
+// Firestore rejects undefined field values outright, and audioData is legacy
+// base64 that must never leave the device.
+function cleanTrackForWrite(track) {
+  var out = {};
+  Object.keys(track || {}).forEach(function(key) {
+    if (key === 'audioData') return;
+    if (track[key] === undefined) return;
+    out[key] = track[key];
+  });
+  return out;
+}
+
+async function fbSaveTrack(track) {
+  if (!track || !track.id) return true;
+  try {
+    setSyncStatus('syncing', 'Saving');
+    await setDoc(doc(db, TRACKS_PATH, String(track.id)), cleanTrackForWrite(track));
+    setSyncStatus('ok', 'Synced');
+    return true;
+  } catch (e) {
+    setSyncStatus('error', 'Save failed');
+    console.error('fbSaveTrack error:', e);
+    return false;
+  }
+}
+
+async function fbDeleteTrack(id) {
+  try {
+    setSyncStatus('syncing', 'Saving');
+    await deleteDoc(doc(db, TRACKS_PATH, String(id)));
+    setSyncStatus('ok', 'Synced');
+    return true;
+  } catch (e) {
+    setSyncStatus('error', 'Save failed');
+    console.error('fbDeleteTrack error:', e);
+    return false;
+  }
+}
+
+async function fbReadTracks() {
+  var snap = await getDocs(collection(db, TRACKS_PATH));
+  var list = [];
+  snap.forEach(function(d) { list.push(d.data()); });
+  return list;
+}
+
+// One-time lift from the legacy single document. Non-destructive: the old
+// document is left exactly where it is, so it stays a free rollback copy.
+async function migrateTracksToCollection() {
+  var existing = await getDocs(collection(db, TRACKS_PATH));
+  if (!existing.empty) return 0;
+  var legacy = await getDoc(doc(db, USER_PATH, 'tracks'));
+  if (!legacy.exists()) return 0;
+  var arr = [];
+  try { arr = JSON.parse(legacy.data().value); } catch (e) { arr = []; }
+  if (!Array.isArray(arr) || !arr.length) return 0;
+  setSyncStatus('syncing', 'Upgrading vault');
+  // Batches cap at 500 operations.
+  for (var i = 0; i < arr.length; i += 400) {
+    var batch = writeBatch(db);
+    arr.slice(i, i + 400).forEach(function(track) {
+      if (track && track.id) batch.set(doc(db, TRACKS_PATH, String(track.id)), cleanTrackForWrite(track));
+    });
+    await batch.commit();
+  }
+  console.info('Migrated ' + arr.length + ' tracks to per-track documents');
+  return arr.length;
+}
+
 async function fbPublishShare(kind, id, data) {
   try {
     setSyncStatus('syncing', 'Publishing');
@@ -152,18 +225,20 @@ async function fbLoadPublicRoute(kind, id) {
 async function fbLoadAll() {
   try {
     setSyncStatus('syncing', 'Syncing');
-    var keys = ['tracks', 'playlists', 'settings'];
+    var keys = ['playlists', 'settings'];
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
       if (window.svHasPendingWrite && window.svHasPendingWrite(k)) continue;
       var snap = await getDoc(doc(db, USER_PATH, k));
       if (!snap.exists()) continue;
       var val = JSON.parse(snap.data().value);
-      if (k === 'tracks') window.tracks = Array.isArray(val) ? val : [];
       if (k === 'playlists') window.playlists = Array.isArray(val) ? val : [];
       if (k === 'settings') window.appSettings = val || {};
       localStorage.setItem('sv_' + k, JSON.stringify(val));
     }
+    await migrateTracksToCollection();
+    if (window.svApplyRemoteTracks) window.svApplyRemoteTracks(await fbReadTracks());
+    subscribeTracks();
     setSyncStatus('ok', 'Synced');
     settleBoot();
     if (window.refreshAll) window.refreshAll();
@@ -188,14 +263,16 @@ function startPrivateSync() {
   // sign-in must subscribe fresh rather than assume the old ones live.
   stopPrivateSync();
   _privateSyncStarted = true;
-  ['tracks', 'playlists', 'settings'].forEach(function(k) {
+  // The tracks collection is subscribed from fbLoadAll(), after the one-time
+  // migration has run -- subscribing first would deliver an empty snapshot
+  // while the legacy document still held the whole library.
+  ['playlists', 'settings'].forEach(function(k) {
     var unsub = onSnapshot(doc(db, USER_PATH, k), function(snap) {
       if (!snap.exists()) return;
       // A local write for this key is still unconfirmed. Applying the server
       // copy here would wipe it from the UI while it sat in the retry queue.
       if (window.svHasPendingWrite && window.svHasPendingWrite(k)) return;
       var val = JSON.parse(snap.data().value);
-      if (k === 'tracks') window.tracks = Array.isArray(val) ? val : [];
       if (k === 'playlists') window.playlists = Array.isArray(val) ? val : [];
       if (k === 'settings') window.appSettings = val || {};
       localStorage.setItem('sv_' + k, JSON.stringify(val));
@@ -211,6 +288,27 @@ function startPrivateSync() {
   fbLoadAll();
 }
 
+// Subscribed only after the migration has run, and only once per sync
+// session -- fbLoadAll() can be called again on re-auth.
+let _tracksUnsub = null;
+
+function subscribeTracks() {
+  if (_tracksUnsub) return;
+  _tracksUnsub = onSnapshot(collection(db, TRACKS_PATH), function(snap) {
+    var list = [];
+    snap.forEach(function(d) { list.push(d.data()); });
+    if (window.svApplyRemoteTracks) window.svApplyRemoteTracks(list);
+    setSyncStatus('ok', 'Synced');
+    if (window.refreshAll) window.refreshAll();
+  }, function(err) {
+    var who = window.fbOwnerUser && window.fbOwnerUser.email;
+    setSyncStatus('error', who ? 'Blocked: ' + who : 'Sign in required');
+    console.error('tracks onSnapshot error:', err);
+  });
+  _privateUnsubs.push(function() { _tracksUnsub = null; });
+  _privateUnsubs.push(_tracksUnsub);
+}
+
 async function fbSignIn() {
   await signInWithPopup(auth, provider);
 }
@@ -220,6 +318,8 @@ async function fbSignOutOwner() {
 }
 
 window.fbSave = fbSave;
+window.fbSaveTrack = fbSaveTrack;
+window.fbDeleteTrack = fbDeleteTrack;
 window.fbLoadAll = fbLoadAll;
 window.fbPublishShare = fbPublishShare;
 window.fbUnpublishShare = fbUnpublishShare;
@@ -3959,6 +4059,19 @@ function load(key, def) {
 }
 
 var _offlineQueue = JSON.parse(localStorage.getItem('sv_offline_queue') || '{}');
+// A queue left by the single-document build holds the entire tracks array
+// under one key. Fan it out to per-track entries so nothing queued before
+// this upgrade is lost.
+(function migrateQueuedTracks() {
+  var legacy = _offlineQueue.tracks;
+  if (!Array.isArray(legacy)) return;
+  delete _offlineQueue.tracks;
+  legacy.forEach(function(track) {
+    if (!track || !track.id) return;
+    _offlineQueue['track:' + track.id] = { kind: 'track', op: 'set', id: track.id, value: track };
+  });
+  try { localStorage.setItem('sv_offline_queue', JSON.stringify(_offlineQueue)); } catch (e) {}
+})();
 var _isOnline = navigator.onLine;
 
 window.addEventListener('online', function() {
@@ -4063,15 +4176,109 @@ window.svHasPendingWrite = function(key) {
   return Object.prototype.hasOwnProperty.call(_offlineQueue, key);
 };
 
-function pushWrite(key, val, seq) {
-  if (!_isOnline || !window.fbSave) { scheduleRetry(); return; }
-  window.fbSave(key, val).then(function(ok) {
-    if (ok) confirmWrite(key, seq);
-    else scheduleRetry();
+// ── Per-track sync ─────────────────────────────────────────────────────
+// Tracks live in their own Firestore collection, one document each, so a
+// play writes ~1KB instead of rewriting the whole library. persistTracks()
+// stays the single choke point every caller already uses: it diffs the array
+// against the last state the server confirmed and queues only what changed.
+var _trackShadow = {};   // id -> fingerprint of the last server-confirmed state
+
+// Key order differs between a locally built object and one returned by
+// Firestore, so sort before comparing or every track looks dirty.
+function trackFingerprint(track) {
+  var out = {};
+  Object.keys(track || {}).filter(function(k) {
+    return k !== 'audioData' && track[k] !== undefined;
+  }).sort().forEach(function(k) { out[k] = track[k]; });
+  return JSON.stringify(out);
+}
+
+function stripAudioData(track) {
+  var copy = Object.assign({}, track);
+  delete copy.audioData;
+  return copy;
+}
+
+function trackQueueKey(id) { return 'track:' + id; }
+
+function hasPendingTrackWrite(id) {
+  return Object.prototype.hasOwnProperty.call(_offlineQueue, trackQueueKey(id));
+}
+
+function queueTrackOp(op, id, track) {
+  var key = trackQueueKey(id);
+  var seq = ++_writeSeq;
+  _queuedSeq[key] = seq;
+  _offlineQueue[key] = { kind: 'track', op: op, id: id, value: op === 'set' ? stripAudioData(track) : null };
+  persistOfflineQueue();
+  renderSyncBanner();
+  pushQueued(key, _offlineQueue[key], seq);
+}
+
+// Diff the live array against server-confirmed state: writes for anything
+// new or changed, deletes for anything that has gone.
+function syncTrackDocs() {
+  var seen = {};
+  tracks.forEach(function(track) {
+    if (!track || !track.id) return;
+    seen[track.id] = 1;
+    if (_trackShadow[track.id] === trackFingerprint(track)) return;
+    queueTrackOp('set', track.id, track);
+  });
+  Object.keys(_trackShadow).forEach(function(id) {
+    if (!seen[id]) queueTrackOp('delete', id, null);
+  });
+}
+
+// Server state for the tracks collection. Anything with an unconfirmed local
+// write wins, so a snapshot cannot wipe an edit still sitting in the queue.
+window.svApplyRemoteTracks = function(remoteList) {
+  var byId = {};
+  (remoteList || []).forEach(function(track) {
+    if (track && track.id) {
+      byId[track.id] = track;
+      _trackShadow[track.id] = trackFingerprint(track);
+    }
+  });
+  Object.keys(_trackShadow).forEach(function(id) {
+    if (!byId[id] && !hasPendingTrackWrite(id)) delete _trackShadow[id];
+  });
+  tracks.forEach(function(track) {
+    if (track && track.id && hasPendingTrackWrite(track.id)) byId[track.id] = track;
+  });
+  var next = Object.keys(byId).map(function(id) { return byId[id]; });
+  next.sort(function(a, b) { return trackTimestamp(b) - trackTimestamp(a); });
+  window.tracks = next;
+  tracks = next;
+  try { localStorage.setItem('sv_tracks', JSON.stringify(tracks)); } catch (e) {}
+  invalidateFilterCache();
+};
+
+function pushQueued(key, entry, seq) {
+  if (!_isOnline) { scheduleRetry(); return; }
+  var promise;
+  if (entry && entry.kind === 'track') {
+    if (!window.fbSaveTrack || !window.fbDeleteTrack) { scheduleRetry(); return; }
+    promise = entry.op === 'delete' ? window.fbDeleteTrack(entry.id) : window.fbSaveTrack(entry.value);
+  } else {
+    if (!window.fbSave) { scheduleRetry(); return; }
+    promise = window.fbSave(key, entry);
+  }
+  promise.then(function(ok) {
+    if (!ok) { scheduleRetry(); return; }
+    if (entry && entry.kind === 'track') {
+      if (entry.op === 'delete') delete _trackShadow[entry.id];
+      else _trackShadow[entry.id] = trackFingerprint(entry.value);
+    }
+    confirmWrite(key, seq);
   }).catch(function(err) {
-    console.error('fbSave rejected:', err);
+    console.error('write rejected:', err);
     scheduleRetry();
   });
+}
+
+function pushWrite(key, val, seq) {
+  pushQueued(key, val, seq);
 }
 
 function flushOfflineQueue() {
@@ -4081,7 +4288,7 @@ function flushOfflineQueue() {
   keys.forEach(function(k) {
     var seq = _queuedSeq[k];
     if (seq == null) { seq = ++_writeSeq; _queuedSeq[k] = seq; }
-    pushWrite(k, _offlineQueue[k], seq);
+    pushQueued(k, _offlineQueue[k], seq);
   });
 }
 
@@ -4110,6 +4317,12 @@ function save(key, val) {
       delete copy.audioData;
       return copy;
     });
+  }
+  // Decoded peaks are device-local. Strip them on the way out so an old
+  // settings object can never re-upload the cache this build just retired.
+  if (key === 'settings' && val && typeof val === 'object' && val.waveformCache) {
+    cleanVal = Object.assign({}, val);
+    delete cleanVal.waveformCache;
   }
   var seq = ++_writeSeq;
   queueWrite(key, cleanVal, seq);
@@ -5133,10 +5346,46 @@ function getTrackTags(track) {
   return uniqueStrings(tags, 8);
 }
 
+// Decoded peaks are derived data -- reconstructible from the audio at any
+// time -- but they were living in the synced settings document at ~681 bytes
+// per track, which put a second 1MiB ceiling about 1,500 tracks away in the
+// document written most often. They are device-local now and never sync.
+var _waveformCache = null;
+
 function getWaveformCache() {
+  if (_waveformCache) return _waveformCache;
+  var stored = null;
+  try { stored = JSON.parse(localStorage.getItem('sv_waveforms') || 'null'); } catch (e) { stored = null; }
+  _waveformCache = (stored && typeof stored === 'object' && !Array.isArray(stored)) ? stored : {};
+  // One-time lift of anything left in the old synced location.
+  var legacy = (window.appSettings || {}).waveformCache;
+  if (legacy && typeof legacy === 'object') {
+    Object.keys(legacy).forEach(function(id) {
+      if (!_waveformCache[id] && Array.isArray(legacy[id])) _waveformCache[id] = legacy[id];
+    });
+    saveWaveformCache();
+  }
+  return _waveformCache;
+}
+
+function saveWaveformCache() {
+  if (!_waveformCache) return;
+  try {
+    localStorage.setItem('sv_waveforms', JSON.stringify(_waveformCache));
+  } catch (e) {
+    // A full quota is not worth losing a save over; peaks re-decode on demand.
+    console.warn('waveform cache not persisted:', e);
+  }
+}
+
+// Drops the cache from the settings object so it stops being uploaded.
+// Returns true when something was actually removed.
+function stripWaveformCacheFromSettings() {
   appSettings = window.appSettings || {};
-  if (!appSettings.waveformCache) appSettings.waveformCache = {};
-  return appSettings.waveformCache;
+  if (!appSettings.waveformCache) return false;
+  delete appSettings.waveformCache;
+  window.appSettings = appSettings;
+  return true;
 }
 
 function getRealPeaksForTrack(track) {
@@ -5244,10 +5493,8 @@ async function ensureWaveformForTrack(track, opts) {
     // Stamp real peaks onto the private track too so share payloads carry them.
     var privateTrack = tracks.find(function(item) { return item.id === track.id; });
     if (privateTrack) privateTrack.peaks = peaks.slice();
-    if (!skipSave) {
-      save('settings', appSettings);
-      if (privateTrack) persistTracks();
-    }
+    saveWaveformCache();
+    if (!skipSave && privateTrack) persistTracks();
     renderTracks();
     updateExpandedPlayer();
     extracted = true;
@@ -5278,8 +5525,7 @@ async function sweepWaveformBackfill() {
     await new Promise(function(resolve) { setTimeout(resolve, 600); });
   }
   if (extracted) {
-    window.appSettings = appSettings;
-    save('settings', appSettings);
+    saveWaveformCache();
     persistTracks();
   }
 }
@@ -6129,7 +6375,14 @@ function persistTracks() {
     invalidateFilterCache();
     return;
   }
-  save('tracks', tracks);
+  // localStorage keeps the whole array as the offline cache; Firestore gets
+  // only the documents that actually changed.
+  try {
+    localStorage.setItem('sv_tracks', JSON.stringify(tracks));
+  } catch (e) {
+    console.warn('local track cache not written:', e);
+  }
+  syncTrackDocs();
   invalidateFilterCache();
 }
 
@@ -8531,8 +8784,7 @@ async function saveAllUploads() {
         invalidateVisualWaveform(t.id);
       }
     });
-    window.appSettings = appSettings;
-    save('settings', appSettings);
+    saveWaveformCache();
     tracks = createdTracks.concat(tracks);
     persistTracks();
   }
@@ -8760,7 +9012,7 @@ function applyBackup(data) {
   playlists = window.playlists;
   appSettings = window.appSettings;
   invalidateFilterCache();
-  save('tracks', tracks);
+  persistTracks();
   save('playlists', playlists);
   save('settings', appSettings);
   window.refreshAll();
