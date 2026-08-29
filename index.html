@@ -1387,6 +1387,13 @@ body.light .track-row:hover,body.light .track-row-wrap.expanded .track-row{backg
   gap:.55rem;
   padding:1.6rem 1rem .4rem;
 }
+.queue-sentinel{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:.45rem;
+  padding:.7rem 0 .2rem;
+}
 .shelf-sentinel-copy{
   font-family:var(--mono);
   font-size:10px;
@@ -6620,6 +6627,68 @@ function renderExpandedWaveform(track) {
   return html;
 }
 
+// ── Queue paging ───────────────────────────────────────────────────────
+// The browse shelf has paged since the progressive-rendering work; the queue
+// panel never did, and rendered every track at once with two reorder buttons
+// each. It pages the same way, but windowed around the current track rather
+// than from the top: the rows worth opening this panel for are the one
+// playing and the one after it, and at 600 tracks those could be row 400.
+var QUEUE_PAGE_SIZE = 40;
+var QUEUE_WINDOW_LEAD = 4;   // rows of context kept above the current track
+var _queueWindowStart = 0;
+var _queueWindowCount = QUEUE_PAGE_SIZE;
+var _queueWindowKey = '';
+var _queueObserver = null;
+
+// Recentre only when the queue itself changes. Pausing must not throw away
+// a window the listener has scrolled through.
+function queueWindowKey(list) {
+  return [_playQueueLabel, list.length, _currentTrack ? _currentTrack.id : '', _shuffleMode ? 's' : ''].join('|');
+}
+
+function resetQueueWindow(list) {
+  var idx = 0;
+  if (_currentTrack) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === _currentTrack.id) { idx = i; break; }
+    }
+  }
+  _queueWindowStart = Math.max(0, idx - QUEUE_WINDOW_LEAD);
+  _queueWindowCount = QUEUE_PAGE_SIZE;
+}
+
+function showEarlierQueue() {
+  var take = Math.min(QUEUE_PAGE_SIZE, _queueWindowStart);
+  if (!take) return;
+  _queueWindowStart -= take;
+  _queueWindowCount += take;
+  updateExpandedPlayer();
+}
+
+function showMoreQueue() {
+  _queueWindowCount += QUEUE_PAGE_SIZE;
+  updateExpandedPlayer();
+}
+
+// The live queue is already in _playQueueIds. Serialising it into every row's
+// onclick made this panel's HTML grow quadratically with the queue -- 716KB
+// for 40 rendered rows at a 600-track queue. Resolve it at click time, the
+// same way buildTrackCard already does.
+function playFromQueue(id) {
+  startPlayback(id, _playQueueIds.slice(), _playQueueLabel);
+}
+
+function observeQueueSentinel() {
+  if (typeof IntersectionObserver === 'undefined') return;
+  if (_queueObserver) _queueObserver.disconnect();
+  var sentinel = document.getElementById('queue-sentinel');
+  if (!sentinel) return;
+  _queueObserver = new IntersectionObserver(function(entries) {
+    if (entries.some(function(entry) { return entry.isIntersecting; })) showMoreQueue();
+  }, { rootMargin: '400px 0px' });
+  _queueObserver.observe(sentinel);
+}
+
 function updateExpandedPlayer() {
   var title = document.getElementById('xp-title');
   if (!title) return;
@@ -6683,7 +6752,24 @@ function updateExpandedPlayer() {
   var nextQueueId = (nextInQueue && (!_currentTrack || nextInQueue.id !== _currentTrack.id))
     ? nextInQueue.id : '';
   document.getElementById('xp-queue-copy').textContent = queueTracks.length ? _playQueueLabel + (_shuffleMode ? ' / Shuffle' : '') + ' / ' + queueTracks.length + ' track' + (queueTracks.length !== 1 ? 's' : '') : 'The active queue will show up here.';
-  document.getElementById('xp-queue-list').innerHTML = queueTracks.length ? queueTracks.map(function(track, index) {
+  var queueKey = queueWindowKey(queueTracks);
+  if (queueKey !== _queueWindowKey) { _queueWindowKey = queueKey; resetQueueWindow(queueTracks); }
+  var queueEnd = Math.min(queueTracks.length, _queueWindowStart + _queueWindowCount);
+  var queueSlice = queueTracks.slice(_queueWindowStart, queueEnd);
+  var queueAfter = queueTracks.length - queueEnd;
+  var earlierHTML = _queueWindowStart > 0
+    ? '<div class="queue-sentinel"><button class="sec-action" onclick="showEarlierQueue()">Show ' + Math.min(QUEUE_PAGE_SIZE, _queueWindowStart) + ' earlier</button></div>'
+    : '';
+  var moreHTML = queueAfter > 0
+    ? '<div class="queue-sentinel" id="queue-sentinel">'
+      + '<button class="sec-action" onclick="showMoreQueue()">Show ' + Math.min(QUEUE_PAGE_SIZE, queueAfter) + ' more</button>'
+      + '<div class="shelf-sentinel-copy">' + queueEnd + ' of ' + queueTracks.length + ' in the queue</div>'
+      + '</div>'
+    : '';
+  document.getElementById('xp-queue-list').innerHTML = queueTracks.length ? earlierHTML + queueSlice.map(function(track, sliceIndex) {
+    // Absolute position: the row number and the reorder bounds are relative
+    // to the whole queue, not the rendered window.
+    var index = _queueWindowStart + sliceIndex;
     var isActive = _currentTrack && _currentTrack.id === track.id;
     var isNext = !isActive && !!nextQueueId && track.id === nextQueueId;
     var state = isActive ? (_isPlaying ? 'Playing' : 'Paused') : (isNext ? 'Next' : '');
@@ -6691,8 +6777,9 @@ function updateExpandedPlayer() {
       + '<button title="Move up" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', -1)"' + (index === 0 ? ' disabled' : '') + '>&#9650;</button>'
       + '<button title="Move down" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', 1)"' + (index === queueTracks.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
       + '</div>';
-    return '<div class="queue-item' + (isActive ? ' active' : '') + '" role="button" tabindex="0"' + (isActive ? ' aria-current="true"' : '') + ' aria-label="' + attr('Play ' + (track.title || 'track') + ', queue position ' + (index + 1) + (state ? ', ' + state.toLowerCase() : '')) + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(_playQueueIds) + ', ' + jsq(_playQueueLabel) + ')"><div class="queue-num" aria-hidden="true">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state' + (isNext ? ' is-next' : '') + '">' + esc(state) + '</div>' + reorder + '</div>';
-  }).join('') : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">No queue yet</strong>Play something to build the queue.</div>';
+    return '<div class="queue-item' + (isActive ? ' active' : '') + '" role="button" tabindex="0"' + (isActive ? ' aria-current="true"' : '') + ' aria-label="' + attr('Play ' + (track.title || 'track') + ', queue position ' + (index + 1) + (state ? ', ' + state.toLowerCase() : '')) + '" onclick="playFromQueue(' + jsq(track.id) + ')"><div class="queue-num" aria-hidden="true">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state' + (isNext ? ' is-next' : '') + '">' + esc(state) + '</div>' + reorder + '</div>';
+  }).join('') + moreHTML : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">No queue yet</strong>Play something to build the queue.</div>';
+  observeQueueSentinel();
 
   document.getElementById('xp-playlist-list').innerHTML = playlists.length ? playlists.map(function(playlist) {
     var present = (playlist.trackIds || []).indexOf(_currentTrack.id) !== -1;
