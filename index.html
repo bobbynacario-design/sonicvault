@@ -79,30 +79,33 @@ function getPublicPath(kind) {
 function setSyncStatus(status, msg) {
   var el = document.getElementById('sync-status');
   if (!el) return;
-  var colors = {
-    syncing: '#F08B62',
-    ok: '#78D0A4',
-    error: '#FF7C74',
-    offline: 'rgba(255,255,255,.42)'
-  };
   var dots = {
     syncing: 'LIVE',
     ok: 'SYNC',
     error: 'ERR',
     offline: 'OFF'
   };
-  el.textContent = (dots[status] || 'OFF') + ' ' + msg;
-  el.style.color = colors[status] || 'rgba(255,255,255,.42)';
+  var key = dots[status] ? status : 'offline';
+  el.textContent = dots[key] + ' ' + msg;
+  el.classList.remove('sync-syncing', 'sync-ok', 'sync-error', 'sync-offline');
+  el.classList.add('sync-' + key);
+  el.style.color = '';
 }
+// updateOnlineStatus() lives in the classic script below and needs this.
+window.setSyncStatus = setSyncStatus;
 
+// Reports success so save() can keep the write queued until the server has
+// actually taken it. Swallowing the error here used to drop the write.
 async function fbSave(key, data) {
   try {
     setSyncStatus('syncing', 'Saving');
     await setDoc(doc(db, USER_PATH, key), { value: JSON.stringify(data), updated: Date.now() });
     setSyncStatus('ok', 'Synced');
+    return true;
   } catch (e) {
     setSyncStatus('error', 'Save failed');
     console.error('fbSave error:', e);
+    return false;
   }
 }
 
@@ -152,6 +155,7 @@ async function fbLoadAll() {
     var keys = ['tracks', 'playlists', 'settings'];
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
+      if (window.svHasPendingWrite && window.svHasPendingWrite(k)) continue;
       var snap = await getDoc(doc(db, USER_PATH, k));
       if (!snap.exists()) continue;
       var val = JSON.parse(snap.data().value);
@@ -187,6 +191,9 @@ function startPrivateSync() {
   ['tracks', 'playlists', 'settings'].forEach(function(k) {
     var unsub = onSnapshot(doc(db, USER_PATH, k), function(snap) {
       if (!snap.exists()) return;
+      // A local write for this key is still unconfirmed. Applying the server
+      // copy here would wipe it from the UI while it sat in the retry queue.
+      if (window.svHasPendingWrite && window.svHasPendingWrite(k)) return;
       var val = JSON.parse(snap.data().value);
       if (k === 'tracks') window.tracks = Array.isArray(val) ? val : [];
       if (k === 'playlists') window.playlists = Array.isArray(val) ? val : [];
@@ -230,6 +237,7 @@ onAuthStateChanged(auth, function(user) {
   window.fbOwnerUser = ownerCandidate ? { email:user.email, uid:user.uid || '' } : null;
   if (ownerCandidate) {
     startPrivateSync();
+    if (window.svFlushQueue) window.svFlushQueue();
   } else {
     if (_privateSyncStarted) stopPrivateSync();
     setSyncStatus('offline', user ? 'Sign in required' : 'Local only');
@@ -273,7 +281,10 @@ if (initialRoute.mode === 'app') {
   --rim3:rgba(255,255,255,.24);
   --text:#f7f2eb;
   --muted:rgba(247,242,235,.62);
-  --muted2:rgba(247,242,235,.38);
+  /* .38 measured 3.22:1 against the card grounds it is used on, under the
+     4.5:1 AA floor. This token carries the genre/mood line under every
+     track title, so it has to clear it. */
+  --muted2:rgba(247,242,235,.58);
   --shadow:0 22px 60px rgba(0,0,0,.34);
   --accent:#f08b62;
   --accent2:#ffb289;
@@ -290,7 +301,13 @@ if (initialRoute.mode === 'app') {
   --display:'Syne',sans-serif;
   --sans:'Space Grotesk','DM Sans',sans-serif;
   --mono:'DM Mono',monospace;
+  /* Starting value only. syncPlayerHeightVar() replaces this with the space
+     the player actually occupies -- it is fluid, and at 375px it renders
+     roughly twice this tall. */
   --player-height:118px;
+  /* Set by renderSyncBanner() so the banner offsets the shell instead of
+     covering the header controls. */
+  --sync-banner-h:0px;
   --sidebar-width:236px;
 }
 body.light{
@@ -306,7 +323,7 @@ body.light{
   --rim3:rgba(28,20,14,.26);
   --text:#171414;
   --muted:rgba(23,20,20,.64);
-  --muted2:rgba(23,20,20,.42);
+  --muted2:rgba(23,20,20,.62);
   --shadow:0 20px 50px rgba(48,32,20,.12);
   --accent:#c56f49;
   --accent2:#e49e78;
@@ -315,8 +332,8 @@ body.light{
   --accent-dynamic:#c56f49;
   --accent-dynamic-soft:rgba(197,111,73,.08);
   --accent-dynamic-deep:rgba(197,111,73,.14);
-  --success:#2e8e5c;
-  --danger:#cf5b4a;
+  --success:#1f7a4d;
+  --danger:#b8402f;
   --blue:#496ecb;
   --violet:#7657cb;
   --amber:#bb8f31;
@@ -410,7 +427,7 @@ body.light ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12)}
 
 .nav{
   position:sticky;
-  top:0;
+  top:var(--sync-banner-h);
   z-index:50;
   backdrop-filter:blur(18px);
   background:linear-gradient(180deg, rgba(9,11,18,.88), rgba(9,11,18,.62));
@@ -510,6 +527,53 @@ body.light .nav{background:linear-gradient(180deg, rgba(241,236,226,.88), rgba(2
   background:currentColor;
   flex:none;
 }
+/* Sync state reads from theme tokens rather than inline colors, so the
+   light theme gets its own darker semantic reds/greens instead of the
+   dark theme's, which measured 2.5:1 on a white sidebar. */
+.status-pill.sync-syncing{color:var(--accent)}
+.status-pill.sync-ok{color:var(--success)}
+.status-pill.sync-error{color:var(--danger)}
+.status-pill.sync-offline{color:var(--muted2)}
+/* One deep red works on both grounds (8.18:1 against white), so the bar does
+   not need theme branching. [hidden] needs its own rule here -- the display
+   below is an author style and would otherwise beat it. */
+.sync-banner{
+  /* In normal flow as the first body child, so it occupies real space
+     instead of covering the header. Sticky keeps it visible while the
+     document scrolls underneath. */
+  position:sticky;
+  top:0;
+  z-index:80;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:.5rem .9rem;
+  padding:.55rem 1rem;
+  background:#8f2d22;
+  color:#fff;
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  box-shadow:0 8px 24px rgba(0,0,0,.28);
+}
+.sync-banner[hidden]{display:none}
+.sync-banner-btn{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:#fff;
+  background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.55);
+  border-radius:999px;
+  padding:.3rem .7rem;
+  min-height:28px;
+  cursor:pointer;
+}
+.sync-banner-btn:hover{background:rgba(255,255,255,.26)}
+.sync-banner-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .clock-nav{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--muted2);text-transform:uppercase;opacity:.7}
 /* The clock is decoration; it is the first thing to go when space is tight. */
 @media (max-width:1100px){.clock-nav{display:none}}
@@ -982,6 +1046,10 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
 /* Each chip row gets a label now that the whole block is behind a toggle —
    without one, four unlabelled rows of chips are a guessing game. */
 .filter-stack{display:grid;gap:.85rem;margin-top:.9rem;padding-top:.9rem;border-top:1px solid var(--rim)}
+/* The display rule above is an author style and beats the UA's
+   [hidden]{display:none}, so the disclosure needs its own hidden case or
+   the panel never actually collapses. */
+.filter-stack[hidden]{display:none}
 .filter-group{display:grid;grid-template-columns:64px minmax(0,1fr);gap:.65rem;align-items:start}
 .filter-group-label{
   font-family:var(--mono);
@@ -1122,7 +1190,9 @@ body.light .track-row:hover,body.light .track-row-wrap.expanded .track-row{backg
   margin-top:.1rem;
 }
 .row-shared{color:var(--success)}
-.row-warn{color:var(--danger)}
+/* A missing lyric sheet is a fact about the track, not a failure -- most
+   instrumentals will never have one. Same weight as the rest of the row. */
+.row-warn{color:var(--muted2)}
 .row-plays,.row-time{
   font-family:var(--mono);
   font-size:11px;
@@ -3035,7 +3105,10 @@ body.light .now-playing-bar{
   border-radius:999px;
   background:linear-gradient(90deg, var(--violet), var(--accent-dynamic));
 }
-.np-controls{display:flex;align-items:center;gap:.45rem;justify-content:flex-end}
+/* Wrap is a backstop, not the plan: at any width where the row still cannot
+   fit, controls move to a second line instead of overflowing the card. The
+   player reports its own height now, so an extra line is absorbed correctly. */
+.np-controls{display:flex;align-items:center;gap:.45rem;justify-content:flex-end;flex-wrap:wrap}
 .np-btn{
   width:44px;
   height:44px;
@@ -3135,14 +3208,14 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
    the content underneath does -- the piece that actually reads as an
    app shell rather than a single long page. */
 @media (min-width:1001px){
-  body{overflow:hidden}
-  .app-shell{display:flex;align-items:stretch;height:100vh}
+  html,body{overflow:hidden}
+  .app-shell{display:flex;align-items:stretch;height:calc(100vh - var(--sync-banner-h))}
   .nav{
     position:static;
     top:auto;
     flex:none;
     width:var(--sidebar-width);
-    height:100vh;
+    height:calc(100vh - var(--sync-banner-h));
     overflow-y:auto;
     border-bottom:none;
     border-right:1px solid var(--rim);
@@ -3233,6 +3306,11 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .public-meta-grid,.public-related-grid{grid-template-columns:1fr}
   .public-track-row,.public-link-row{grid-template-columns:1fr}
   .public-track-index,.public-track-time,.public-row-action{display:none}
+  /* Six controls need ~304px; the docked bar's control column is only ~229px
+     at 375px, which pushed "Open" clean off the screen. Shuffle and Repeat
+     drop out here -- the expanded player carries both with fuller labels
+     ("Shuffle: On", "Repeat: Queue"), and Open is how you get there. */
+  .np-controls .mode-btn{display:none}
   .player-topbar{align-items:flex-start;flex-direction:column}
   .player-wave{height:92px;gap:2px}
   .player-copy-grid{grid-template-columns:1fr}
@@ -3260,6 +3338,13 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 </style>
 </head>
 <body>
+<!-- Unsynced writes are a data-loss state, so they get a persistent bar with
+     an action rather than the 10px status pill, which the next operation
+     overwrites within a second. -->
+<div id="sync-banner" class="sync-banner" role="alert" hidden>
+  <span class="sync-banner-text"></span>
+  <button type="button" class="sync-banner-btn">Retry now</button>
+</div>
 <!-- App shell: sidebar + independently scrolling content pane, above the
      1000px breakpoint where the bottom mobile nav takes over. Below it,
      .app-shell/.app-main are plain block elements and the document scrolls
@@ -3853,30 +3938,141 @@ window.addEventListener('online', function() {
   _isOnline = true;
   flushOfflineQueue();
   updateOnlineStatus();
+  renderSyncBanner();
 });
 window.addEventListener('offline', function() {
   _isOnline = false;
   updateOnlineStatus();
+  renderSyncBanner();
 });
 
-function updateOnlineStatus() {
-  var el = document.getElementById('sync-status');
+// Pending writes are the one state the transient pill cannot carry: it is
+// overwritten by the next operation, and the queue can outlive a reload.
+function renderSyncBanner() {
+  var el = document.getElementById('sync-banner');
   if (!el) return;
+  var count = getPendingWriteKeys().length;
+  if (!count) {
+    el.hidden = true;
+    syncBannerHeightVar();
+    return;
+  }
+  var textEl = el.querySelector('.sync-banner-text');
+  var btn = el.querySelector('.sync-banner-btn');
+  var label = count + (count !== 1 ? ' changes' : ' change') + ' not saved to the cloud';
   if (!_isOnline) {
-    el.textContent = 'OFF Local only';
-    el.style.color = '#f08b62';
+    textEl.textContent = label + ' · offline';
+    btn.textContent = 'Retry now';
+    btn.onclick = retrySyncNow;
+  } else if (!window.fbOwnerUser) {
+    textEl.textContent = label + ' · sign in to sync';
+    btn.textContent = 'Sign in';
+    btn.onclick = function() { toggleOwnerAuth(); };
+  } else {
+    textEl.textContent = label;
+    btn.textContent = 'Retry now';
+    btn.onclick = retrySyncNow;
+  }
+  el.hidden = false;
+  syncBannerHeightVar();
+}
+
+// The banner wraps to more lines as the viewport narrows, so its height has to
+// be re-read on resize just like the player's -- a value measured once goes
+// stale the moment the window changes and leaves the shell mis-sized.
+function syncBannerHeightVar() {
+  var el = document.getElementById('sync-banner');
+  if (!el) return;
+  // Fractional height: offsetHeight rounds, which left the shell a pixel off.
+  var h = el.hidden ? 0 : el.getBoundingClientRect().height;
+  document.documentElement.style.setProperty('--sync-banner-h', h + 'px');
+}
+
+function updateOnlineStatus() {
+  if (_isOnline || !window.setSyncStatus) return;
+  window.setSyncStatus('offline', 'Local only');
+}
+
+// The queue is a write-ahead log, not just an offline buffer. Every write
+// enters it and only leaves once the server confirms that exact write, so a
+// failure online -- permission denied, the 1MiB document ceiling, a dropped
+// request -- is retried instead of vanishing with a status pill for company.
+var _writeSeq = 0;
+var _queuedSeq = {};   // key -> seq of the value currently sitting in the queue
+var _retryTimer = null;
+
+function persistOfflineQueue() {
+  try {
+    localStorage.setItem('sv_offline_queue', JSON.stringify(_offlineQueue));
+  } catch (e) {
+    console.error('offline queue persist failed:', e);
   }
 }
 
-function flushOfflineQueue() {
-  var keys = Object.keys(_offlineQueue);
-  if (!keys.length) return;
-  keys.forEach(function(k) {
-    if (window.fbSave) window.fbSave(k, _offlineQueue[k]);
-  });
-  _offlineQueue = {};
-  localStorage.setItem('sv_offline_queue', '{}');
+function queueWrite(key, val, seq) {
+  _offlineQueue[key] = val;
+  _queuedSeq[key] = seq;
+  persistOfflineQueue();
+  renderSyncBanner();
 }
+
+// Only clear the entry if it is still the write we just confirmed. A newer
+// save for the same key while this one was in flight must stay queued.
+function confirmWrite(key, seq) {
+  if (_queuedSeq[key] !== seq) return;
+  delete _offlineQueue[key];
+  delete _queuedSeq[key];
+  persistOfflineQueue();
+  renderSyncBanner();
+}
+
+function getPendingWriteKeys() {
+  return Object.keys(_offlineQueue);
+}
+
+// Sync listeners use this so a confirmed-stale server copy cannot overwrite
+// local work that has not been accepted yet.
+window.svHasPendingWrite = function(key) {
+  return Object.prototype.hasOwnProperty.call(_offlineQueue, key);
+};
+
+function pushWrite(key, val, seq) {
+  if (!_isOnline || !window.fbSave) { scheduleRetry(); return; }
+  window.fbSave(key, val).then(function(ok) {
+    if (ok) confirmWrite(key, seq);
+    else scheduleRetry();
+  }).catch(function(err) {
+    console.error('fbSave rejected:', err);
+    scheduleRetry();
+  });
+}
+
+function flushOfflineQueue() {
+  var keys = getPendingWriteKeys();
+  if (!keys.length) return;
+  if (!_isOnline || !window.fbSave) { scheduleRetry(); return; }
+  keys.forEach(function(k) {
+    var seq = _queuedSeq[k];
+    if (seq == null) { seq = ++_writeSeq; _queuedSeq[k] = seq; }
+    pushWrite(k, _offlineQueue[k], seq);
+  });
+}
+
+function scheduleRetry() {
+  if (_retryTimer || !getPendingWriteKeys().length) return;
+  _retryTimer = setTimeout(function() {
+    _retryTimer = null;
+    if (getPendingWriteKeys().length) flushOfflineQueue();
+  }, 30000);
+}
+
+function retrySyncNow() {
+  if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
+  flushOfflineQueue();
+}
+// Sign-in happens in the module script; it drains anything queued from a
+// signed-out session or a previous visit.
+window.svFlushQueue = function() { retrySyncNow(); };
 
 function save(key, val) {
   localStorage.setItem('sv_' + key, JSON.stringify(val));
@@ -3888,12 +4084,9 @@ function save(key, val) {
       return copy;
     });
   }
-  if (_isOnline && window.fbSave) {
-    window.fbSave(key, cleanVal);
-  } else {
-    _offlineQueue[key] = cleanVal;
-    localStorage.setItem('sv_offline_queue', JSON.stringify(_offlineQueue));
-  }
+  var seq = ++_writeSeq;
+  queueWrite(key, cleanVal, seq);
+  pushWrite(key, cleanVal, seq);
 }
 
 window.tracks = load('tracks', []);
@@ -5626,6 +5819,7 @@ function updateNowPlaying() {
     document.getElementById('np-bar-fill').style.width = '0%';
     clearMediaSession();
     updateExpandedPlayer();
+    syncPlayerHeightVar();
     if (_routeState.mode !== 'app') renderRouteAwareView(true);
     return;
   }
@@ -5648,6 +5842,7 @@ function updateNowPlaying() {
   updateMobileNavPulse();
   updateMediaSession();
   updateExpandedPlayer();
+  syncPlayerHeightVar();
   if (_routeState.mode !== 'app') renderRouteAwareView(true);
 }
 
@@ -5656,6 +5851,48 @@ function updateMobileNavPulse() {
   if (!nav) return;
   if (_currentTrack && _isPlaying) nav.classList.add('is-playing');
   else nav.classList.remove('is-playing');
+}
+
+// The player is fluid -- at 375px the title, metadata and queue line all wrap
+// and it renders ~243px tall, not the 118px the layout used to assume. The
+// mobile nav, page bottom padding and the toast all position off this
+// variable, so a stale constant buried the nav underneath the player.
+// Layout height plus the bar's own bottom inset, so the value covers all the
+// space it occupies. Deliberately uses offsetHeight rather than
+// getBoundingClientRect(): the bar slides in on a 220ms transform, and a rect
+// read during that slide reports the off-screen position, which nothing would
+// ever correct -- ResizeObserver does not fire for a transform.
+function syncPlayerHeightVar() {
+  var bar = document.getElementById('now-playing');
+  if (!bar) return;
+  var occupied = 0;
+  if (bar.classList.contains('active')) {
+    var inset = parseFloat(getComputedStyle(bar).bottom) || 0;
+    occupied = Math.ceil(bar.offsetHeight + inset);
+  }
+  document.documentElement.style.setProperty('--player-height', occupied + 'px');
+}
+
+var _chromeObserver = null;
+function syncChromeHeightVars() {
+  syncPlayerHeightVar();
+  syncBannerHeightVar();
+}
+
+// Both the player and the sync banner are fluid, and everything else in the
+// layout positions off their heights.
+function observeChromeHeights() {
+  var bar = document.getElementById('now-playing');
+  var banner = document.getElementById('sync-banner');
+  syncChromeHeightVars();
+  // The player's .active toggle changes transform, not size, so
+  // ResizeObserver never fires for it -- updateNowPlaying() syncs directly.
+  if (window.ResizeObserver && !_chromeObserver) {
+    _chromeObserver = new ResizeObserver(syncChromeHeightVars);
+    if (bar) _chromeObserver.observe(bar);
+    if (banner) _chromeObserver.observe(banner);
+  }
+  window.addEventListener('resize', syncChromeHeightVars);
 }
 
 // Throttle the expensive expanded-waveform DOM rebuild to ~5fps.
@@ -6337,8 +6574,24 @@ function browseTag(value) {
 // hides state — it only hides the *choices*.
 var _filterPanelOpen = false;
 
+function getSearchQuery() {
+  var input = document.getElementById('search-input');
+  return input ? String(input.value || '').trim() : '';
+}
+
+function clearSearch() {
+  var input = document.getElementById('search-input');
+  if (input) input.value = '';
+  if (_searchDebounce) { clearTimeout(_searchDebounce); _searchDebounce = null; }
+  renderTrackList();
+}
+
 function getActiveFilters() {
   var active = [];
+  var query = getSearchQuery();
+  // The search box narrows the shelf exactly like the chip filters do, so it
+  // has to be visible and removable in the same place they are.
+  if (query) active.push({ label:'Search: ' + query, clear:'clearSearch()' });
   if (_genreFilter !== 'All') active.push({ label:'Genre: ' + _genreFilter, clear:'setGenreFilter(\'All\')' });
   if (_moodFilter !== 'All') active.push({ label:'Mood: ' + _moodFilter, clear:'setMoodFilter(\'All\')' });
   if (_sourceFilter !== 'All') active.push({ label:'Source: ' + _sourceFilter, clear:'setSourceFilter(\'All\')' });
@@ -6849,6 +7102,8 @@ function renderBrowseSummary(filtered) {
   var el = document.getElementById('browse-summary');
   if (!el) return;
   var filters = [];
+  var query = getSearchQuery();
+  if (query) filters.push('search: "' + query + '"');
   if (_genreFilter !== 'All') filters.push('genre: ' + _genreFilter);
   if (_moodFilter !== 'All') filters.push('mood: ' + _moodFilter);
   if (_sourceFilter !== 'All') filters.push('source: ' + _sourceFilter);
@@ -7499,9 +7754,19 @@ function renderPlaylistHero() {
   }
   var featured = getFeaturedPlaylist();
   var tracksInFeatured = getPlaylistTracks(featured);
-  el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="playlist-hero-grid"><div class="playlist-hero-main"><div class="section-kicker">Featured mixtape</div><div class="playlist-hero-card">' + buildPlaylistCover(featured, 'sm') + '<div><div class="section-title" style="font-size:42px">' + esc(featured.name) + '</div><div class="section-sub" style="margin-top:.65rem">' + esc(featured.desc || 'A curated sequence built from your vault.') + '</div><div class="pill-row" style="margin-top:.8rem"><span class="meta-pill highlight">' + tracksInFeatured.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(tracksInFeatured)) + '</span><span class="meta-pill">' + esc((tracksInFeatured[0] && tracksInFeatured[0].source) || 'Mixed') + '</span></div><div class="section-action-row" style="margin-top:1rem"><button class="sec-action primary" onclick="playPlaylist(' + jsq(featured.id) + ')">Play playlist</button><button class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open details</button><button class="sec-action" onclick="sharePlaylist(' + jsq(featured.id) + ')">Share</button></div></div></div></div><div class="side-card"><div class="side-kicker">Why playlists matter</div><div class="side-title">Mixtapes over folders.</div><div class="side-copy">The playlist page now treats sets like editorial releases: visual covers, clearer sequencing, and front-to-back play controls.</div><div class="playlist-track-list" style="margin-top:.9rem">' + tracksInFeatured.slice(0, 3).map(function(track, index) {
-    return '<div class="playlist-track-pill" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ' from ' + (featured.name || 'playlist')) + '" style="cursor:pointer" onclick="playPlaylistTrack(' + jsq(featured.id) + ', ' + jsq(track.id) + ')"><div class="playlist-track-pill-main"><span class="playlist-track-order">' + (index + 1) + '</span><span>' + esc(track.title) + '</span></div><span>' + esc(track.mood || 'Mood') + '</span></div>';
-  }).join('') + '</div></div></div></div></div>';
+  // The side card used to explain the playlist page to its owner. It now
+  // carries the featured mixtape's running order instead.
+  var previewTracks = tracksInFeatured.slice(0, 6);
+  var remaining = tracksInFeatured.length - previewTracks.length;
+  var sideBody = previewTracks.length
+    ? '<div class="playlist-track-list" style="margin-top:.9rem">' + previewTracks.map(function(track, index) {
+        return '<div class="playlist-track-pill" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ' from ' + (featured.name || 'playlist')) + '" style="cursor:pointer" onclick="playPlaylistTrack(' + jsq(featured.id) + ', ' + jsq(track.id) + ')"><div class="playlist-track-pill-main"><span class="playlist-track-order">' + (index + 1) + '</span><span>' + esc(track.title) + '</span></div><span>' + esc(track.mood || 'Mood') + '</span></div>';
+      }).join('') + '</div>'
+      + (remaining > 0
+          ? '<div class="section-action-row" style="margin-top:.8rem"><button class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open all ' + tracksInFeatured.length + ' tracks</button></div>'
+          : '')
+    : '<div class="side-copy">This mixtape has no tracks yet. Open it to add some from the vault.</div>';
+  el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="playlist-hero-grid"><div class="playlist-hero-main"><div class="section-kicker">Featured mixtape</div><div class="playlist-hero-card">' + buildPlaylistCover(featured, 'sm') + '<div><div class="section-title" style="font-size:42px">' + esc(featured.name) + '</div><div class="section-sub" style="margin-top:.65rem">' + esc(featured.desc || 'A curated sequence built from your vault.') + '</div><div class="pill-row" style="margin-top:.8rem"><span class="meta-pill highlight">' + tracksInFeatured.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(tracksInFeatured)) + '</span><span class="meta-pill">' + esc((tracksInFeatured[0] && tracksInFeatured[0].source) || 'Mixed') + '</span></div><div class="section-action-row" style="margin-top:1rem"><button class="sec-action primary" onclick="playPlaylist(' + jsq(featured.id) + ')">Play playlist</button><button class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open details</button><button class="sec-action" onclick="sharePlaylist(' + jsq(featured.id) + ')">Share</button></div></div></div></div><div class="side-card"><div class="side-kicker">Running order</div>' + sideBody + '</div></div></div></div>';
 }
 
 // Whitelist of allowed playlist accent colors. Anything not in this set
@@ -8376,6 +8641,7 @@ window.refreshAll = function() {
   updateNowPlaying();
   updateAuthButton();
   updateAIConfigStatus();
+  renderSyncBanner();
   renderRouteAwareView(true);
 };
 
@@ -8391,6 +8657,11 @@ renderPendingPreview();
 updateNowPlaying();
 updateAIConfigStatus();
 renderRouteAwareView(true);
+observeChromeHeights();
+// A queue restored from localStorage means the last session ended with
+// writes the server never took. Surface it, and retry once sync is up.
+renderSyncBanner();
+scheduleRetry();
 
 // Backfill real waveforms for any tracks still missing decoded peaks,
 // after initial render and first sync have had a moment to settle.
