@@ -2989,6 +2989,8 @@ body.light .queue-item:hover{background:rgba(0,0,0,.04)}
   color:var(--accent-dynamic);
   font-weight:500;
 }
+/* "Next" is context, not live state -- quieter than the playing row. */
+.queue-state.is-next{color:var(--muted);font-weight:400}
 .queue-reorder{display:flex;flex-direction:column;gap:3px}
 .queue-reorder button{
   width:24px;height:18px;
@@ -6102,7 +6104,7 @@ function updateNowPlaying() {
   art.innerHTML = buildCoverArt(_currentTrack, 'sm', false);
   document.getElementById('np-name').textContent = _currentTrack.title;
   document.getElementById('np-genre').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno');
-  var next = getNextTrack();
+  var next = _repeatMode === 'one' ? null : getNextTrack();
   var orderedQueue = getOrderedQueueTracks();
   var queueCount = orderedQueue.length;
   var queueLine = _playQueueLabel + ' queue';
@@ -6650,14 +6652,25 @@ function updateExpandedPlayer() {
   updateLyricHighlight(true);
 
   var queueTracks = getOrderedQueueTracks();
+  // Every row in a queue is queued, so labelling them all said nothing 59
+  // times over. Only the two rows that carry information are labelled now.
+  // Repeat-one is excluded deliberately: the 'ended' handler replays the
+  // current track and never consults getNextTrack(), so the track it returns
+  // is not what plays next -- nothing is, and the current row already reads
+  // "Playing".
+  var nextInQueue = _repeatMode === 'one' ? null : getNextTrack();
+  var nextQueueId = (nextInQueue && (!_currentTrack || nextInQueue.id !== _currentTrack.id))
+    ? nextInQueue.id : '';
   document.getElementById('xp-queue-copy').textContent = queueTracks.length ? _playQueueLabel + (_shuffleMode ? ' / Shuffle' : '') + ' / ' + queueTracks.length + ' track' + (queueTracks.length !== 1 ? 's' : '') : 'The active queue will show up here.';
   document.getElementById('xp-queue-list').innerHTML = queueTracks.length ? queueTracks.map(function(track, index) {
     var isActive = _currentTrack && _currentTrack.id === track.id;
+    var isNext = !isActive && !!nextQueueId && track.id === nextQueueId;
+    var state = isActive ? (_isPlaying ? 'Playing' : 'Paused') : (isNext ? 'Next' : '');
     var reorder = '<div class="queue-reorder">'
       + '<button title="Move up" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', -1)"' + (index === 0 ? ' disabled' : '') + '>&#9650;</button>'
       + '<button title="Move down" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', 1)"' + (index === queueTracks.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
       + '</div>';
-    return '<div class="queue-item' + (isActive ? ' active' : '') + '" role="button" tabindex="0"' + (isActive ? ' aria-current="true"' : '') + ' aria-label="' + attr('Play ' + (track.title || 'track') + ', queue position ' + (index + 1)) + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(_playQueueIds) + ', ' + jsq(_playQueueLabel) + ')"><div class="queue-num" aria-hidden="true">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state">' + (isActive ? (_isPlaying ? 'Playing' : 'Paused') : 'Queued') + '</div>' + reorder + '</div>';
+    return '<div class="queue-item' + (isActive ? ' active' : '') + '" role="button" tabindex="0"' + (isActive ? ' aria-current="true"' : '') + ' aria-label="' + attr('Play ' + (track.title || 'track') + ', queue position ' + (index + 1) + (state ? ', ' + state.toLowerCase() : '')) + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(_playQueueIds) + ', ' + jsq(_playQueueLabel) + ')"><div class="queue-num" aria-hidden="true">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state' + (isNext ? ' is-next' : '') + '">' + esc(state) + '</div>' + reorder + '</div>';
   }).join('') : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">No queue yet</strong>Play something to build the queue.</div>';
 
   document.getElementById('xp-playlist-list').innerHTML = playlists.length ? playlists.map(function(playlist) {
