@@ -236,16 +236,42 @@ async function fbLoadAll() {
       if (k === 'settings') window.appSettings = val || {};
       localStorage.setItem('sv_' + k, JSON.stringify(val));
     }
-    await migrateTracksToCollection();
-    if (window.svApplyRemoteTracks) window.svApplyRemoteTracks(await fbReadTracks());
-    subscribeTracks();
-    setSyncStatus('ok', 'Synced');
+    var tracksResult = await loadTracksFromServer();
+    if (window.svApplyRemoteTracks) window.svApplyRemoteTracks(tracksResult.list);
+    if (tracksResult.source === 'legacy') {
+      // Playlists and settings are syncing; only the per-track collection is
+      // unreachable. Say which, rather than collapsing it into "Local only".
+      setSyncStatus('error', 'Track sync blocked');
+    } else {
+      setSyncStatus('ok', 'Synced');
+    }
     settleBoot();
     if (window.refreshAll) window.refreshAll();
   } catch (e) {
-    setSyncStatus('error', 'Local only');
-    console.error('fbLoadAll error:', e);
+    setSyncStatus('error', e && e.code === 'permission-denied' ? 'Permission denied' : 'Local only');
+    console.error('fbLoadAll error:', e && e.code, e);
     settleBoot();
+  }
+}
+
+// Prefer per-track documents, but fall back to the legacy single document if
+// the collection cannot be read. The migration deliberately left that document
+// in place; without this, a rules problem on the new collection means the
+// vault reads as empty on any device whose local cache is cold.
+async function loadTracksFromServer() {
+  try {
+    await migrateTracksToCollection();
+    var list = await fbReadTracks();
+    subscribeTracks();
+    return { list: list, source: 'collection' };
+  } catch (e) {
+    console.error('Per-track collection unavailable (' + (e && e.code) + '); '
+      + 'falling back to the legacy tracks document. Check that the '
+      + 'sonicvault-bob-tracks rules are deployed.', e);
+    var snap = await getDoc(doc(db, USER_PATH, 'tracks'));
+    if (!snap.exists()) throw e;
+    var val = JSON.parse(snap.data().value);
+    return { list: Array.isArray(val) ? val : [], source: 'legacy' };
   }
 }
 
