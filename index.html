@@ -3383,8 +3383,13 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 }
 
 @media (max-width:900px){
-  .nav-row{padding:.9rem 1rem}
-  .nav-left{flex-direction:column;align-items:flex-start}
+  /* Brand and controls both refuse to shrink below their content, so on one
+     row they overlapped by 65px at 375px -- the Keys button sat on top of the
+     wordmark. Letting the row wrap puts the controls on their own line when
+     they no longer fit beside the brand, and leaves them inline when they do. */
+  .nav-row{padding:.9rem 1rem;flex-wrap:wrap;gap:.65rem 1rem}
+  .nav-left{flex-direction:column;align-items:flex-start;flex:1 1 auto;min-width:0}
+  .nav-right{flex:1 1 auto;justify-content:flex-end}
   .nav-groups{display:none}
   .mobile-nav{display:flex}
   .page{padding:1.1rem 1rem calc(var(--player-height) + 5.4rem)}
