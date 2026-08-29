@@ -979,7 +979,10 @@ body.light .side-item{background:rgba(0,0,0,.03)}
 .library-home-stack{display:grid;gap:1.2rem}
 .rail-grid{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  /* auto-fit rather than a fixed count: the Recently played rail only exists
+     once something has been played, so this row is three or four cards wide
+     depending on the vault, and wraps instead of cramming when narrow. */
+  grid-template-columns:repeat(auto-fit,minmax(232px,1fr));
   gap:1rem;
 }
 .rail-card{
@@ -1006,12 +1009,25 @@ body.light .side-item{background:rgba(0,0,0,.03)}
 }
 .mini-track-card:hover{transform:translateY(-2px);border-color:var(--rim2)}
 body.light .mini-track-card{background:rgba(0,0,0,.03)}
-.mini-track-title{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Four rails leave each card ~260px wide, where a single ellipsised line cut
+   most titles to a few characters. Two clamped lines keep the card height
+   bounded and show the whole of nearly every title. */
+.mini-track-title{
+  font-size:13px;
+  font-weight:700;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  /* break-word, not anywhere: anywhere also shrinks min-content sizing and
+     pushed two-word titles onto a third line. */
+  overflow-wrap:break-word;
+}
 .mini-track-sub{font-size:11px;color:var(--muted2);margin-top:.2rem}
 .mini-track-meta{font-family:var(--mono);font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em}
 .mini-track-play{
-  width:34px;
-  height:34px;
+  width:28px;
+  height:28px;
   border-radius:50%;
   display:flex;
   align-items:center;
@@ -6999,6 +7015,22 @@ function getContinueTrack() {
   return savedId ? getTrackById(savedId) : null;
 }
 
+// rememberPlayback() has always kept the last 24 played ids; nothing read
+// them until now. Ids of deleted tracks simply fall out, and the caller
+// excludes whatever the resume strip is already showing so the rail does not
+// repeat the row directly above it.
+function getRecentlyPlayedTracks(limit, excludeId) {
+  var history = (appSettings && Array.isArray(appSettings.playHistory)) ? appSettings.playHistory : [];
+  var max = limit || 4;
+  var out = [];
+  for (var i = 0; i < history.length && out.length < max; i++) {
+    if (excludeId && history[i] === excludeId) continue;
+    var track = getTrackById(history[i]);
+    if (track) out.push(track);
+  }
+  return out;
+}
+
 // Hours/minutes formatter for long spans (listening time, catalog runtime),
 // where fmtTime's m:ss would read awkwardly.
 function fmtLongDuration(totalSeconds) {
@@ -7431,7 +7463,13 @@ function buildMiniTrackCard(track, queueLabel, queueIds) {
     +     '<div class="mini-track-title">' + esc(track.title) + '</div>'
     +     '<div class="mini-track-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + '</div>'
     +   '</div>'
-    +   '<div class="mini-track-play">' + (_currentTrack && _currentTrack.id === track.id && _isPlaying ? 'II' : 'Play') + '</div>'
+    +   (_currentTrack && _currentTrack.id === track.id
+            // The whole card is the play control -- role="button" with its own
+            // onclick -- so the pill was a non-interactive label repeating
+            // that, and at four rails it cost the title more width than the
+            // title had. It now appears only to mark the current track.
+            ? '<div class="mini-track-play" aria-hidden="true">' + (_isPlaying ? 'II' : '&#9654;') + '</div>'
+            : '')
     + '</div>';
 }
 
@@ -7582,6 +7620,7 @@ function renderLibraryHome() {
   var recentTracks = getNewestTracks(4);
   var hiddenGems = getLeastPlayedTracks(4);
   var mostPlayed = getMostPlayedTracks(4);
+  var recentlyPlayed = getRecentlyPlayedTracks(4, getContinueTrack() ? continueTrack.id : '');
 
   // The old home opened with a marketing hero, four stat tiles, a spotlight
   // card, two side cards, a four-card snapshot grid, and nine rails before a
@@ -7606,6 +7645,9 @@ function renderLibraryHome() {
     +   '</div>'
     +   '<div class="rail-grid">'
     +     '<div class="rail-card"><div class="rail-title">Recently added</div><div class="mini-track-list">' + buildMiniRail(recentTracks, 'Recently added') + '</div></div>'
+    +     (recentlyPlayed.length
+            ? '<div class="rail-card"><div class="rail-title">Recently played</div><div class="mini-track-list">' + buildMiniRail(recentlyPlayed, 'Recently played') + '</div></div>'
+            : '')
     +     '<div class="rail-card"><div class="rail-title">Most played</div><div class="mini-track-list">' + buildMiniRail(mostPlayed, 'Most played') + '</div></div>'
     +     '<div class="rail-card"><div class="rail-title">Rarely played</div><div class="mini-track-list">' + buildMiniRail(hiddenGems, 'Rarely played') + '</div></div>'
     +   '</div>'
