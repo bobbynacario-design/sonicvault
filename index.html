@@ -715,11 +715,23 @@ body.light .section-card{background:linear-gradient(180deg, rgba(255,255,255,.78
   color:var(--accent-dynamic);
   margin-bottom:.45rem;
 }
+/* One heading scale. .section-title is 24px here and was then overridden
+   inline at 26, 28, 30 and 42px, so the same element rendered four different
+   sizes depending which tab you were on -- and on Insights the card headings
+   came out larger than the page title above them. Sections use the default;
+   the one page-level title in a view takes .is-hero. */
 .section-title{
   font-family:var(--display);font-weight:700;
   font-size:24px;
   letter-spacing:.02em;
   line-height:1.05;
+}
+.section-title.is-hero{
+  font-size:34px;
+  letter-spacing:-.01em;
+}
+@media (max-width:640px){
+  .section-title.is-hero{font-size:27px}
 }
 .section-sub{
   max-width:640px;
@@ -2685,6 +2697,11 @@ body.light .player-modal{
   padding:1.2rem 1.4rem 2rem;
   min-height:100vh;
   display:grid;
+  /* Without an explicit zero minimum the implicit column is sized `auto` and
+     grows to its widest child's min-content, which pushed the whole expanded
+     player 73px past a 375px viewport -- the Close button included -- with no
+     way to scroll to it. */
+  grid-template-columns:minmax(0, 1fr);
   grid-template-rows:auto 1fr;
   gap:1rem;
 }
@@ -2728,7 +2745,10 @@ body.light .player-modal{
   box-shadow:var(--shadow);
 }
 .player-stage-card{position:sticky;top:1rem}
-.player-cover-wrap{display:grid;gap:1rem}
+/* Auto-sized implicit column again: the 72-bar waveform's min-content (72
+   bars at 3px plus 2px gaps = 358px) forced this column wider than the
+   viewport, and .cover-lg{width:100%} then stretched the cover to match. */
+.player-cover-wrap{display:grid;grid-template-columns:minmax(0, 1fr);gap:1rem}
 .player-cover-wrap .cover-lg{max-width:none}
 .player-title{
   font-family:var(--display);font-weight:800;
@@ -3306,7 +3326,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .public-grid,.public-context-grid{grid-template-columns:1fr}
   .upload-batch-layout{grid-template-columns:1fr}
   .spotlight-card{grid-template-columns:96px minmax(0,1fr)}
-  .player-layout{grid-template-columns:1fr}
+  .player-layout{grid-template-columns:minmax(0, 1fr)}
   .player-stage-card{position:relative;top:auto}
   .now-playing-bar{grid-template-columns:74px minmax(0,1fr);gap:.75rem}
   .np-progress-area{grid-column:1 / -1}
@@ -3442,7 +3462,10 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
      ("Shuffle: On", "Repeat: Queue"), and Open is how you get there. */
   .np-controls .mode-btn{display:none}
   .player-topbar{align-items:flex-start;flex-direction:column}
-  .player-wave{height:92px;gap:2px}
+  /* 72 bars at 3px + 2px gaps needs 358px, which no phone has. Thinner bars
+     and tighter gaps bring the floor to ~215px. */
+  .player-wave{height:92px;gap:1px}
+  .player-wave .pbar{min-width:2px}
   .player-copy-grid{grid-template-columns:1fr}
   .player-controls,.playlist-chip{grid-template-columns:1fr}
   .track-actions,.section-action-row,.modal-actions{width:100%}
@@ -3625,7 +3648,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
           <div class="upload-grid">
             <div id="upload-progress" class="upload-info-card" style="display:none">
               <div class="section-kicker">Uploading</div>
-              <div class="section-title" style="font-size:26px;margin-bottom:.35rem">Uploading</div>
+              <div class="section-title" style="margin-bottom:.35rem">Uploading</div>
               <div id="upload-progress-copy" class="upload-progress-copy">One file at a time.</div>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:.55rem">
                 <span>Progress</span>
@@ -3639,7 +3662,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 
             <div class="upload-form-card" id="upload-form" style="display:none">
               <div class="section-kicker">Batch studio</div>
-              <div class="section-title" style="font-size:26px;margin-bottom:.9rem">Pending batch</div>
+              <div class="section-title" style="margin-bottom:.9rem">Pending batch</div>
 
               <div class="upload-batch-toolbar">
                 <div class="form-grid">
@@ -3982,20 +4005,20 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
         <div class="player-side">
           <div class="player-side-card">
             <div class="section-kicker">Queue</div>
-            <div class="section-title" style="font-size:30px">What plays next</div>
+            <div class="section-title">What plays next</div>
             <div class="section-sub" style="margin-bottom:1rem" id="xp-queue-copy">The active queue will show up here.</div>
             <div class="queue-list" id="xp-queue-list"></div>
           </div>
 
           <div class="player-side-card">
             <div class="section-kicker">Add to playlist</div>
-            <div class="section-title" style="font-size:30px">Slot this track into a mixtape</div>
+            <div class="section-title">Slot this track into a mixtape</div>
             <div class="playlist-chip-list" id="xp-playlist-list"></div>
           </div>
 
           <div class="player-side-card">
             <div class="section-kicker">Similar vibe</div>
-            <div class="section-title" style="font-size:30px">Stay in the same lane</div>
+            <div class="section-title">Stay in the same lane</div>
             <div class="related-row" id="xp-related"></div>
           </div>
         </div>
@@ -7218,19 +7241,19 @@ function renderInsights() {
 
   el.innerHTML = ''
     + '<div class="section-card"><div class="section-inner">'
-    +   '<div class="section-head"><div><div class="section-kicker">Insights</div><div class="section-title">Your private listening room, by the numbers</div><div class="section-sub">Everything here is derived from the tracks and play counts already in your vault — no external tracking.</div></div></div>'
+    +   '<div class="section-head"><div><div class="section-kicker">Insights</div><div class="section-title is-hero">Your private listening room, by the numbers</div><div class="section-sub">Everything here is derived from the tracks and play counts already in your vault — no external tracking.</div></div></div>'
     +   '<div class="stat-grid">' + statsHtml + '</div>'
     + '</div></div>'
     + '<div class="insight-cols">'
-    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">Genres</div><div class="section-title" style="font-size:30px">Genre distribution</div><div class="dist-list">' + buildDistributionBars(genres, getGenreColor, tracks.length, function(k) { return 'setGenreFilter(' + jsq(k) + ");switchView('library')"; }) + '</div></div></div>'
-    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">Moods</div><div class="section-title" style="font-size:30px">Mood distribution</div><div class="dist-list">' + buildDistributionBars(moods, getMoodColor, tracks.length, function(k) { return 'browseMood(' + jsq(k) + ')'; }) + '</div></div></div>'
+    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">Genres</div><div class="section-title">Genre distribution</div><div class="dist-list">' + buildDistributionBars(genres, getGenreColor, tracks.length, function(k) { return 'setGenreFilter(' + jsq(k) + ");switchView('library')"; }) + '</div></div></div>'
+    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">Moods</div><div class="section-title">Mood distribution</div><div class="dist-list">' + buildDistributionBars(moods, getMoodColor, tracks.length, function(k) { return 'browseMood(' + jsq(k) + ')'; }) + '</div></div></div>'
     + '</div>'
     + '<div class="insight-cols">'
-    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">On repeat</div><div class="section-title" style="font-size:30px">Most played</div><div class="rank-list">' + mostHtml + '</div></div></div>'
-    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">Hidden gems</div><div class="section-title" style="font-size:30px">Give these a spin</div><div class="section-sub" style="margin-bottom:1rem">Your least-played records — the under-loved corners of the vault.</div><div class="rank-list">' + gemsHtml + '</div></div></div>'
+    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">On repeat</div><div class="section-title">Most played</div><div class="rank-list">' + mostHtml + '</div></div></div>'
+    +   '<div class="section-card"><div class="section-inner"><div class="section-kicker">Hidden gems</div><div class="section-title">Give these a spin</div><div class="section-sub" style="margin-bottom:1rem">Your least-played records — the under-loved corners of the vault.</div><div class="rank-list">' + gemsHtml + '</div></div></div>'
     + '</div>'
     + '<div class="section-card"><div class="section-inner">'
-    +   '<div class="section-kicker">Library health</div><div class="section-title" style="font-size:30px">Catalog coverage</div>'
+    +   '<div class="section-kicker">Library health</div><div class="section-title">Catalog coverage</div>'
     +   '<div class="health-grid">'
     +     '<div class="health-tile"><div class="health-val">' + aiPct + '%</div><div class="health-label">AI-tagged</div><div class="health-sub">' + withAI + ' of ' + tracks.length + ' have AI metadata</div></div>'
     +     '<div class="health-tile"><div class="health-val">' + lyricPct + '%</div><div class="health-label">Lyrics on file</div><div class="health-sub">' + withLyrics + ' of ' + tracks.length + ' have a lyric sheet</div></div>'
@@ -8207,7 +8230,7 @@ function renderPlaylistHero() {
           ? '<div class="section-action-row" style="margin-top:.8rem"><button class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open all ' + tracksInFeatured.length + ' tracks</button></div>'
           : '')
     : '<div class="side-copy">This mixtape has no tracks yet. Open it to add some from the vault.</div>';
-  el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="playlist-hero-grid"><div class="playlist-hero-main"><div class="section-kicker">Featured mixtape</div><div class="playlist-hero-card">' + buildPlaylistCover(featured, 'sm') + '<div><div class="section-title" style="font-size:42px">' + esc(featured.name) + '</div><div class="section-sub" style="margin-top:.65rem">' + esc(featured.desc || 'A curated sequence built from your vault.') + '</div><div class="pill-row" style="margin-top:.8rem"><span class="meta-pill highlight">' + tracksInFeatured.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(tracksInFeatured)) + '</span><span class="meta-pill">' + esc((tracksInFeatured[0] && tracksInFeatured[0].source) || 'Mixed') + '</span></div><div class="section-action-row" style="margin-top:1rem"><button class="sec-action primary" onclick="playPlaylist(' + jsq(featured.id) + ')">Play playlist</button><button class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open details</button><button class="sec-action" onclick="sharePlaylist(' + jsq(featured.id) + ')">Share</button></div></div></div></div><div class="side-card"><div class="side-kicker">Running order</div>' + sideBody + '</div></div></div></div>';
+  el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="playlist-hero-grid"><div class="playlist-hero-main"><div class="section-kicker">Featured mixtape</div><div class="playlist-hero-card">' + buildPlaylistCover(featured, 'sm') + '<div><div class="section-title is-hero">' + esc(featured.name) + '</div><div class="section-sub" style="margin-top:.65rem">' + esc(featured.desc || 'A curated sequence built from your vault.') + '</div><div class="pill-row" style="margin-top:.8rem"><span class="meta-pill highlight">' + tracksInFeatured.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(tracksInFeatured)) + '</span><span class="meta-pill">' + esc((tracksInFeatured[0] && tracksInFeatured[0].source) || 'Mixed') + '</span></div><div class="section-action-row" style="margin-top:1rem"><button class="sec-action primary" onclick="playPlaylist(' + jsq(featured.id) + ')">Play playlist</button><button class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open details</button><button class="sec-action" onclick="sharePlaylist(' + jsq(featured.id) + ')">Share</button></div></div></div></div><div class="side-card"><div class="side-kicker">Running order</div>' + sideBody + '</div></div></div></div>';
 }
 
 // Whitelist of allowed playlist accent colors. Anything not in this set
@@ -8702,7 +8725,7 @@ function renderUploadEditor() {
   el.innerHTML = ''
     + '<div class="upload-editor-card">'
     +   lyricsBanner
-    +   '<div class="upload-editor-head"><div class="upload-editor-copy"><div class="section-kicker">Focused release</div><div class="section-title" style="font-size:28px">' + esc(item.title || 'Untitled release') + '</div><div class="upload-editor-meta">' + esc(item.file.name) + ' / ' + formatFileSize(item.file.size) + ' / ' + (item.duration ? fmtTime(item.duration) : 'Length pending') + '</div></div><div class="upload-editor-nav"><button class="sec-action" onclick="stepUploadFocus(-1)"' + (_pendingUploads[0] && _pendingUploads[0].id === item.id ? ' disabled' : '') + '>Prev</button><button class="sec-action" onclick="stepUploadFocus(1)"' + (_pendingUploads[_pendingUploads.length - 1] && _pendingUploads[_pendingUploads.length - 1].id === item.id ? ' disabled' : '') + '>Next</button><div class="upload-queue-status">' + esc(item.status === 'done' ? 'Saved to vault' : item.status === 'error' ? 'Needs retry' : item.status === 'uploading' ? 'Uploading now' : 'Ready to save') + '</div></div></div>'
+    +   '<div class="upload-editor-head"><div class="upload-editor-copy"><div class="section-kicker">Focused release</div><div class="section-title">' + esc(item.title || 'Untitled release') + '</div><div class="upload-editor-meta">' + esc(item.file.name) + ' / ' + formatFileSize(item.file.size) + ' / ' + (item.duration ? fmtTime(item.duration) : 'Length pending') + '</div></div><div class="upload-editor-nav"><button class="sec-action" onclick="stepUploadFocus(-1)"' + (_pendingUploads[0] && _pendingUploads[0].id === item.id ? ' disabled' : '') + '>Prev</button><button class="sec-action" onclick="stepUploadFocus(1)"' + (_pendingUploads[_pendingUploads.length - 1] && _pendingUploads[_pendingUploads.length - 1].id === item.id ? ' disabled' : '') + '>Next</button><div class="upload-queue-status">' + esc(item.status === 'done' ? 'Saved to vault' : item.status === 'error' ? 'Needs retry' : item.status === 'uploading' ? 'Uploading now' : 'Ready to save') + '</div></div></div>'
     +   buildCoverArt(item, 'md', true)
     +   '<div class="form-grid">'
     +     '<div class="form-group"><label class="form-label">Title</label><input class="form-input" type="text" value="' + attr(item.title) + '" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('title') + ', this.value)"></div>'
