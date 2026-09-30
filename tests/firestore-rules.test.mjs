@@ -43,6 +43,14 @@ const read = (who, path) => call('GET', path, who);
 const create = (who, path, body) => call('PATCH', path, who, body, 'currentDocument.exists=false');
 const update = (who, path, body) => call('PATCH', path, who, body, 'currentDocument.exists=true');
 const remove = (who, path) => call('DELETE', path, who);
+// The app's list queries: where('uid','==',uid) on a collection.
+async function queryOwn(who, collectionId, uid) {
+  const res = await fetch(BASE + ':runQuery', {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + USERS[who] },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId }], where: { fieldFilter: { field: { fieldPath: 'uid' }, op: 'EQUAL', value: { stringValue: uid } } } } }),
+  });
+  return res.status;
+}
 
 let failures = 0, passes = 0;
 async function expect(label, promise, allowed) {
@@ -57,6 +65,7 @@ async function main() {
   await create('admin', 'daybook-invites/bobbynacario@gmail.com', { email: 'bobbynacario@gmail.com', role: 'owner', name: 'Bob', invitedAt: '2026-09-30T08:28:49Z', invitedBy: 'bobbynacario@gmail.com' });
   await create('admin', 'daybook-invites/alice@example.com', { email: 'alice@example.com', role: 'member', name: 'Alice', invitedAt: '2026-09-30T09:00:00Z', invitedBy: 'bobbynacario@gmail.com' });
   await create('admin', 'briefings-bob/radar', { summary: 'shared feed, no uid' });
+  await create('admin', 'briefings-bob/llm-usage', { summary: 'the owner\'s AI spend, no uid' });
   await create('admin', 'briefings-bob/Wednesday--September-30--2026', { uid: 'bob-uid', data: '{}' });
   await create('admin', 'briefings-bob/usage-alice-uid', { uid: 'alice-uid', kind: 'usage' });
   await create('admin', 'reports-bob/r1', { uid: 'bob-uid', topic: 'x' });
@@ -78,6 +87,14 @@ async function main() {
   await expect('Alice cannot read Bob\'s briefing', read('alice', 'briefings-bob/Wednesday--September-30--2026'), false);
   await expect('Alice cannot read Bob\'s journal', read('alice', 'journal-bob/j1'), false);
   await expect('Alice cannot create a document as Bob', create('alice', 'briefings-bob/goals-bob-uid', { uid: 'bob-uid', kind: 'goals' }), false);
+
+  // The AI cost ledger is Bob's spend: of the shared documents, only he reads it.
+  await expect('Bob reads the AI cost ledger', read('bob', 'briefings-bob/llm-usage'), true);
+  await expect('Alice cannot read the AI cost ledger', read('alice', 'briefings-bob/llm-usage'), false);
+  // ...and the app's own-uid list queries still work for both.
+  await expect('Alice lists her own briefings', queryOwn('alice', 'briefings-bob', 'alice-uid'), true);
+  await expect('Bob lists his own briefings', queryOwn('bob', 'briefings-bob', 'bob-uid'), true);
+  await expect('Alice cannot list Bob\'s briefings', queryOwn('alice', 'briefings-bob', 'bob-uid'), false);
 
   // The shared feeds are written only by the jobs: nobody takes one over or deletes one.
   await expect('Alice cannot take over a shared feed', update('alice', 'briefings-bob/radar', { uid: 'alice-uid', summary: 'mine now' }), false);

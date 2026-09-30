@@ -75,8 +75,11 @@ service cloud.firestore {
     // over by writing their uid into it.
     // ─────────────────────────────────────────────────────────────
     match /briefings-bob/{docId} {
+      // Of the shared documents, the AI cost ledger (llm-usage) is Bob's own
+      // spend, so members do not read it (2026-09-30).
       allow read: if isDaybookMember()
-        && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
+        && (resource.data.uid == request.auth.uid
+          || (!('uid' in resource.data) && (docId != 'llm-usage' || isBobGoogleAccount())));
 
       allow create: if isDaybookMember()
         && request.resource.data.uid == request.auth.uid;
