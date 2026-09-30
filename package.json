@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "Folder watcher that auto-imports Suno downloads into SonicVault via Firebase",
   "scripts": {
-    "watch": "node watcher.js"
+    "watch": "node watcher.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-shared-rules \"node tests/firestore-rules.test.mjs\""
   },
   "dependencies": {
     "firebase-admin": "^12.0.0",

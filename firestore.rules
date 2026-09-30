@@ -25,12 +25,27 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Verified email required (2026-09-30): once Email/Password sign-in is on
+    // for this project (Daybook invites), an unverified account must never
+    // pass as Bob's. Bob's Google account is always verified.
     function isBobGoogleAccount() {
       return request.auth != null
         && request.auth.token.email != null
+        && request.auth.token.email_verified == true
         && request.auth.token.email.lower() in [
           'bobbynacario@gmail.com'
         ];
+    }
+
+    // Daybook (Bob's Daily Briefing) is invite-only (2026-09-30). A member is
+    // a verified account whose lowercase email has a daybook-invites document,
+    // or Bob, who never depends on that document.
+    function isDaybookMember() {
+      return isBobGoogleAccount()
+        || (request.auth != null
+          && request.auth.token.email != null
+          && request.auth.token.email_verified == true
+          && exists(/databases/$(database)/documents/daybook-invites/$(request.auth.token.email.lower())));
     }
 
     function isSonicVaultOwner() {
@@ -52,55 +67,84 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Bob's Daily Briefing — authenticated, uid-scoped
+    // Bob's Daily Briefing — invite-only (2026-09-30), uid-scoped
+    // Members read their own documents and the shared feed documents
+    // (no uid: radar, markets, sports, numbers…). The feeds are written
+    // only by the jobs and Functions (Admin SDK), so no member may
+    // update or delete a document without their own uid, or take one
+    // over by writing their uid into it.
     // ─────────────────────────────────────────────────────────────
     match /briefings-bob/{docId} {
-      allow read: if request.auth != null
+      allow read: if isDaybookMember()
         && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
 
-      allow create: if request.auth != null
+      allow create: if isDaybookMember()
         && request.resource.data.uid == request.auth.uid;
 
-      allow update: if request.auth != null
-        && (resource.data.uid == request.auth.uid || !('uid' in resource.data))
+      allow update: if isDaybookMember()
+        && resource.data.uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid;
 
-      allow delete: if request.auth != null
-        && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
+      allow delete: if isDaybookMember()
+        && resource.data.uid == request.auth.uid;
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Bob's Daily Briefing — deep-research reports, uid-scoped
+    // Bob's Daily Briefing — deep-research reports, same posture
     // ─────────────────────────────────────────────────────────────
     match /reports-bob/{docId} {
-      allow read: if request.auth != null
+      allow read: if isDaybookMember()
         && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
 
-      allow create: if request.auth != null
+      allow create: if isDaybookMember()
         && request.resource.data.uid == request.auth.uid;
 
-      allow update: if request.auth != null
-        && (resource.data.uid == request.auth.uid || !('uid' in resource.data))
+      allow update: if isDaybookMember()
+        && resource.data.uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid;
 
-      allow delete: if request.auth != null
-        && (resource.data.uid == request.auth.uid || !('uid' in resource.data));
+      allow delete: if isDaybookMember()
+        && resource.data.uid == request.auth.uid;
     }
 
     // Bob's Daily Briefing — decision journal, uid-scoped
     match /journal-bob/{docId} {
-      allow read: if request.auth != null
+      allow read: if isDaybookMember()
         && resource.data.uid == request.auth.uid;
 
-      allow create: if request.auth != null
+      allow create: if isDaybookMember()
         && request.resource.data.uid == request.auth.uid;
 
-      allow update: if request.auth != null
+      allow update: if isDaybookMember()
         && resource.data.uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid;
 
-      allow delete: if request.auth != null
+      allow delete: if isDaybookMember()
         && resource.data.uid == request.auth.uid;
+    }
+
+    // Daybook's invite list, one document per lowercase email. A verified
+    // account reads only its own invite (the page's access check). Bob
+    // lists and manages them from Daybook's Invites panel. A member invite
+    // carries only these fields; Bob's own owner invite cannot be deleted
+    // or demoted from the page.
+    match /daybook-invites/{email} {
+      allow read: if isBobGoogleAccount()
+        || (request.auth != null
+          && request.auth.token.email_verified == true
+          && request.auth.token.email.lower() == email);
+
+      allow create, update: if isBobGoogleAccount()
+        && email == email.lower()
+        && request.resource.data.keys().hasOnly(['email', 'role', 'name', 'invitedAt', 'invitedBy'])
+        && request.resource.data.email == email
+        && request.resource.data.role == (email == 'bobbynacario@gmail.com' ? 'owner' : 'member')
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80
+        && request.resource.data.invitedAt is string
+        && request.resource.data.invitedBy == request.auth.token.email.lower();
+
+      allow delete: if isBobGoogleAccount()
+        && email != 'bobbynacario@gmail.com';
     }
 
     // ─────────────────────────────────────────────────────────────
