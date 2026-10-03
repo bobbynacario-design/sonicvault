@@ -5,6 +5,12 @@ var _activeView = 'library';
 var _routeState = { mode:'app', id:'', prefix:'', path:'/' };
 var _publicRoutePayload = null;
 var _publicRouteLoading = false;
+// 'mode:id' of the last share route whose lookup came back empty or failed.
+// A finished lookup re-renders, and rendering is what starts a lookup, so
+// without this a missing share was fetched again on every render that the
+// previous fetch caused -- an endless run of Firestore reads, with the page
+// stuck on its loading skeleton instead of saying "not found".
+var _publicRouteMissed = '';
 
 function getPublicPlaylistList() {
   if (!_publicRoutePayload) return [];
@@ -148,6 +154,8 @@ function openSharedRoute(kind, id, replace) {
   _routeState = parseRouteState(window.location.pathname);
   _publicRoutePayload = null;
   window._publicShareData = null;
+  // Following a link is a fresh question, even for a share that was missing.
+  _publicRouteMissed = '';
   renderRouteAwareView();
 }
 
@@ -157,17 +165,20 @@ function ensurePublicRouteData() {
     _publicRoutePayload = window._publicShareData;
   }
   if (_publicRoutePayload && _publicRoutePayload.id === _routeState.id && _publicRoutePayload.kind === _routeState.mode) return;
-  if (_publicRouteLoading || !window.fbLoadPublicRoute) return;
+  var routeKey = _routeState.mode + ':' + _routeState.id;
+  if (_publicRouteLoading || _publicRouteMissed === routeKey || !window.fbLoadPublicRoute) return;
   _publicRouteLoading = true;
   window.fbLoadPublicRoute(_routeState.mode, _routeState.id).then(function(payload) {
     _publicRouteLoading = false;
     _publicRoutePayload = payload;
     window._publicShareData = payload;
+    if (!payload) _publicRouteMissed = routeKey;
     renderRouteAwareView(true);
   }).catch(function(err) {
     _publicRouteLoading = false;
     _publicRoutePayload = null;
     window._publicShareData = null;
+    _publicRouteMissed = routeKey;
     console.error('Public route load failed:', err);
     renderRouteAwareView(true);
   });
