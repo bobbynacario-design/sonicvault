@@ -130,17 +130,30 @@ function probeUploadDraft(draft) {
   decodeUploadPeaks(draft);
 }
 
-// Decode real waveform peaks straight from the picked file while it is
-// still in memory — no Cloudinary round-trip needed after saving.
+// Read the picked file while it is still in memory -- no Cloudinary
+// round-trip needed after saving: the lyric sheet Suno embeds in its tag
+// (filled in only when the lyrics box is still empty) and the waveform.
 async function decodeUploadPeaks(draft) {
-  if (!draft || !draft.file || !(window.AudioContext || window.webkitAudioContext)) return;
+  if (!draft || !draft.file) return;
+  var bufferData;
   try {
-    var bufferData = await draft.file.arrayBuffer();
+    bufferData = await draft.file.arrayBuffer();
+  } catch (e) {
+    return;
+  }
+  var embedded = findEmbeddedLyrics(new Uint8Array(bufferData));
+  if (embedded && !getTrackLyrics(draft)) {
+    draft.lyrics = embedded;
+    renderUploadQueue();
+    renderUploadEditor();
+  }
+  if (!(window.AudioContext || window.webkitAudioContext)) return;
+  try {
     if (!_audioContext) _audioContext = new (window.AudioContext || window.webkitAudioContext)();
     var decoded = await _audioContext.decodeAudioData(bufferData);
-    draft.peaks = extractWaveformPeaks(decoded, 72);
+    draft.loudness = extractWaveformLevels(decoded, 72);
   } catch (e) {
-    console.warn('Upload peak decode skipped for', draft && draft.id, e);
+    console.warn('Upload waveform decode skipped for', draft && draft.id, e);
   }
 }
 
@@ -452,7 +465,7 @@ async function saveAllUploads() {
         audioURL: audioURL,
         duration: item.duration || 0,
         waveform: [],
-        peaks: Array.isArray(item.peaks) && item.peaks.length ? item.peaks.slice() : [],
+        loudness: Array.isArray(item.loudness) && item.loudness.length ? item.loudness.slice() : [],
         created: new Date().toISOString().split('T')[0],
         plays: 0,
         shared: false,
@@ -485,8 +498,8 @@ async function saveAllUploads() {
   if (createdTracks.length) {
     var wfCache = getWaveformCache();
     createdTracks.forEach(function(t) {
-      if (Array.isArray(t.peaks) && t.peaks.length) {
-        wfCache[t.id] = t.peaks.slice();
+      if (Array.isArray(t.loudness) && t.loudness.length) {
+        wfCache[t.id] = t.loudness.slice();
         invalidateVisualWaveform(t.id);
       }
     });

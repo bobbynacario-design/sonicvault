@@ -79,6 +79,44 @@ test("returns null for no picture, a truncated tag, or no tag", () => {
   assert.equal(g.findEmbeddedArt(Uint8Array.from(JPEG)), null);
 });
 
+function usltBody({ encoding = 3, lang = "eng", desc = "", text = "" } = {}) {
+  const enc = (s) => {
+    if (encoding === 3) return [...Buffer.from(s, "utf8")];
+    if (encoding === 1) return [0xff, 0xfe, ...Buffer.from(s, "utf16le")];
+    return ascii(s);
+  };
+  const term = encoding === 1 ? [0, 0] : [0];
+  return [encoding, ...ascii(lang), ...(desc || encoding !== 1 ? enc(desc) : [0xff, 0xfe]), ...term, ...enc(text)];
+}
+
+test("reads a UTF-8 lyric sheet, as Suno's current exports write it", () => {
+  const sheet = "[Verse 1]\nWoke up September — one more turn\n[Chorus]\nStill in";
+  const t = tag(4, [text(4, "TIT2", "Still In"), frame(4, "USLT", usltBody({ text: sheet })), frame(4, "APIC", apicBody())]);
+  assert.equal(g.findEmbeddedLyrics(t), sheet);
+});
+
+test("reads a UTF-16 sheet with byte-order marks on both description and text", () => {
+  // Older Suno exports: encoding 1, an empty description that is just a BOM
+  // and its terminator, then a BOM-prefixed text.
+  const sheet = "(Verse 1)\nSun beats down\n\n(Chorus)\nSummer heat";
+  const t = tag(3, [frame(3, "USLT", usltBody({ encoding: 1, text: sheet }))]);
+  assert.equal(g.findEmbeddedLyrics(t), sheet);
+});
+
+test("tidies the sheet: CRLF, trailing spaces, stray BOMs, runs of blank lines", () => {
+  const raw = "\uFEFF[Intro]  \r\nLine one\r\n\r\n\r\n\r\nLine two\u0000";
+  const t = tag(3, [frame(3, "USLT", usltBody({ text: raw }))]);
+  assert.equal(g.findEmbeddedLyrics(t), "[Intro]\nLine one\n\nLine two");
+});
+
+test("takes the longest sheet, reads v2.2 ULT, and returns '' when there is none", () => {
+  const t = tag(3, [frame(3, "USLT", usltBody({ text: "short" })), frame(3, "USLT", usltBody({ lang: "fil", text: "the longer one" }))]);
+  assert.equal(g.findEmbeddedLyrics(t), "the longer one");
+  assert.equal(g.findEmbeddedLyrics(tag(2, [frame(2, "ULT", usltBody({ encoding: 0, text: "old tag" }))])), "old tag");
+  assert.equal(g.findEmbeddedLyrics(tag(3, [frame(3, "APIC", apicBody())])), "");
+  assert.equal(g.findEmbeddedLyrics(Uint8Array.from(JPEG)), "");
+});
+
 function pixels(...colors) {
   return Uint8ClampedArray.from(colors.flatMap(([r, g2, b, n = 1]) => new Array(n).fill([r, g2, b, 255]).flat()));
 }

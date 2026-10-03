@@ -23,7 +23,7 @@ function makeTrackSnapshot(track) {
     duration: Number(track.duration || 0),
     audioURL: track.audioURL || '',
     coverStyle: getCoverStyle(track),
-    peaks: getRealPeaksForTrack(track),
+    loudness: getRealPeaksForTrack(track),
     plays: Number(track.plays || 0),
     created: track.created || '',
     shared: !!track.shared,

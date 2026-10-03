@@ -1,6 +1,6 @@
-// Waveform arithmetic: decoding peaks out of an AudioBuffer, resampling them
-// to a bar count, and the stable stand-in drawn before real peaks exist.
-// Pure: no DOM, no app state, nothing outside js/data.
+// Waveform arithmetic: measuring loudness levels out of an AudioBuffer,
+// resampling them to a bar count, and the stable stand-in drawn before real
+// levels exist. Pure: no DOM, no app state, nothing outside js/data.
 
 function buildFallbackWaveform(track, count) {
   var len = count || 48;
@@ -27,25 +27,36 @@ function normalizeWaveform(values, count) {
   return out;
 }
 
-function extractWaveformPeaks(buffer, count) {
-  var samples = count || 72;
-  var channelData = [];
-  for (var c = 0; c < buffer.numberOfChannels; c++) {
-    channelData.push(buffer.getChannelData(c));
-  }
-  var blockSize = Math.floor(buffer.length / samples) || 1;
-  var peaks = [];
-
-  for (var i = 0; i < samples; i++) {
+// One level per bar, shaped so a song's structure shows. The old measure
+// took each block's loudest sample and scaled it up, and a mastered track
+// (every Suno export) peaks near full scale in every block -- so every bar
+// hit the ceiling and the waveform drew as a flat wall. Levels are each
+// block's RMS energy instead, relative to the track's own loudest block,
+// stretched over the track's own range and eased so quiet passages read as
+// quiet without vanishing.
+function extractWaveformLevels(buffer, count) {
+  var bars = count || 72;
+  var channels = [];
+  for (var c = 0; c < buffer.numberOfChannels; c++) channels.push(buffer.getChannelData(c));
+  var blockSize = Math.floor(buffer.length / bars) || 1;
+  var energy = [];
+  for (var i = 0; i < bars; i++) {
     var start = i * blockSize;
     var end = Math.min(start + blockSize, buffer.length);
-    var peak = 0;
-    for (var j = start; j < end; j++) {
-      var sum = 0;
-      for (var k = 0; k < channelData.length; k++) sum += Math.abs(channelData[k][j] || 0);
-      peak = Math.max(peak, sum / channelData.length);
+    var sum = 0;
+    for (var k = 0; k < channels.length; k++) {
+      var data = channels[k];
+      for (var j = start; j < end; j++) sum += data[j] * data[j];
     }
-    peaks.push(Math.max(.08, Math.min(.98, peak * 1.85)));
+    var n = (end - start) * (channels.length || 1);
+    energy.push(n > 0 ? Math.sqrt(sum / n) : 0);
   }
-  return peaks;
+  var max = Math.max.apply(null, energy);
+  if (!(max > 0)) return energy.map(function() { return .08; });
+  var relative = energy.map(function(e) { return e / max; });
+  var floor = Math.min.apply(null, relative) * .7;
+  return relative.map(function(r) {
+    var shaped = floor < 1 ? Math.pow((r - floor) / (1 - floor), 1.4) : 1;
+    return Math.round(Math.max(.08, Math.min(.98, .1 + .88 * shaped)) * 1000) / 1000;
+  });
 }

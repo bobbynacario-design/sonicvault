@@ -8,7 +8,10 @@ function formatLyricsHTML(rawLyrics) {
     var clean = String(line || '');
     var trimmed = clean.trim();
     if (!trimmed) return '<div class="lyric-line">&nbsp;</div>';
-    if (/^\[[^\]]+\]$/.test(trimmed)) {
+    // Suno labels sections "[Verse 1]" in newer exports and "(Verse 1)" in
+    // older ones. Parenthesised lines only count when they name a section,
+    // so an ad-lib like "(oh-oh)" stays a lyric.
+    if (/^\[[^\]]+\]$/.test(trimmed) || /^\((?:intro|verse|pre-?chorus|chorus|post-?chorus|hook|refrain|bridge|break(?:down)?|interlude|instrumental|solo|drop|build(?:-?up)?|outro|end|fade(?: out)?)\b[^)]*\)$/i.test(trimmed)) {
       return '<div class="lyric-section-header">' + esc(trimmed) + '</div>';
     }
     return '<div class="lyric-line">' + esc(clean) + '</div>';

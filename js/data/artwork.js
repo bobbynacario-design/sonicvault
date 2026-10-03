@@ -1,6 +1,7 @@
-// Embedded cover art: the picture an audio file carries in its ID3 tag, and
-// a palette read from that picture's pixels. Suno writes a 360x360 JPEG into
-// every MP3 it exports (APIC, picture type 3), inside the first ~30KB.
+// What an audio file carries in its ID3 tag -- the cover picture and the
+// lyric sheet -- and a palette read from the picture's pixels. Suno writes
+// both into every MP3 it exports, inside the first ~30KB: a 360x360 JPEG
+// (APIC, picture type 3) and the full lyrics (USLT).
 // Pure: bytes and pixel arrays in, plain values out.
 
 function readSyncsafe(bytes, i) {
@@ -75,11 +76,12 @@ function parsePictureFrame(body, isV22) {
   return mime ? { mime: mime, type: type, data: data } : null;
 }
 
-// The front cover (picture type 3) from an ID3v2.2/2.3/2.4 tag, else the
-// first picture it carries; null when there is none or the tag is cut short.
-function findEmbeddedArt(bytes) {
+// Every frame in an ID3v2.2/2.3/2.4 tag as { id, body }, bodies unwrapped
+// and ready to read. Compressed or encrypted frames are rare enough to skip.
+// Empty when there is no tag or it is cut short.
+function readID3Frames(bytes) {
   var total = id3TagLength(bytes);
-  if (!total || bytes.length < total) return null;
+  if (!total || bytes.length < total) return [];
   var major = bytes[3];
   var flags = bytes[5];
   var tag = bytes.subarray(10, total - ((flags & 0x10) ? 10 : 0));
@@ -91,7 +93,7 @@ function findEmbeddedArt(bytes) {
   }
   var idLength = major === 2 ? 3 : 4;
   var headLength = major === 2 ? 6 : 10;
-  var best = null;
+  var frames = [];
   while (pos + headLength <= tag.length) {
     var id = asciiOf(tag.subarray(pos, pos + idLength));
     if (!/^[A-Z0-9]+$/.test(id)) break;
@@ -100,27 +102,90 @@ function findEmbeddedArt(bytes) {
       : (major === 4 ? readSyncsafe(tag, pos + 4) : readUint32(tag, pos + 4));
     var end = pos + headLength + size;
     if (size <= 0 || end > tag.length) break;
-    if (id === 'APIC' || id === 'PIC') {
-      var body = tag.subarray(pos + headLength, end);
-      var format = major === 2 ? 0 : tag[pos + 9];
-      // Compressed or encrypted pictures are rare enough to skip.
-      var packed = major === 4 ? (format & 0x0c) : (major === 3 ? (format & 0xc0) : 0);
-      if (!packed) {
-        if (major === 4) {
-          if (format & 0x40) body = body.subarray(1);
-          if (format & 0x01) body = body.subarray(4);
-          if (format & 0x02) body = removeUnsync(body);
-        } else if (major === 3 && (format & 0x20)) {
-          body = body.subarray(1);
-        }
-        var pic = parsePictureFrame(body, major === 2);
-        if (pic && (!best || (pic.type === 3 && best.type !== 3))) best = pic;
-        if (best && best.type === 3) break;
+    var body = tag.subarray(pos + headLength, end);
+    var format = major === 2 ? 0 : tag[pos + 9];
+    var packed = major === 4 ? (format & 0x0c) : (major === 3 ? (format & 0xc0) : 0);
+    if (!packed) {
+      if (major === 4) {
+        if (format & 0x40) body = body.subarray(1);
+        if (format & 0x01) body = body.subarray(4);
+        if (format & 0x02) body = removeUnsync(body);
+      } else if (major === 3 && (format & 0x20)) {
+        body = body.subarray(1);
       }
+      frames.push({ id: id, body: body });
     }
     pos = end;
   }
+  return frames;
+}
+
+// The front cover (picture type 3), else the first picture the tag carries;
+// null when there is none or the tag is cut short.
+function findEmbeddedArt(bytes) {
+  var best = null;
+  readID3Frames(bytes).some(function(frame) {
+    if (frame.id !== 'APIC' && frame.id !== 'PIC') return false;
+    var pic = parsePictureFrame(frame.body, frame.id === 'PIC');
+    if (pic && (!best || (pic.type === 3 && best.type !== 3))) best = pic;
+    return !!(best && best.type === 3);
+  });
   return best ? { mime: best.mime, data: best.data } : null;
+}
+
+// ID3 text in its declared encoding: 0 Latin-1, 1 UTF-16 with a byte-order
+// mark, 2 UTF-16BE, 3 UTF-8.
+function decodeID3Text(bytes, encoding) {
+  if (!bytes || !bytes.length) return '';
+  if (encoding === 0) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return s;
+  }
+  var label = encoding === 3 ? 'utf-8' : 'utf-16le';
+  if (encoding === 2) label = 'utf-16be';
+  if (encoding === 1 && bytes.length > 1) {
+    if (bytes[0] === 0xfe && bytes[1] === 0xff) label = 'utf-16be';
+    if ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff)) bytes = bytes.subarray(2);
+  }
+  try {
+    return new TextDecoder(label).decode(bytes);
+  } catch (e) {
+    return '';
+  }
+}
+
+// Offset just past a string terminated in this encoding (one zero byte, or
+// two aligned ones for UTF-16).
+function skipID3String(body, p, encoding) {
+  if (encoding === 1 || encoding === 2) {
+    while (p + 1 < body.length && !(body[p] === 0 && body[p + 1] === 0)) p += 2;
+    return p + 2;
+  }
+  while (p < body.length && body[p] !== 0) p++;
+  return p + 1;
+}
+
+// The lyric sheet from USLT (v2.3/2.4) or ULT (v2.2): encoding, a language
+// code, a description, then the text. The longest sheet wins when a file
+// carries more than one. Tidied for display: stray byte-order marks gone,
+// line endings normalised, runs of blank lines folded to one. '' if none.
+function findEmbeddedLyrics(bytes) {
+  var best = '';
+  readID3Frames(bytes).forEach(function(frame) {
+    if ((frame.id !== 'USLT' && frame.id !== 'ULT') || frame.body.length < 5) return;
+    var encoding = frame.body[0];
+    var start = skipID3String(frame.body, 4, encoding);
+    var text = decodeID3Text(frame.body.subarray(start), encoding)
+      .replace(/\uFEFF/g, '')
+      .replace(/\u0000+$/, '')
+      .replace(/\r\n?/g, '\n')
+      .split('\n').map(function(line) { return line.replace(/\s+$/, ''); }).join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    if (text.length > best.length) best = text;
+  });
+  return best;
 }
 
 function rgbToHsl(r, g, b) {

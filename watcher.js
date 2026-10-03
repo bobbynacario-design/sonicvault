@@ -146,13 +146,37 @@ function waitForStableSize(filePath, cb) {
   }, SIZE_STABLE_MS);
 }
 
-async function extractDuration(filePath) {
+// The longest lyric sheet in the file's tag. Suno writes the full lyrics
+// into every MP3 (USLT); music-metadata 7 leaves them in the native frames
+// rather than in metadata.common.
+function lyricsFromMetadata(metadata) {
+  var best = '';
+  Object.keys((metadata && metadata.native) || {}).forEach(function(format) {
+    metadata.native[format].forEach(function(tag) {
+      if (tag.id !== 'USLT' && tag.id !== 'ULT') return;
+      var text = typeof tag.value === 'string' ? tag.value : (tag.value && tag.value.text) || '';
+      text = String(text)
+        .replace(/\uFEFF/g, '')
+        .replace(/\r\n?/g, '\n')
+        .split('\n').map(function(line) { return line.replace(/\s+$/, ''); }).join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      if (text.length > best.length) best = text;
+    });
+  });
+  return best;
+}
+
+async function readAudioMetadata(filePath) {
   try {
     var mm = require('music-metadata');
     var metadata = await mm.parseFile(filePath, { duration: true });
-    return Math.round(metadata.format.duration || 0);
+    return {
+      duration: Math.round(metadata.format.duration || 0),
+      lyrics: lyricsFromMetadata(metadata)
+    };
   } catch (e) {
-    return 0;
+    return { duration: 0, lyrics: '' };
   }
 }
 
@@ -190,8 +214,9 @@ async function processFile(filePath) {
       // Generate track ID
       var trackId = 't-' + Date.now();
 
-      // Extract audio duration
-      var duration = await extractDuration(filePath);
+      // Duration, and the lyric sheet Suno embeds in the file
+      var audioInfo = await readAudioMetadata(filePath);
+      var duration = audioInfo.duration;
 
       // Upload to Cloudinary
       var result = await cloudinary.uploader.upload(filePath, {
@@ -214,7 +239,7 @@ async function processFile(filePath) {
         source:       'Suno',
         coverStyle:   pickCoverStyle({ title: title, genre: 'Other', mood: 'Energetic', source: 'Suno', fileName: filename }),
         prompt:       '',
-        lyrics:       '',
+        lyrics:       audioInfo.lyrics,
         audioURL:     downloadURL,
         duration:     duration,
         waveform:     [],
@@ -245,7 +270,7 @@ async function processFile(filePath) {
       // left to lose -- and no shared 1MiB ceiling to grow into.
       await db.collection(TRACKS_COLLECTION).doc(trackId).set(track);
 
-      log('Track "' + title + '" added to SonicVault ✓');
+      log('Track "' + title + '" added to SonicVault ✓' + (audioInfo.lyrics ? ' (with lyrics)' : ''));
 
       // Move to imported/ subfolder
       var importedDir = path.join(path.dirname(filePath), 'imported');

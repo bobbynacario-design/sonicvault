@@ -217,13 +217,26 @@ function sameOriginStrategy(request) {
   });
 }
 
-// The page asks before reading artwork from audio files, because a worker
-// without the pass-through below would turn each read into a full download.
+// The page asks before its tagged reads of audio files, because a worker
+// without the handling below would turn each one into a cached download.
 self.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'sv-capabilities' && event.ports && event.ports[0]) {
-    event.ports[0].postMessage({ artProbe: true });
+    event.ports[0].postMessage({ artProbe: true, waveProbe: true });
   }
 });
+
+// Waveform backfill downloads a whole song to measure it. Use the copy the
+// audio cache already holds when there is one; otherwise fetch it without
+// caching, so measuring the library cannot evict the songs actually played.
+function waveStrategy(request, url) {
+  var plain = new URL(url.href);
+  plain.searchParams.delete('sv-wave');
+  return caches.open(AUDIO_CACHE).then(function(cache) {
+    return cache.match(plain.href);
+  }).then(function(cached) {
+    return cached || fetch(request);
+  });
+}
 
 self.addEventListener('fetch', function(event) {
   var request = event.request;
@@ -234,6 +247,10 @@ self.addEventListener('fetch', function(event) {
   // Through audioStrategy they would fetch and cache the whole file, and
   // push recently played songs out of the audio cache.
   if (url.searchParams.has('sv-art')) return;
+  if (url.searchParams.has('sv-wave')) {
+    event.respondWith(waveStrategy(request, url));
+    return;
+  }
 
   if (isAudioRequest(url, request)) {
     event.respondWith(audioStrategy(request));

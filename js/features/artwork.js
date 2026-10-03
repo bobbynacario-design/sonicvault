@@ -1,9 +1,11 @@
-// Real cover art. Suno embeds each song's artwork in the MP3, so the picture
-// is read from the first few KB of the track's own audio -- a ranged request,
-// never the whole file -- and kept on this device: the image in Cache
-// Storage, its palette and a "checked" mark in localStorage. Like decoded
-// waveforms it is derived data, reconstructible from the audio at any time,
-// so none of it syncs and nothing here writes to the vault.
+// Real cover art and lyrics. Suno embeds each song's artwork and lyric sheet
+// in the MP3's tag, so both are read from the first few KB of the track's
+// own audio -- a ranged request, never the whole file.
+//
+// The picture is derived data, kept on this device only: the image in Cache
+// Storage, its palette and a "checked" mark in localStorage. Lyrics are the
+// track's own content, so they are saved to the vault -- but only into a
+// track whose lyrics are empty, never over lyrics someone has written.
 
 var ART_CACHE_NAME = 'sv-art-v1';   // sw.js keeps this cache when it activates
 var ART_PROBE_PARAM = 'sv-art';     // sw.js passes these requests straight through
@@ -122,9 +124,10 @@ function loadCachedArt() {
 }
 
 // An older sw.js answers any Cloudinary audio request by downloading and
-// caching the whole song, so with a worker in control, probe only once it
-// confirms it passes probes through. No worker, nothing to intercept.
-function artProbeAllowed() {
+// caching the whole song, so with a worker in control, tagged reads
+// (?sv-art, ?sv-wave) wait until it confirms it handles them. No worker,
+// nothing to intercept.
+function workerSupports(capability) {
   var sw = navigator.serviceWorker;
   if (!sw || !sw.controller) return Promise.resolve(true);
   return new Promise(function(resolve) {
@@ -132,7 +135,7 @@ function artProbeAllowed() {
     var channel = new MessageChannel();
     channel.port1.onmessage = function(event) {
       settled = true;
-      resolve(!!(event.data && event.data.artProbe));
+      resolve(!!(event.data && event.data[capability]));
     };
     setTimeout(function() { if (!settled) resolve(false); }, 2000);
     sw.controller.postMessage({ type:'sv-capabilities' }, [channel.port2]);
@@ -203,14 +206,33 @@ async function paletteFromBlob(blob) {
   return paletteFromPixels(ctx.getImageData(0, 0, 24, 24).data);
 }
 
+// Put the file's lyric sheet into the private track when its lyrics are
+// empty, and save that one track straight away. Returns whether the file
+// had lyrics at all, so a track whose lyrics are later cleared on purpose
+// is not refilled on the next sweep.
+var _lyricsFilledThisSweep = false;
+function fillLyricsFromTag(track, bytes) {
+  var text = findEmbeddedLyrics(bytes);
+  if (!text) return false;
+  var privateTrack = (tracks || []).find(function(item) { return item.id === track.id; });
+  if (privateTrack && !hasLyrics(privateTrack)) {
+    privateTrack.lyrics = text;
+    persistTracks();
+    _lyricsFilledThisSweep = true;
+    if (_currentTrack && _currentTrack.id === privateTrack.id) updateExpandedPlayer();
+  }
+  return true;
+}
+
 // Look one track up. A network failure records nothing, so the next sweep
-// tries again; a file read cleanly with no picture is remembered as such.
+// tries again; a file read cleanly is remembered, art or not.
 async function probeTrackArt(track) {
   var index = getArtIndex();
   var bytes = await readAudioHead(track.audioURL);
+  var hasLyricSheet = fillLyricsFromTag(track, bytes);
   var art = findEmbeddedArt(bytes);
   if (!art) {
-    index[track.id] = { src:track.audioURL, art:false };
+    index[track.id] = { src:track.audioURL, art:false, lyrics:hasLyricSheet };
     saveArtIndex();
     return false;
   }
@@ -219,13 +241,13 @@ async function probeTrackArt(track) {
   try {
     palette = await paletteFromBlob(blob);
   } catch (e) {
-    index[track.id] = { src:track.audioURL, art:false };
+    index[track.id] = { src:track.audioURL, art:false, lyrics:hasLyricSheet };
     saveArtIndex();
     return false;
   }
   var cache = await caches.open(ART_CACHE_NAME);
   await cache.put(artCacheKey(track.id), new Response(blob, { headers:{ 'Content-Type':art.mime } }));
-  index[track.id] = { src:track.audioURL, art:true, palette:palette };
+  index[track.id] = { src:track.audioURL, art:true, palette:palette, lyrics:hasLyricSheet };
   saveArtIndex();
   setArtBlob(track.id, blob);
   paintArt(track.id);
@@ -245,13 +267,17 @@ function getArtCandidates() {
 async function sweepArtwork() {
   if (_artSweepRunning || !('caches' in window) || !window.ReadableStream) return;
   var index = getArtIndex();
+  // Entries from before lyrics were read have no `lyrics` key: re-read
+  // those once too.
   var todo = getArtCandidates().filter(function(track) {
-    return !index[track.id] || index[track.id].src !== track.audioURL;
+    var entry = index[track.id];
+    return !entry || entry.src !== track.audioURL || !('lyrics' in entry);
   });
   if (!todo.length) return;
   _artSweepRunning = true;
+  _lyricsFilledThisSweep = false;
   try {
-    if (!(await artProbeAllowed())) return;
+    if (!(await workerSupports('artProbe'))) return;
     for (var i = 0; i < todo.length; i++) {
       if (navigator.onLine === false) break;
       try {
@@ -263,6 +289,9 @@ async function sweepArtwork() {
     }
   } finally {
     _artSweepRunning = false;
+    // One re-render for every lyric sheet filled, so "Lyrics missing" labels
+    // clear without rebuilding the views once per track.
+    if (_lyricsFilledThisSweep) renderTracks();
   }
 }
 
