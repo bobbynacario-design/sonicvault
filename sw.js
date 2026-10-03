@@ -2,7 +2,7 @@
    Shell is network-first, so normal deploys propagate on the next online
    load without touching this file. Bump VERSION only when the caching
    logic itself changes and old caches must be discarded. */
-var VERSION = 'v1';
+var VERSION = 'v2';
 var SHELL_CACHE = 'sv-shell-' + VERSION;
 var STATIC_CACHE = 'sv-static-' + VERSION;
 var AUDIO_CACHE = 'sv-audio-' + VERSION;
@@ -12,6 +12,36 @@ var SHELL_ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './styles/app.css',
+  './js/app.js',
+  './js/data/util.js',
+  './js/data/tracks.js',
+  './js/data/covers.js',
+  './js/data/metadata.js',
+  './js/data/waveform.js',
+  './js/data/routes.js',
+  './js/data/backup-format.js',
+  './js/features/vault.js',
+  './js/features/sync.js',
+  './js/features/shell.js',
+  './js/features/modals.js',
+  './js/features/routes.js',
+  './js/features/covers.js',
+  './js/features/waveform.js',
+  './js/features/media-session.js',
+  './js/features/player.js',
+  './js/features/expanded-player.js',
+  './js/features/library.js',
+  './js/features/home.js',
+  './js/features/insights.js',
+  './js/features/playlists.js',
+  './js/features/share.js',
+  './js/features/edit-track.js',
+  './js/features/ai-metadata.js',
+  './js/features/upload.js',
+  './js/features/backup.js',
+  './js/features/keyboard.js',
+  './js/boot.js',
   './assets/icons/sonicvault-mark.svg',
   './assets/icons/favicon-32.png',
   './assets/icons/icon-192.png',
@@ -124,10 +154,24 @@ function cdnStrategy(request) {
   });
 }
 
+// The redirect 404.html performs for /track/:id and /playlist/:id: back to
+// the app base, carrying the route in ?sv-route.
+function shareRouteRedirect(url) {
+  var parts = url.pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+  var routeIndex = parts.indexOf('track');
+  if (routeIndex === -1) routeIndex = parts.indexOf('playlist');
+  if (routeIndex === -1) return null;
+  var prefix = routeIndex > 0 ? '/' + parts.slice(0, routeIndex).join('/') : '';
+  var route = '/' + parts.slice(routeIndex).join('/');
+  return Response.redirect(url.origin + prefix + '/?sv-route=' + encodeURIComponent(route), 302);
+}
+
 // Network-first for navigations so deploys land immediately; cached shell
 // only when the network is unreachable. /track/:id and /playlist/:id 404
 // responses are passed through online (GitHub Pages 404.html handles the
-// redirect) and fall back to the shell offline.
+// redirect). Offline they get the same redirect from here: serving the shell
+// at the deep URL would resolve its relative js/ and styles/ paths under
+// /track/ and boot a page with no code.
 function navigationStrategy(request, url) {
   return fetch(request).then(function(response) {
     if (response && response.status === 200 && isShellNavigation(url)) {
@@ -136,6 +180,8 @@ function navigationStrategy(request, url) {
     }
     return response;
   }).catch(function() {
+    var redirect = shareRouteRedirect(url);
+    if (redirect) return redirect;
     return caches.match(request).then(function(cached) {
       return cached || caches.match('./index.html');
     });
@@ -143,6 +189,11 @@ function navigationStrategy(request, url) {
 }
 
 // Cache-first for same-origin static files (icons, manifest).
+// Code and styles are requested with a ?v= token (index.html), so an exact
+// match is safe to serve cache-first: a new deploy changes the URL and misses.
+// SHELL_ASSETS precaches them without the token, though, so offline the exact
+// versioned URL is often absent -- fall back to any cached copy of the same
+// file rather than failing, or offline boot loads the page without its CSS.
 function sameOriginStrategy(request) {
   return caches.match(request).then(function(cached) {
     if (cached) return cached;
@@ -152,6 +203,11 @@ function sameOriginStrategy(request) {
         caches.open(SHELL_CACHE).then(function(cache) { cache.put(request, copy); });
       }
       return response;
+    }).catch(function(err) {
+      return caches.match(request, { ignoreSearch: true }).then(function(fallback) {
+        if (fallback) return fallback;
+        throw err;
+      });
     });
   });
 }
