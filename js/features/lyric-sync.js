@@ -190,7 +190,7 @@ function renderLyricStatus() {
   else if (sync && sync.source === 'unmatched') text = 'Couldn’t match these lyrics to the vocals. Tap a line as it’s sung to time it.';
   else if (_lyricSyncFailed[track.id]) text = 'Couldn’t reach the AI worker, so timing is estimated. Tap a line as it’s sung to set it.';
   else if (!getVaultTrack(track.id)) text = '';
-  else if (!lyricSyncEndpoint()) text = 'Timing is estimated. Add your AI endpoint under Import to time lyrics from the audio, or tap a line as it’s sung.';
+  else if (!lyricSyncEndpoint()) text = 'Timing is estimated. Set up the AI worker on the Import page to time lyrics from the audio, or tap a line as it’s sung.';
   else text = 'Timing is estimated until the song has played a few seconds.';
   el.textContent = text;
 }

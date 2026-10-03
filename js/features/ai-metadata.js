@@ -31,13 +31,13 @@ function updateAIConfigField(field, value) {
   updateAIConfigStatus();
 }
 
+// The field being typed in is left alone: rewriting its value on every
+// keystroke moved the caret to the end.
 function hydrateAIConfigInputs() {
-  var endpoint = document.getElementById('ai-endpoint');
-  var token = document.getElementById('ai-token');
-  var model = document.getElementById('ai-model');
-  if (endpoint) endpoint.value = _aiConfig.endpoint || '';
-  if (token) token.value = _aiConfig.token || '';
-  if (model) model.value = _aiConfig.model || '';
+  ['endpoint', 'token', 'model'].forEach(function(field) {
+    var input = document.getElementById('ai-' + field);
+    if (input && input !== document.activeElement) input.value = _aiConfig[field] || '';
+  });
 }
 
 function updateAIConfigStatus() {
@@ -47,10 +47,55 @@ function updateAIConfigStatus() {
   if (_aiConfig.endpoint) {
     var host = '';
     try { host = new URL(_aiConfig.endpoint).host; } catch (e) {}
-    el.innerHTML = '<strong>Remote AI ready.</strong> Metadata requests will POST to ' + esc(host || _aiConfig.endpoint) + '. Token ' + (_aiConfig.token ? 'loaded' : 'missing') + '. The bearer token stays in this browser only and is never written into Firestore.';
+    el.innerHTML = '<strong>Worker set:</strong> ' + esc(host || _aiConfig.endpoint) + '. ' + (_aiConfig.token
+      ? 'Token saved in this browser (never synced). Use Test connection to check it.'
+      : 'No access token yet, so the worker will refuse requests.');
   } else {
-    el.innerHTML = '<strong>Local suggestion mode.</strong> SonicVault can still derive tags, mood, genre, and summaries from title, prompt, and lyrics. Add a secure endpoint if you want hosted AI generation.';
+    el.innerHTML = '<strong>No worker set.</strong> Tags come from local suggestions and lyric timing is estimated. Paste the worker URL and its access token to turn both on.';
   }
+}
+
+// Checks the URL and token without running any AI: an empty request to
+// /transcribe is refused for the missing audio only after the token has
+// been accepted, so the status code says which part is wrong.
+async function testAIWorker() {
+  var el = document.getElementById('upload-ai-status');
+  var btn = document.getElementById('ai-test-btn');
+  if (!el) return;
+  if (!_aiConfig.endpoint) {
+    el.innerHTML = '<strong>No worker set.</strong> Paste the worker URL first.';
+    return;
+  }
+  var url;
+  try { url = new URL('/transcribe', _aiConfig.endpoint).toString(); } catch (e) {
+    el.innerHTML = '<strong>That URL doesn\u2019t look right.</strong> It should start with https://';
+    return;
+  }
+  if (btn) btn.disabled = true;
+  el.innerHTML = 'Checking\u2026';
+  var message;
+  try {
+    var headers = { 'Content-Type':'application/json' };
+    if (_aiConfig.token) headers.Authorization = 'Bearer ' + _aiConfig.token;
+    var response = await fetch(url, { method:'POST', headers:headers, body:'{}' });
+    var data = await response.json().catch(function() { return {}; });
+    var error = String(data && data.error || '');
+    if (response.status === 400 && /audioURL/i.test(error)) {
+      message = '<strong>Connected.</strong> The token was accepted. New tracks will be tagged and lyrics timed through this worker.';
+    } else if (response.status === 400 && /title/i.test(error)) {
+      message = '<strong>Connected, but the worker is out of date.</strong> It can tag tracks but not time lyrics. Redeploy it from cloudflare-worker/.';
+    } else if (response.status === 401) {
+      message = '<strong>The worker refused this token.</strong> Check it matches the worker\u2019s SONICVAULT_CLIENT_TOKEN.';
+    } else if (response.status === 403) {
+      message = '<strong>The worker doesn\u2019t accept requests from this site.</strong> Add this address to ALLOWED_ORIGIN in wrangler.toml.';
+    } else {
+      message = '<strong>Unexpected answer (' + response.status + ').</strong> ' + esc(error || 'Is this the SonicVault worker URL?');
+    }
+  } catch (e) {
+    message = '<strong>Couldn\u2019t reach the worker.</strong> Check the URL and your connection.';
+  }
+  if (btn) btn.disabled = false;
+  el.innerHTML = message;
 }
 
 async function requestRemoteAIMetadata(input, fallback) {

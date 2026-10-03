@@ -1638,6 +1638,11 @@ body.light .expand-item{background:none}
   font-size:12px;
   line-height:1.65;
 }
+.upload-ai-status strong{color:var(--text);font-weight:600}
+.ai-worker-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.2fr) minmax(0,.7fr);gap:.8rem}
+.ai-worker-status{margin-top:.9rem;font-size:13px}
+.form-label-note{text-transform:none;letter-spacing:normal;font-family:var(--sans);opacity:.8}
+@media (max-width:900px){.ai-worker-grid{grid-template-columns:1fr}}
 .upload-ai-card{
   display:grid;
   gap:.65rem;

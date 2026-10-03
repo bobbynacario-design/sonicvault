@@ -21,8 +21,8 @@
 <meta name="twitter:description" content="Curate tracks, build mixtapes, and stream your AI-generated music from anywhere.">
 <title>SonicVault - Private AI Music Vault</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<script type="module" src="js/app.js?v=20261004e"></script>
-<link rel="stylesheet" href="styles/app.css?v=20261004e">
+<script type="module" src="js/app.js?v=20261004f"></script>
+<link rel="stylesheet" href="styles/app.css?v=20261004f">
 </head>
 <body>
 <!-- Icon sprite. Every glyph in the app is <svg class="ic"><use href="#i-NAME"/></svg>,
@@ -263,31 +263,18 @@
               <div class="upload-ai-panel">
                 <div>
                   <div class="section-kicker">Lyrics + AI metadata</div>
-                  <div class="section-sub">Lyrics are required for manual uploads. Leave the endpoint blank to tag locally instead.</div>
+                  <div class="section-sub">Lyrics are required for manual uploads. Metadata comes from the AI worker set up below the import area, or from local suggestions without one.</div>
                 </div>
                 <div class="form-grid">
                   <div class="form-group" style="grid-column:1 / -1">
                     <label class="form-label">Optional batch lyrics</label>
                     <textarea class="form-input" id="batch-lyrics" rows="4" placeholder="Paste shared lyrics only if multiple queued tracks truly use the same lyric sheet."></textarea>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">AI endpoint (Claude worker URL)</label>
-                    <input class="form-input" id="ai-endpoint" type="url" placeholder="https://sonicvault-metadata.your-name.workers.dev" oninput="updateAIConfigField('endpoint', this.value)" onchange="updateAIConfigField('endpoint', this.value)">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">AI bearer token</label>
-                    <input class="form-input" id="ai-token" type="password" placeholder="Stored only in this browser" oninput="updateAIConfigField('token', this.value)" onchange="updateAIConfigField('token', this.value)">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Model label</label>
-                    <input class="form-input" id="ai-model" type="text" placeholder="Optional, e.g. claude-haiku-4-5" oninput="updateAIConfigField('model', this.value)" onchange="updateAIConfigField('model', this.value)">
-                  </div>
                 </div>
                 <div class="upload-batch-actions">
                   <button class="sec-action" onclick="applyBatchLyrics()">Apply lyrics to all</button>
                   <button class="sec-action" onclick="generateMetadataForAllPending()">Generate metadata for all pending</button>
                 </div>
-                <div class="upload-ai-status" id="upload-ai-status">Local suggestion mode is active. Add a secure endpoint if you want hosted AI metadata generation.</div>
               </div>
 
               <div class="upload-batch-head">
@@ -308,6 +295,37 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Device-local settings, so they live outside the batch studio, which
+         stays hidden until files are queued. -->
+    <div class="section-card" id="ai-worker-card">
+      <div class="section-inner">
+        <div class="section-head">
+          <div>
+            <div class="section-title">AI worker</div>
+            <div class="section-sub">Tags new tracks with Claude and times lyrics to the audio. Saved only in this browser, so set it once on each device.</div>
+          </div>
+          <div class="section-action-row">
+            <button class="sec-action" id="ai-test-btn" onclick="testAIWorker()">Test connection</button>
+          </div>
+        </div>
+        <div class="ai-worker-grid">
+          <div class="form-group">
+            <label class="form-label" for="ai-endpoint">Worker URL</label>
+            <input class="form-input" id="ai-endpoint" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://your-worker.workers.dev" oninput="updateAIConfigField('endpoint', this.value)" onchange="updateAIConfigField('endpoint', this.value)">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ai-token">Access token</label>
+            <input class="form-input" id="ai-token" type="password" autocomplete="off" spellcheck="false" placeholder="The worker's SONICVAULT_CLIENT_TOKEN" oninput="updateAIConfigField('token', this.value)" onchange="updateAIConfigField('token', this.value)">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ai-model">Model <span class="form-label-note">optional</span></label>
+            <input class="form-input" id="ai-model" type="text" autocomplete="off" spellcheck="false" placeholder="claude-haiku-4-5" oninput="updateAIConfigField('model', this.value)" onchange="updateAIConfigField('model', this.value)">
+          </div>
+        </div>
+        <div class="upload-ai-status ai-worker-status" id="upload-ai-status" role="status" aria-live="polite"></div>
       </div>
     </div>
 
@@ -644,37 +662,37 @@
      global scope, which is what lets the inline onclick handlers above reach
      feature functions. On deploy, bump the ?v= token on every local asset
      together; sw.js serves them cache-first. -->
-<script src="js/data/util.js?v=20261004e"></script>
-<script src="js/data/tracks.js?v=20261004e"></script>
-<script src="js/data/covers.js?v=20261004e"></script>
-<script src="js/data/artwork.js?v=20261004e"></script>
-<script src="js/data/lyric-sync.js?v=20261004e"></script>
-<script src="js/data/metadata.js?v=20261004e"></script>
-<script src="js/data/waveform.js?v=20261004e"></script>
-<script src="js/data/routes.js?v=20261004e"></script>
-<script src="js/data/backup-format.js?v=20261004e"></script>
-<script src="js/features/vault.js?v=20261004e"></script>
-<script src="js/features/sync.js?v=20261004e"></script>
-<script src="js/features/shell.js?v=20261004e"></script>
-<script src="js/features/modals.js?v=20261004e"></script>
-<script src="js/features/routes.js?v=20261004e"></script>
-<script src="js/features/covers.js?v=20261004e"></script>
-<script src="js/features/artwork.js?v=20261004e"></script>
-<script src="js/features/lyric-sync.js?v=20261004e"></script>
-<script src="js/features/waveform.js?v=20261004e"></script>
-<script src="js/features/media-session.js?v=20261004e"></script>
-<script src="js/features/player.js?v=20261004e"></script>
-<script src="js/features/expanded-player.js?v=20261004e"></script>
-<script src="js/features/library.js?v=20261004e"></script>
-<script src="js/features/home.js?v=20261004e"></script>
-<script src="js/features/insights.js?v=20261004e"></script>
-<script src="js/features/playlists.js?v=20261004e"></script>
-<script src="js/features/share.js?v=20261004e"></script>
-<script src="js/features/edit-track.js?v=20261004e"></script>
-<script src="js/features/ai-metadata.js?v=20261004e"></script>
-<script src="js/features/upload.js?v=20261004e"></script>
-<script src="js/features/backup.js?v=20261004e"></script>
-<script src="js/features/keyboard.js?v=20261004e"></script>
-<script src="js/boot.js?v=20261004e"></script>
+<script src="js/data/util.js?v=20261004f"></script>
+<script src="js/data/tracks.js?v=20261004f"></script>
+<script src="js/data/covers.js?v=20261004f"></script>
+<script src="js/data/artwork.js?v=20261004f"></script>
+<script src="js/data/lyric-sync.js?v=20261004f"></script>
+<script src="js/data/metadata.js?v=20261004f"></script>
+<script src="js/data/waveform.js?v=20261004f"></script>
+<script src="js/data/routes.js?v=20261004f"></script>
+<script src="js/data/backup-format.js?v=20261004f"></script>
+<script src="js/features/vault.js?v=20261004f"></script>
+<script src="js/features/sync.js?v=20261004f"></script>
+<script src="js/features/shell.js?v=20261004f"></script>
+<script src="js/features/modals.js?v=20261004f"></script>
+<script src="js/features/routes.js?v=20261004f"></script>
+<script src="js/features/covers.js?v=20261004f"></script>
+<script src="js/features/artwork.js?v=20261004f"></script>
+<script src="js/features/lyric-sync.js?v=20261004f"></script>
+<script src="js/features/waveform.js?v=20261004f"></script>
+<script src="js/features/media-session.js?v=20261004f"></script>
+<script src="js/features/player.js?v=20261004f"></script>
+<script src="js/features/expanded-player.js?v=20261004f"></script>
+<script src="js/features/library.js?v=20261004f"></script>
+<script src="js/features/home.js?v=20261004f"></script>
+<script src="js/features/insights.js?v=20261004f"></script>
+<script src="js/features/playlists.js?v=20261004f"></script>
+<script src="js/features/share.js?v=20261004f"></script>
+<script src="js/features/edit-track.js?v=20261004f"></script>
+<script src="js/features/ai-metadata.js?v=20261004f"></script>
+<script src="js/features/upload.js?v=20261004f"></script>
+<script src="js/features/backup.js?v=20261004f"></script>
+<script src="js/features/keyboard.js?v=20261004f"></script>
+<script src="js/boot.js?v=20261004f"></script>
 </body>
 </html>
