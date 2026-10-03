@@ -19,12 +19,6 @@ function getNewestTracks(limit) {
   }).slice(0, limit || 4);
 }
 
-function getAutoImportedTracks(limit) {
-  return tracks.filter(function(track) { return !!track.autoImported; }).sort(function(a, b) {
-    return compareNewestFirst(a, b);
-  }).slice(0, limit || 4);
-}
-
 function getContinueTrack() {
   var savedId = appSettings && appSettings.lastPlayedTrackId;
   return savedId ? getTrackById(savedId) : null;
@@ -113,26 +107,6 @@ function buildMiniTrackCard(track, queueLabel, queueIds) {
             ? '<div class="mini-track-play" aria-hidden="true">' + (_isPlaying ? 'II' : '&#9654;') + '</div>'
             : '')
     + '</div>';
-}
-
-function buildMoodCards() {
-  var counts = {};
-  tracks.forEach(function(track) {
-    counts[track.mood || 'Other'] = (counts[track.mood || 'Other'] || 0) + 1;
-  });
-  return Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a]; }).slice(0, 6).map(function(mood) {
-    return '<button class="mood-card" style="--card-glow:' + getMoodColor(mood) + '33" onclick="browseMood(' + jsq(mood) + ')"><div class="mood-name">' + esc(mood) + '</div><div class="mood-meta">' + counts[mood] + ' track' + (counts[mood] !== 1 ? 's' : '') + ' leaning into this mood.</div><div class="mood-count">Open mood shelf</div></button>';
-  }).join('');
-}
-
-function buildSourceCards() {
-  var counts = {};
-  tracks.forEach(function(track) {
-    counts[track.source || 'Other'] = (counts[track.source || 'Other'] || 0) + 1;
-  });
-  return Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a]; }).map(function(source) {
-    return '<button class="source-card" style="--card-glow:' + getGenreColor(source === 'Suno' ? 'Synthwave' : source === 'Original' ? 'Folk' : 'Electronic') + '33" onclick="browseSource(' + jsq(source) + ')"><div class="source-name">' + esc(source) + '</div><div class="source-meta">' + counts[source] + ' track' + (counts[source] !== 1 ? 's' : '') + ' imported from this lane.</div><div class="source-count">Browse source</div></button>';
-  }).join('');
 }
 
 // Shape-matched placeholder for the hero, so the first paint of a syncing

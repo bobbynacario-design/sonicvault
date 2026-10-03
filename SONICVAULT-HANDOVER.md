@@ -162,7 +162,7 @@ function load(key, def) {
 - Resource type: `auto`
 - Progress bar shown during upload (`#upload-progress`, `#upload-progress-bar`, `#upload-progress-pct`)
 - File size limit: 100MB
-- `saveTrack()` is async — uploads first, then saves metadata to Firestore
+- `saveAllUploads()` is async — uploads each queued file first, then saves its metadata to Firestore
 
 ## Design System
 

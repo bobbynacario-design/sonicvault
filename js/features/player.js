@@ -26,10 +26,6 @@ function setPlaybackQueue(ids, label) {
   if (_currentTrack) updateMediaSession();
 }
 
-function getQueueTracks() {
-  return _playQueueIds.map(function(id) { return getTrackById(id); }).filter(Boolean);
-}
-
 // Fisher-Yates over the canonical queue. The current track is pinned to
 // the front so toggling shuffle mid-listen never causes an instant skip.
 function rebuildShuffleOrder() {

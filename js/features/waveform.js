@@ -36,16 +36,6 @@ function saveWaveformCache() {
   }
 }
 
-// Drops the cache from the settings object so it stops being uploaded.
-// Returns true when something was actually removed.
-function stripWaveformCacheFromSettings() {
-  appSettings = window.appSettings || {};
-  if (!appSettings.waveformCache) return false;
-  delete appSettings.waveformCache;
-  window.appSettings = appSettings;
-  return true;
-}
-
 function getRealPeaksForTrack(track) {
   if (!track) return [];
   var cache = getWaveformCache()[track.id];
@@ -149,12 +139,6 @@ function updateWaveformProgress(trackId, pct) {
     var barPct = i / total;
     bar.className = 'wbar ' + (barPct <= pct ? 'wbar-active' : 'wbar-inactive');
   });
-}
-
-function generateWaveform(n) {
-  var bars = [];
-  for (var i = 0; i < n; i++) bars.push(Math.round((0.15 + Math.random() * 0.85) * 100) / 100);
-  return bars;
 }
 
 // aria-hidden: this is a pointer shortcut for an action the card already

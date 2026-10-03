@@ -9,18 +9,6 @@ function buildCoverStyleOptions(current) {
   }).join('');
 }
 
-function buildCoverStylePicker(item, onSelectCall) {
-  var current = getCoverStyle(item);
-  return '<div class="cover-style-picker">' + COVER_STYLES.map(function(style) {
-    var preview = Object.assign({}, item || {}, { coverStyle: style.id });
-    return ''
-      + '<button type="button" class="cover-style-option' + (style.id === current ? ' active' : '') + '" onclick="' + onSelectCall + '(' + jsq(style.id) + ')">'
-      +   buildCoverArt(preview, 'xs', false)
-      +   '<span class="cover-style-label">' + esc(style.name) + '</span>'
-      + '</button>';
-  }).join('') + '</div>';
-}
-
 function makeCoverDemoTracks() {
   var demos = [
     { title:'Neon Highway', genre:'Synthwave', mood:'Energetic', coverStyle:'prism', prompt:'neon synthwave night drive, chrome skyline, bright arps', aiTheme:'Night-drive escape', aiEnergy:'High', aiTags:['Neon','Night drive','Chrome'] },

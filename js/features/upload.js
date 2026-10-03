@@ -519,10 +519,6 @@ async function saveAllUploads() {
   }
 }
 
-function saveTrack() {
-  return saveAllUploads();
-}
-
 var dropZone = document.getElementById('upload-drop');
 if (dropZone) {
   dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });

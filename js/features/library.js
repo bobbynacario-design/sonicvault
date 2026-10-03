@@ -59,13 +59,6 @@ function browseMood(value) {
   document.getElementById('browse-panel').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
-function browseSource(value) {
-  switchView('library');
-  _sourceFilter = value;
-  renderTrackList();
-  document.getElementById('browse-panel').scrollIntoView({ behavior:'smooth', block:'start' });
-}
-
 function browseTag(value) {
   switchView('library');
   _tagFilter = value;
