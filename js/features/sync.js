@@ -15,6 +15,22 @@ var _offlineQueue = JSON.parse(localStorage.getItem('sv_offline_queue') || '{}')
   });
   try { localStorage.setItem('sv_offline_queue', JSON.stringify(_offlineQueue)); } catch (e) {}
 })();
+// Track writes queued by the first lyric-sync build carry lyric timings in
+// a shape Firestore rejects (see packLyricSync), so they failed on every
+// retry. Convert them in place; the next flush then goes through.
+(function migrateQueuedLyricSync() {
+  var changed = false;
+  Object.keys(_offlineQueue).forEach(function(key) {
+    var entry = _offlineQueue[key];
+    var value = entry && entry.kind === 'track' && entry.value;
+    if (!value || !value.lyricSync || !Array.isArray(value.lyricSync.lines)) return;
+    value.lyricSync = cloudSafeLyricSync(value.lyricSync);
+    changed = true;
+  });
+  if (changed) {
+    try { localStorage.setItem('sv_offline_queue', JSON.stringify(_offlineQueue)); } catch (e) {}
+  }
+})();
 var _isOnline = navigator.onLine;
 
 window.addEventListener('online', function() {

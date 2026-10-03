@@ -19,6 +19,38 @@ function said(text, from) {
   return g.lyricWordsOf(text).map((w, i) => [w, from + i, from + i + 0.8]);
 }
 
+// Firestore rejects a document holding an array directly inside an array.
+function hasNestedArray(value, insideArray) {
+  if (Array.isArray(value)) return insideArray || value.some((v) => hasNestedArray(v, true));
+  if (value && typeof value === "object") return Object.values(value).some((v) => hasNestedArray(v, false));
+  return false;
+}
+
+test("stored timings are flat arrays Firestore accepts, and unpack to the same lines", () => {
+  const lines = [[20, 26.5], null, [50.24, 58]];
+  const packed = g.packLyricSync(SHEET, lines, "audio", "2026-10-04T00:00:00Z");
+  assert.equal(hasNestedArray(packed), false);
+  assert.deepEqual(packed.starts, [20, null, 50.24]);
+  assert.deepEqual(packed.ends, [26.5, null, 58]);
+  assert.equal(packed.key, g.lyricSyncKey(SHEET));
+  assert.deepEqual(g.unpackLyricLines(packed), lines);
+});
+
+test("timings saved by the first build are converted to the flat shape", () => {
+  const legacy = { key: "v1:9", lines: [[20, 26.5], null, [50.24, 58]], source: "audio+fixed", at: "x" };
+  assert.equal(hasNestedArray(legacy), true);
+  const safe = g.cloudSafeLyricSync(legacy);
+  assert.equal(hasNestedArray(safe), false);
+  assert.deepEqual(safe, { key: "v1:9", starts: [20, null, 50.24], ends: [26.5, null, 58], source: "audio+fixed", at: "x" });
+  assert.deepEqual(g.unpackLyricLines(legacy), g.unpackLyricLines(safe));
+  // Already flat, or not a sync: untouched.
+  assert.equal(g.cloudSafeLyricSync(safe), safe);
+  assert.equal(g.cloudSafeLyricSync(undefined), undefined);
+  // An unmatched result stores no lines at all.
+  const none = g.packLyricSync(SHEET, [], "unmatched", "x");
+  assert.deepEqual([none.starts, none.ends], [[], []]);
+});
+
 test("the sheet splits into labels, gaps and numbered sung lines", () => {
   const rows = g.parseLyricSheet(SHEET);
   assert.deepEqual(rows.map((r) => r.kind), ["header", "line", "line", "gap", "header", "line", "line", "line"]);

@@ -7,7 +7,9 @@
 // A line that came out wrong is fixed by tapping it while it is being sung;
 // with no worker configured, the same taps time a song by hand.
 //
-// track.lyricSync = { key, lines: [[start, end] | null, ...], source, at }
+// track.lyricSync = { key, starts: [s | null...], ends: [e | null...], source, at }
+//   (two flat arrays: Firestore rejects an array inside an array -- see
+//   packLyricSync in js/data/lyric-sync.js)
 //   key     lyricSyncKey(lyrics) -- editing the lyrics retires the timings
 //   source  'audio' | 'audio+fixed' | 'manual' | 'unmatched'
 
@@ -23,13 +25,17 @@ function getVaultTrack(id) {
   return (tracks || []).find(function(item) { return item.id === id; }) || null;
 }
 
-// The track's saved sync, if it still belongs to these lyrics.
+// The track's saved sync, if it still belongs to these lyrics, as
+// { lines: [[start, end] | null...], source, at } whatever shape it is
+// stored in.
 function getLyricSync(track) {
   var sync = track && track.lyricSync;
-  if (!sync || !Array.isArray(sync.lines) || !hasLyrics(track)) return null;
+  if (!sync || !hasLyrics(track)) return null;
+  var lines = unpackLyricLines(sync);
+  if (!lines) return null;
   if (sync.key !== lyricSyncKey(getTrackLyrics(track))) return null;
-  if (sync.source !== 'unmatched' && sync.lines.length !== sungLyricLines(getTrackLyrics(track)).length) return null;
-  return sync;
+  if (sync.source !== 'unmatched' && lines.length !== sungLyricLines(getTrackLyrics(track)).length) return null;
+  return { key:sync.key, lines:lines, source:sync.source, at:sync.at };
 }
 
 function hasUsableLyricTimes(track) {
@@ -78,12 +84,7 @@ async function requestLyricSync(track) {
     if (getLyricSync(track) || !hasLyrics(track)) return;
     var aligned = alignLyricsToWords(lyrics, data.words || []);
     var trusted = aligned.matched >= LYRIC_SYNC_MIN_MATCH;
-    track.lyricSync = {
-      key:lyricSyncKey(lyrics),
-      lines:trusted ? aligned.lines : [],
-      source:trusted ? 'audio' : 'unmatched',
-      at:new Date().toISOString()
-    };
+    track.lyricSync = packLyricSync(lyrics, trusted ? aligned.lines : [], trusted ? 'audio' : 'unmatched', new Date().toISOString());
     persistTracks();
   } catch (e) {
     _lyricSyncFailed[track.id] = e && e.name === 'AbortError' ? 'timeout' : 'error';
@@ -145,12 +146,7 @@ function onLyricLineTap(index) {
     time:_audio.currentTime,
     at:Date.now()
   };
-  track.lyricSync = {
-    key:lyricSyncKey(lyrics),
-    lines:fixLyricLine(base, index, _audio.currentTime),
-    source:source,
-    at:new Date().toISOString()
-  };
+  track.lyricSync = packLyricSync(lyrics, fixLyricLine(base, index, _audio.currentTime), source, new Date().toISOString());
   _lyricTimesCache = null;
   persistTracks();
   renderLyricStatus();
@@ -163,7 +159,7 @@ function undoLyricFix() {
   _lastLyricFix = null;
   var track = fix && getVaultTrack(fix.trackId);
   if (!track || Date.now() - fix.at > LYRIC_UNDO_MS) { renderLyricStatus(); return; }
-  if (fix.previous) track.lyricSync = fix.previous;
+  if (fix.previous) track.lyricSync = cloudSafeLyricSync(fix.previous);
   else delete track.lyricSync;
   _lyricTimesCache = null;
   persistTracks();

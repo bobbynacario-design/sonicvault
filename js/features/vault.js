@@ -14,6 +14,13 @@ var tracks = window.tracks;
 var playlists = window.playlists;
 var appSettings = window.appSettings;
 
+// Lyric timings from the first lyric-sync build were stored in a shape
+// Firestore rejects (an array of [start, end] arrays), so every save of
+// those tracks failed and sat in the queue. Convert this device's copy.
+tracks.forEach(function(track) {
+  if (track && track.lyricSync) track.lyricSync = cloudSafeLyricSync(track.lyricSync);
+});
+
 function getTrackById(id) {
   return tracks.find(function(t) { return t.id === id; }) || getPublicTrackPool().find(function(t) { return t.id === id; }) || null;
 }

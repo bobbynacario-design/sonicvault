@@ -242,6 +242,57 @@ function currentLyricIndex(times, t, lead) {
   return idx;
 }
 
+// How timings are stored on a track. Firestore cannot hold an array
+// directly inside another array -- it rejects the whole document -- so the
+// [start, end] pairs are kept as two flat arrays of the same length, null
+// where a line is untimed:
+//   { key, starts:[s|null...], ends:[e|null...], source, at }
+// (The first build stored lines:[[start, end]...]; every save of a timed
+// track failed. cloudSafeLyricSync converts those.)
+function packLyricSync(lyrics, lines, source, at) {
+  var starts = [];
+  var ends = [];
+  (lines || []).forEach(function(span) {
+    var ok = span && isFinite(span[0]);
+    starts.push(ok ? Number(span[0]) : null);
+    ends.push(ok ? Number(isFinite(span[1]) ? span[1] : span[0]) : null);
+  });
+  return { key:lyricSyncKey(lyrics), starts:starts, ends:ends, source:source, at:at };
+}
+
+// The [start, end] | null per line a stored sync describes, from either shape.
+function unpackLyricLines(sync) {
+  if (!sync) return null;
+  if (Array.isArray(sync.starts)) {
+    var ends = Array.isArray(sync.ends) ? sync.ends : [];
+    return sync.starts.map(function(start, i) {
+      if (start === null || start === undefined || !isFinite(start)) return null;
+      var end = ends[i];
+      return [Number(start), end === null || end === undefined || !isFinite(end) ? Number(start) : Number(end)];
+    });
+  }
+  if (Array.isArray(sync.lines)) {
+    return sync.lines.map(function(span) {
+      return span && isFinite(span[0]) ? [Number(span[0]), Number(isFinite(span[1]) ? span[1] : span[0])] : null;
+    });
+  }
+  return null;
+}
+
+// A stored sync in the shape Firestore accepts; anything already in it, or
+// not a sync at all, comes back unchanged.
+function cloudSafeLyricSync(sync) {
+  if (!sync || typeof sync !== 'object' || !Array.isArray(sync.lines)) return sync;
+  var lines = unpackLyricLines(sync);
+  return {
+    key:sync.key,
+    starts:lines.map(function(span) { return span ? span[0] : null; }),
+    ends:lines.map(function(span) { return span ? span[1] : null; }),
+    source:sync.source,
+    at:sync.at
+  };
+}
+
 // A hand correction: line index starts at t. Neighbours that would now be
 // out of order are pulled just clear of it, so the sheet keeps its order.
 function fixLyricLine(spans, index, t) {
