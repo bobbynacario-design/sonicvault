@@ -152,7 +152,7 @@ function updateExpandedPlayer() {
     document.getElementById('xp-total').textContent = '0:00';
     document.getElementById('xp-progress-fill').style.width = '0%';
     document.getElementById('xp-wave').innerHTML = '';
-    document.getElementById('xp-play-btn').textContent = 'Play';
+    setPlayButton(document.getElementById('xp-play-btn'), false);
     document.getElementById('xp-queue-copy').textContent = 'The active queue will show up here.';
     document.getElementById('xp-queue-list').innerHTML = '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">No queue yet</strong>Start playback to open the full player.</div>';
     document.getElementById('xp-playlist-list').innerHTML = '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">No track selected</strong>Choose a record first.</div>';
@@ -162,7 +162,7 @@ function updateExpandedPlayer() {
 
   ensureWaveformForTrack(_currentTrack);
   document.getElementById('xp-cover').innerHTML = buildCoverArt(_currentTrack, 'lg', true);
-  document.getElementById('xp-kicker').textContent = (_playQueueLabel || 'Vault') + ' / Expanded player';
+  document.getElementById('xp-kicker').textContent = 'Playing from ' + (_playQueueLabel || 'your vault');
   document.getElementById('xp-title').textContent = _currentTrack.title;
   document.getElementById('xp-meta').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno') + ' / ' + fmtCompactNumber(_currentTrack.plays || 0) + ' plays';
   document.getElementById('xp-prompt').textContent = _currentTrack.prompt || promptFallback(_currentTrack);
@@ -181,7 +181,7 @@ function updateExpandedPlayer() {
   var pct = _audio.duration ? (_audio.currentTime / _audio.duration) * 100 : 0;
   document.getElementById('xp-progress-fill').style.width = pct + '%';
   document.getElementById('xp-wave').innerHTML = renderExpandedWaveform(_currentTrack);
-  document.getElementById('xp-play-btn').textContent = _isPlaying ? 'Pause' : 'Play';
+  setPlayButton(document.getElementById('xp-play-btn'), _isPlaying);
   syncPlayerLiveState();
   updateLyricHighlight(true);
 

@@ -111,18 +111,43 @@ function inferCoverStyle(input, metadata) {
   });
 }
 
+// Hue pairs that stay clean on a dark ground: a lead hue and a neighbour.
+// The old palette blended across the wheel at ~40% saturation, and anything
+// that landed in the yellow-green band faded to olive -- most covers came out
+// muddy. There is deliberately no pair between 48 and 145.
+var COVER_HUE_PAIRS = [
+  [350, 18], [18, 340], [34, 350], [48, 16],
+  [145, 186], [168, 206], [196, 238], [222, 262],
+  [248, 290], [274, 318], [298, 340], [324, 4]
+];
+
+function hueDistance(a, b) {
+  var d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
 function getTrackPalette(track) {
   var base = hashString((track && track.title || '') + '|' + (track && track.genre || '') + '|' + (track && track.mood || '') + '|' + (track && track.source || ''));
+  // Mood and source still steer the colour: the derived hue snaps to the
+  // nearest pair rather than being thrown away.
   var hue = (base % 360 + moodWeight(track && track.mood) + sourceWeight(track && track.source)) % 360;
-  var hue2 = (hue + 44 + (base % 60)) % 360;
-  var hue3 = (hue + 130 + (base % 80)) % 360;
+  var pair = COVER_HUE_PAIRS.reduce(function(best, p) {
+    return hueDistance(p[0], hue) < hueDistance(best[0], hue) ? p : best;
+  });
+  var jitter = (base % 13) - 6;
+  var h1 = (pair[0] + jitter + 360) % 360;
+  var h2 = (pair[1] + jitter + 360) % 360;
+  // Dark orange is brown, so warm pairs fade into plum instead of into a
+  // darker version of themselves.
+  var warm = h1 < 60 || h1 > 330;
+  var ground = warm ? 304 : (h2 + 18) % 360;
   return {
-    a: 'hsl(' + hue + ' 42% 50%)',
-    b: 'hsl(' + hue2 + ' 38% 53%)',
-    c: 'hsl(' + hue3 + ' 30% 24%)',
-    accent: 'hsl(' + ((hue + 8) % 360) + ' 54% 63%)',
-    soft: 'hsla(' + hue + ', 50%, 54%, .1)',
-    deep: 'hsla(' + hue + ', 34%, 18%, .18)',
+    a: 'hsl(' + h1 + ' 80% 62%)',
+    b: 'hsl(' + h2 + ' 72% 54%)',
+    c: 'hsl(' + ground + ' 46% 14%)',
+    accent: 'hsl(' + h1 + ' 76% 70%)',
+    soft: 'hsla(' + h1 + ', 72%, 58%, .12)',
+    deep: 'hsla(' + h1 + ', 60%, 34%, .22)',
     angle: (base % 150) + 18
   };
 }

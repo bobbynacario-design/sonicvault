@@ -40,6 +40,12 @@
      covering the header controls. */
   --sync-banner-h:0px;
   --sidebar-width:236px;
+  /* Fixed so the docked player can sit on top of it without measuring. */
+  --mobile-nav-h:62px;
+  /* The one fill interior elements get instead of a rim: hover rows, inputs,
+     ghost buttons. */
+  --surface:rgba(255,255,255,.045);
+  --surface-hover:rgba(255,255,255,.075);
 }
 body.light{
   --bg:#f1ece2;
@@ -68,6 +74,8 @@ body.light{
   --blue:#496ecb;
   --violet:#7657cb;
   --amber:#bb8f31;
+  --surface:rgba(28,20,14,.045);
+  --surface-hover:rgba(28,20,14,.075);
 }
 html,body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
 body{
@@ -118,6 +126,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:2px s
 input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent-dynamic);outline-offset:1px}
 /* Visually hidden but still read aloud — used for labels on inputs whose
    purpose is only conveyed by a placeholder or an adjacent glyph. */
+.ic{width:20px;height:20px;flex:none;display:block;pointer-events:none}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
 /* Cards used as buttons must look identical to their div originals. */
 [role="button"]{cursor:pointer}
@@ -176,24 +185,24 @@ body.light .nav{background:linear-gradient(180deg, rgba(241,236,226,.88), rgba(2
 }
 .nav-left{display:flex;align-items:center;gap:1.4rem;min-width:0}
 .nav-brand-wrap{display:flex;align-items:center;gap:.9rem;min-width:0}
+/* An aurora orb rather than a lettered tile: it picks up the playing track's
+   accent, like the background blooms do. */
 .nav-mark{
-  width:42px;
-  height:42px;
-  border-radius:14px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:linear-gradient(135deg, var(--accent-dynamic-soft), rgba(255,255,255,.04));
-  border:1px solid var(--rim2);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.1);
-  font-family:var(--mono);
-  font-size:12px;
-  letter-spacing:.16em;
-  color:var(--accent-dynamic);
+  flex:none;
+  width:34px;
+  height:34px;
+  border-radius:11px;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255,255,255,.6), transparent 42%),
+    radial-gradient(circle at 80% 85%, var(--accent-dynamic), transparent 70%),
+    linear-gradient(140deg, var(--violet), var(--accent-dynamic));
+  box-shadow:0 10px 26px -10px var(--accent-dynamic);
 }
 .nav-brand{display:flex;flex-direction:column;gap:.12rem;min-width:0}
-.nav-brand-title{font-family:var(--display);font-weight:700;font-size:23px;letter-spacing:.05em;line-height:1}
-.nav-brand-sub{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted2)}
+.nav-brand-title{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-.01em;line-height:1}
+/* The tagline wrapped onto two tracked-out mono lines beside the wordmark.
+   The wordmark is enough. */
+.nav-brand-sub{display:none}
 .nav-groups{display:flex;gap:.42rem;flex-wrap:wrap}
 /* Sentence-case tabs are wider than the old mono caps, which pushed
    "Insights" onto a second line. The brand tagline is the least useful thing
@@ -203,41 +212,42 @@ body.light .nav{background:linear-gradient(180deg, rgba(241,236,226,.88), rgba(2
   .group-tab{padding:.55rem .78rem}
 }
 .group-tab{
+  display:flex;
+  align-items:center;
+  gap:.8rem;
   padding:.62rem .95rem;
-  border-radius:999px;
-  border:1px solid transparent;
+  border-radius:12px;
   color:var(--muted);
   cursor:pointer;
   font-family:var(--sans);
-  font-size:13px;
+  font-size:14px;
   letter-spacing:normal;
-  transition:all .2s ease;
+  transition:background .16s ease,color .16s ease;
   font-weight:500;
 }
-.group-tab:hover{color:var(--text);background:var(--panel-soft);border-color:var(--rim)}
-.group-tab.active{
-  color:var(--accent-dynamic);
-  background:var(--accent-dynamic-soft);
-  border-color:var(--accent-ghost);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
-}
+.group-tab .ic{width:19px;height:19px;opacity:.85}
+.group-tab:hover{color:var(--text);background:var(--surface)}
+.group-tab.active{color:var(--text);background:var(--surface-hover)}
+.group-tab.active .ic{color:var(--accent-dynamic);opacity:1}
 .nav-right{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;justify-content:flex-end}
 /* Controls and status used to look identical -- five equal-weight pills in
    the top-right competing with each other. Controls keep the pill; status
    (sync state, clock) drops to quiet borderless text so the eye skips it. */
+.nav-tools{display:flex;gap:.25rem}
 .theme-toggle{
-  padding:.55rem .85rem;
-  border-radius:999px;
-  border:1px solid var(--rim);
-  background:var(--panel-soft);
+  width:40px;
+  height:40px;
+  border-radius:12px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
   color:var(--muted);
-  font-family:var(--sans);
-  font-size:12.5px;
-  font-weight:500;
   cursor:pointer;
-  transition:all .18s ease;
+  transition:background .16s ease,color .16s ease;
 }
-.theme-toggle:hover{color:var(--text);border-color:var(--rim2)}
+.theme-toggle .ic{width:19px;height:19px}
+.theme-toggle:hover{color:var(--text);background:var(--surface)}
+.theme-toggle.signed-in{color:var(--success)}
 .status-pill{
   display:inline-flex;
   align-items:center;
@@ -316,20 +326,16 @@ body.light .nav{background:linear-gradient(180deg, rgba(241,236,226,.88), rgba(2
   padding:1.6rem 1.4rem calc(var(--player-height) + 2.2rem);
 }
 .page.active{display:block}
-.page-stack{display:grid;gap:1.3rem}
+.page-stack{display:grid;gap:2.6rem}
 body.public-route .nav-groups,
 body.public-route .mobile-nav,
 body.public-route .status-pill,
 body.public-route .clock-nav{display:none !important}
-.section-card{
-  background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
-  border:1px solid var(--rim);
-  border-radius:26px;
-  box-shadow:var(--shadow);
-  overflow:hidden;
-}
-body.light .section-card{background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.92))}
-.section-inner{padding:1.3rem}
+/* Sections are groupings, not boxes. Every page used to be a stack of rimmed
+   panels holding more rimmed cards; the panels now keep only their spacing,
+   so the cards inside them are the one level of chrome left. */
+.section-card{min-width:0}
+.section-inner{padding:0}
 .section-head{
   display:flex;
   align-items:flex-end;
@@ -354,7 +360,7 @@ body.light .section-card{background:linear-gradient(180deg, rgba(255,255,255,.78
 .section-title{
   font-family:var(--display);font-weight:700;
   font-size:24px;
-  letter-spacing:.02em;
+  letter-spacing:-.01em;
   line-height:1.05;
 }
 .section-title.is-hero{
@@ -384,7 +390,9 @@ body.light .section-card{background:linear-gradient(180deg, rgba(255,255,255,.78
   transition:all .18s ease;
   font-weight:500;
 }
-.sec-action:hover{color:var(--text);background:var(--accent-dynamic-soft)}
+.sec-action:hover{color:var(--text);background:var(--surface-hover)}
+.sec-action.has-icon{display:inline-flex;align-items:center;gap:.45rem;padding-left:.9rem}
+.sec-action.has-icon .ic{width:15px;height:15px}
 body.light .sec-action{background:rgba(0,0,0,.05)}
 .sec-action.primary{
   background:rgba(255,255,255,.94);
@@ -610,45 +618,38 @@ body.light .side-item{background:rgba(0,0,0,.03)}
 }
 .snapshot-sub{font-size:12px;color:var(--muted2);margin-top:.35rem}
 
-.library-home-stack{display:grid;gap:1.2rem}
+.library-home-stack{display:grid;gap:2.4rem}
 .rail-grid{
   display:grid;
   /* auto-fit rather than a fixed count: the Recently played rail only exists
      once something has been played, so this row is three or four cards wide
      depending on the vault, and wraps instead of cramming when narrow. */
   grid-template-columns:repeat(auto-fit,minmax(232px,1fr));
-  gap:1rem;
+  gap:1.4rem 2rem;
 }
-.rail-card{
-  padding:1.15rem;
-  border-radius:24px;
-  border:1px solid var(--rim);
-  background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.016));
-}
+.rail-card{min-width:0}
 .rail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.7rem;margin-bottom:1rem}
-.rail-title{font-family:var(--display);font-weight:700;font-size:22px;line-height:1}
+.rail-title{font-family:var(--display);font-weight:700;font-size:19px;line-height:1;margin:0 0 .7rem .5rem}
 .rail-copy{font-size:12px;color:var(--muted);line-height:1.6;margin-top:.35rem}
-.mini-track-list{display:grid;gap:.7rem}
+.mini-track-list{display:grid;gap:.1rem}
 .mini-track-card{
   display:grid;
-  grid-template-columns:54px minmax(0,1fr) auto;
-  gap:.7rem;
+  grid-template-columns:48px minmax(0,1fr) auto;
+  gap:.8rem;
   align-items:center;
-  padding:.72rem;
-  border-radius:18px;
-  background:rgba(255,255,255,.04);
-  border:1px solid transparent;
+  padding:.45rem .5rem;
+  border-radius:14px;
   cursor:pointer;
-  transition:transform .18s ease,border-color .18s ease,background .18s ease;
+  transition:background .16s ease;
 }
-.mini-track-card:hover{transform:translateY(-2px);border-color:var(--rim2)}
-body.light .mini-track-card{background:rgba(0,0,0,.03)}
+.mini-track-card:hover{background:var(--surface)}
+.mini-track-card .cover-art{width:48px;height:48px;border-radius:11px}
 /* Four rails leave each card ~260px wide, where a single ellipsised line cut
    most titles to a few characters. Two clamped lines keep the card height
    bounded and show the whole of nearly every title. */
 .mini-track-title{
-  font-size:13px;
-  font-weight:700;
+  font-size:14px;
+  font-weight:600;
   display:-webkit-box;
   -webkit-line-clamp:2;
   -webkit-box-orient:vertical;
@@ -657,21 +658,18 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
      pushed two-word titles onto a third line. */
   overflow-wrap:break-word;
 }
-.mini-track-sub{font-size:11px;color:var(--muted2);margin-top:.2rem}
+.mini-track-sub{font-size:12px;color:var(--muted2);margin-top:.15rem}
 .mini-track-meta{font-family:var(--mono);font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em}
 .mini-track-play{
-  width:28px;
-  height:28px;
+  width:30px;
+  height:30px;
   border-radius:50%;
   display:flex;
   align-items:center;
   justify-content:center;
-  background:var(--accent-dynamic-soft);
   color:var(--accent-dynamic);
-  border:1px solid var(--accent-ghost);
-  font-family:var(--mono);
-  font-size:12px;
 }
+.mini-track-play .ic{width:16px;height:16px}
 
 .tag-cloud{display:flex;gap:.5rem;flex-wrap:wrap}
 .prompt-chip{
@@ -699,34 +697,26 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
 .search-input-wrap{
   display:flex;
   align-items:center;
-  gap:.75rem;
-  padding:.95rem 1rem;
-  border-radius:18px;
-  border:1px solid var(--rim);
-  background:rgba(255,255,255,.03);
+  gap:.7rem;
+  padding:.78rem 1.1rem;
+  border-radius:999px;
+  background:var(--surface);
+  transition:background .16s ease,box-shadow .16s ease;
 }
-.search-icon{
-  width:34px;
-  height:34px;
-  border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:var(--accent-dynamic-soft);
-  color:var(--accent-dynamic);
-  font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.12em;
-}
+.search-input-wrap:focus-within{background:var(--surface-hover);box-shadow:0 0 0 1px var(--accent-ghost)}
+.search-icon{display:flex;color:var(--muted2)}
+.search-icon .ic{width:18px;height:18px}
 .search-input-wrap input{
   flex:1;
+  min-width:0;
   background:transparent;
   border:none;
   outline:none;
   color:var(--text);
-  font-family:var(--mono);
-  font-size:13px;
+  font-family:var(--sans);
+  font-size:14px;
 }
+.search-input-wrap input::placeholder{color:var(--muted2)}
 .filter-bar{
   display:flex;
   align-items:center;
@@ -808,9 +798,8 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   background:var(--accent-dynamic);
 }
 .browse-summary{
-  margin-top:1rem;
-  padding:1rem 0 .8rem;
-  border-top:1px solid var(--rim);
+  margin-top:.6rem;
+  padding:.8rem 0 .2rem;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -842,6 +831,9 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
 }
 .browse-clear-pill:hover{background:var(--accent);color:#fff}
 
+/* The shelf belongs to the Library header above it, not a section of its own. */
+#track-list{margin-top:-2rem}
+#track-list[hidden]{display:none}
 .track-grid{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
@@ -854,7 +846,7 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
 .track-row-wrap{border-radius:12px}
 .track-row{
   display:grid;
-  grid-template-columns:30px 40px minmax(0,1fr) 56px 54px auto;
+  grid-template-columns:30px 42px minmax(0,1fr) 84px 54px auto;
   align-items:center;
   gap:.85rem;
   padding:.42rem .7rem;
@@ -862,10 +854,9 @@ body.light .mini-track-card{background:rgba(0,0,0,.03)}
   cursor:pointer;
   transition:background .14s ease;
 }
-.track-row:hover,.track-row-wrap.expanded .track-row{background:rgba(255,255,255,.05)}
-body.light .track-row:hover,body.light .track-row-wrap.expanded .track-row{background:rgba(0,0,0,.04)}
+.track-row:hover,.track-row-wrap.expanded .track-row{background:var(--surface)}
 .track-row.current .row-title{color:var(--accent-dynamic)}
-.track-row .cover-art{width:40px;height:40px;border-radius:9px}
+.track-row .cover-art{width:42px;height:42px;border-radius:9px}
 .row-index{
   font-family:var(--mono);
   font-size:11px;
@@ -887,7 +878,7 @@ body.light .track-row:hover,body.light .track-row-wrap.expanded .track-row{backg
      size scale, and it's the single most-viewed text in the app now that
      list view is the default. */
   font-size:14px;
-  font-weight:700;
+  font-weight:600;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
@@ -920,17 +911,24 @@ body.light .track-row:hover,body.light .track-row-wrap.expanded .track-row{backg
 .track-row-wrap .track-expand{display:none;padding:.2rem .7rem 1rem 1.55rem}
 .track-row-wrap.expanded .track-expand{display:grid;gap:.85rem}
 @media (hover:none){.row-actions{opacity:1}}
+.row-actions .icon-btn{background:transparent}
+.row-actions .icon-btn:hover{background:var(--surface-hover);color:var(--text)}
+.card-menu-btn .ic{width:18px;height:18px;margin:0 auto}
+.card-menu .menu-notes{display:none}
 @media (max-width:640px){
   /* Five visible children once .row-plays is hidden — declaring four columns
      wrapped the actions onto a second implicit row and doubled row height. */
-  .track-row{grid-template-columns:26px 40px minmax(0,1fr) auto auto;gap:.55rem}
+  .track-row{grid-template-columns:22px 42px minmax(0,1fr) auto auto;gap:.6rem}
   .row-plays{display:none}
-  /* No hover on a phone, so actions cannot be hover-revealed. */
+  /* No hover on a phone, so actions cannot be hover-revealed. Notes moves
+     into the overflow menu so the title keeps the width. */
   .row-actions{opacity:1}
+  .row-actions .js-notes-btn{display:none}
+  .card-menu .menu-notes{display:block}
   .view-switch-btn{min-height:44px}
 }
 
-.view-switch{display:inline-flex;gap:2px;margin-left:auto;padding:3px;border-radius:999px;background:var(--panel-soft);border:1px solid var(--rim)}
+.view-switch{display:inline-flex;gap:2px;margin-left:auto;padding:3px;border-radius:999px;background:var(--surface)}
 .view-switch-btn{
   padding:.34rem .72rem;
   border-radius:999px;
@@ -941,36 +939,55 @@ body.light .track-row:hover,body.light .track-row-wrap.expanded .track-row{backg
   transition:all .14s ease;
 }
 .view-switch-btn:hover{color:var(--text)}
-.view-switch-btn.active{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+.view-switch-btn.active{background:var(--surface-hover);color:var(--text)}
 
 /* ── Resume strip ───────────────────────────────────────────────────── */
+/* The home's one hero. --hero-a/--hero-b are the track's own cover colours
+   (set inline by renderLibraryHome), so the strip blooms in its palette. */
 .resume-strip{
+  position:relative;
   display:grid;
   grid-template-columns:auto minmax(0,1fr) auto;
-  align-items:center;
-  gap:1rem;
-  padding:.9rem 1.1rem;
-  border-radius:22px;
-  border:1px solid var(--rim);
-  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  align-items:end;
+  gap:1.6rem;
+  padding:1.6rem;
+  border-radius:30px;
+  overflow:hidden;
+  background:
+    radial-gradient(80% 160% at 0% 0%, color-mix(in srgb, var(--hero-a, var(--accent-dynamic)) 30%, transparent), transparent 70%),
+    radial-gradient(70% 140% at 100% 100%, color-mix(in srgb, var(--hero-b, var(--violet)) 18%, transparent), transparent 70%),
+    var(--surface);
 }
+.resume-strip .cover-art{width:168px;height:168px;border-radius:22px;box-shadow:0 30px 60px -24px rgba(0,0,0,.7)}
 .resume-kicker{
   font-family:var(--mono);
-  font-size:9.5px;
-  letter-spacing:.16em;
+  font-size:10px;
+  letter-spacing:.18em;
   text-transform:uppercase;
-  color:var(--accent-dynamic);
-  margin-bottom:.2rem;
+  color:var(--muted);
+  margin-bottom:.6rem;
 }
-.resume-title{font-family:var(--display);font-weight:700;font-size:26px;line-height:1.05;letter-spacing:-.01em}
-.resume-meta{font-size:12.5px;color:var(--muted2);margin-top:.22rem}
+.resume-title{font-family:var(--display);font-weight:700;font-size:clamp(30px,3.6vw,46px);line-height:1;letter-spacing:-.02em}
+.resume-meta{font-size:14px;color:var(--muted);margin-top:.6rem}
 .resume-actions{display:flex;gap:.5rem;flex-wrap:wrap}
 @media (max-width:640px){
-  .resume-strip{grid-template-columns:auto minmax(0,1fr);gap:.8rem}
+  .resume-strip{grid-template-columns:auto minmax(0,1fr);align-items:center;gap:1rem;padding:1.1rem;border-radius:24px}
+  .resume-strip .cover-art{width:96px;height:96px;border-radius:16px}
   .resume-actions{grid-column:1 / -1}
   .resume-actions .sec-action{flex:1;justify-content:center}
-  .resume-title{font-size:21px}
+  .resume-title{font-size:24px}
+  .resume-meta{font-size:13px;margin-top:.35rem}
 }
+.demo-banner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.6rem 1rem;
+  flex-wrap:wrap;
+  color:var(--muted);
+  font-size:13px;
+}
+.demo-banner strong{color:var(--text);font-weight:600}
 
 /* Spans the grid so the "show more" affordance reads as a shelf footer
    rather than another card in the row. */
@@ -1199,14 +1216,19 @@ body.light .expand-item{background:none}
 }
 .expand-value{font-size:13px;line-height:1.55;color:var(--text)}
 
+/* Two blooms of neighbouring hues over a deep ground of the same family --
+   the aurora the rest of the app is painted with. Every style below lays its
+   pattern over this one mesh. */
 .cover-art{
+  --cover-mesh:
+    radial-gradient(95% 85% at 16% 10%, var(--cover-a), transparent 64%),
+    radial-gradient(90% 95% at 92% 96%, var(--cover-b), transparent 62%),
+    linear-gradient(var(--cover-angle,135deg), var(--cover-c), #07080e);
   position:relative;
   overflow:hidden;
   border-radius:24px;
-  border:1px solid rgba(255,255,255,.12);
-  background:
-    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 52%, var(--cover-c));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 999px rgba(6,8,14,.12);
+  background:var(--cover-mesh);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);
   isolation:isolate;
 }
 .cover-art::before,
@@ -1224,14 +1246,14 @@ body.light .expand-item{background:none}
   background:radial-gradient(circle, rgba(255,255,255,.14), transparent 68%);
   mix-blend-mode:screen;
 }
+/* Shade only where the labels sit; the old full-height wash greyed every
+   cover down. */
 .cover-art::after{
   inset:0;
   width:auto;
   height:auto;
   border-radius:inherit;
-  background:
-    linear-gradient(180deg, rgba(6,8,14,.08), rgba(6,8,14,.2) 54%, rgba(6,8,14,.32)),
-    radial-gradient(circle at 82% 18%, rgba(0,0,0,.18), transparent 36%);
+  background:linear-gradient(180deg, rgba(6,8,14,.16), transparent 22%, transparent 62%, rgba(6,8,14,.34));
 }
 .cover-grid{
   position:absolute;
@@ -1279,7 +1301,7 @@ body.light .expand-item{background:none}
   background:
     radial-gradient(circle at 50% 50%, rgba(6,8,14,.86) 0 7%, rgba(255,255,255,.2) 7.5% 8.5%, rgba(6,8,14,.78) 9% 35%, transparent 35.5%),
     repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.16) 0 1px, transparent 1px 8px),
-    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 52%, var(--cover-c));
+    var(--cover-mesh);
 }
 .cover-art.cover-style-vinyl .cover-grid{opacity:.04}
 .cover-art.cover-style-vinyl .cover-wave{
@@ -1294,14 +1316,14 @@ body.light .expand-item{background:none}
   background:
     linear-gradient(90deg, rgba(255,255,255,.1) 0 1px, transparent 1px 18px),
     linear-gradient(180deg, rgba(255,255,255,.08) 0 1px, transparent 1px 18px),
-    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 48%, var(--cover-c));
+    var(--cover-mesh);
 }
 .cover-art.cover-style-poster .cover-ring{border-radius:4px;transform:rotate(14deg);opacity:.34}
 .cover-art.cover-style-scope{
   background:
     radial-gradient(circle at 18% 20%, rgba(255,255,255,.24), transparent 22%),
     radial-gradient(circle at 78% 72%, rgba(255,255,255,.14), transparent 28%),
-    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 52%, var(--cover-c));
+    var(--cover-mesh);
 }
 .cover-art.cover-style-scope .cover-wave{
   inset:21% -18% auto auto;
@@ -1311,9 +1333,12 @@ body.light .expand-item{background:none}
   transform:rotate(18deg);
   opacity:.42;
 }
+/* Facets of light over the mesh. A conic sweep through the palette itself
+   dragged the deep ground colour through the middle as a brown wedge. */
 .cover-art.cover-style-prism{
   background:
-    conic-gradient(from var(--cover-angle,135deg) at 38% 42%, var(--cover-a), var(--cover-b), var(--cover-c), var(--cover-a));
+    conic-gradient(from var(--cover-angle,135deg) at 38% 42%, rgba(255,255,255,.24), transparent 16%, rgba(255,255,255,.07) 38%, transparent 56%, rgba(255,255,255,.16) 78%, rgba(255,255,255,.24)),
+    var(--cover-mesh);
 }
 .cover-art.cover-style-prism .cover-grid{
   opacity:.14;
@@ -1332,7 +1357,7 @@ body.light .expand-item{background:none}
 .cover-art.cover-style-pulse{
   background:
     repeating-linear-gradient(90deg, rgba(255,255,255,.16) 0 3px, transparent 3px 13px),
-    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 52%, var(--cover-c));
+    var(--cover-mesh);
 }
 .cover-art.cover-style-pulse .cover-wave{
   inset:auto -8% 8% -8%;
@@ -1347,7 +1372,7 @@ body.light .expand-item{background:none}
 .cover-art.cover-style-tape{
   background:
     linear-gradient(180deg, rgba(6,8,14,.34) 0 16%, transparent 16% 76%, rgba(6,8,14,.38) 76%),
-    linear-gradient(var(--cover-angle,135deg), var(--cover-a), var(--cover-b) 48%, var(--cover-c));
+    var(--cover-mesh);
 }
 .cover-art.cover-style-tape .cover-ring{width:34%;height:34%;opacity:.5}
 .cover-art.cover-style-tape .cover-wave{
@@ -1387,18 +1412,19 @@ body.light .expand-item{background:none}
   text-overflow:ellipsis;
   white-space:nowrap;
 }
-/* Only the 320px lg cover has room for a label on each side. Below that,
-   two labels either collide or ellipsis into noise ("CHI…", "ENER…"), and
-   they duplicate the genre/mood pills sitting right next to the cover
-   anyway — so the smaller covers keep the primary label only. */
-/* 54px thumbnails cannot legibly hold a 9px tracked-out label at all — even
-   a single word truncates. They get artwork and monogram only. */
+/* Only the lg cover has room for its labels. Below it they collided with the
+   monogram ("SUNO" printed over "RS") or ellipsised into noise ("ENERGE…"),
+   and they repeat the genre/mood line sitting beside every smaller cover --
+   so xs/sm/md are artwork only, and md keeps the monogram. */
 .cover-xs .cover-topline,
-.cover-xs .cover-bottomline{display:none}
-.cover-sm .cover-topline > span:last-child,
-.cover-sm .cover-bottomline > span:last-child,
-.cover-md .cover-topline > span:last-child,
-.cover-md .cover-bottomline > span:last-child{display:none}
+.cover-xs .cover-bottomline,
+.cover-sm .cover-topline,
+.cover-sm .cover-bottomline,
+.cover-md .cover-topline,
+.cover-md .cover-bottomline,
+.cover-xs .cover-mark,
+.cover-sm .cover-mark{display:none}
+.cover-md .cover-mark{bottom:14px}
 /* cover-lg is fluid (max-width:320px) so it shrinks well below the width two
    labels need — drop the secondary once the column gets narrow. */
 @media (max-width:1000px){
@@ -1418,16 +1444,16 @@ body.light .expand-item{background:none}
   letter-spacing:-.06em;
   color:#fff;
   max-width:72%;
-  text-shadow:0 6px 24px rgba(0,0,0,.16);
+  text-shadow:0 6px 24px rgba(0,0,0,.22);
 }
-.cover-xs{width:54px;height:54px;border-radius:16px}
-.cover-sm{width:78px;height:78px;border-radius:18px}
+.cover-xs{width:54px;height:54px;border-radius:12px}
+.cover-sm{width:78px;height:78px;border-radius:16px}
 .cover-md{width:118px;height:118px}
 .cover-lg{width:100%;max-width:320px;aspect-ratio:1/1}
 /* "Now playing" cover: gentle breathing scale + pulsing accent glow, and the
    generative ring/wave slowly drift to signal an active track. */
 @keyframes coverBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.014)}}
-@keyframes coverLiveGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 999px rgba(6,8,14,.12), 0 10px 30px -18px var(--accent-dynamic-soft)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 999px rgba(6,8,14,.12), 0 26px 70px -14px var(--accent-dynamic-soft)}}
+@keyframes coverLiveGlow{0%,100%{box-shadow:inset 0 0 0 1px rgba(255,255,255,.1), 0 10px 30px -18px var(--accent-dynamic)}50%{box-shadow:inset 0 0 0 1px rgba(255,255,255,.1), 0 26px 70px -14px var(--accent-dynamic)}}
 @keyframes coverDrift{to{transform:rotate(360deg)}}
 .cover-art.cover-live{animation:coverBreathe 6s ease-in-out infinite, coverLiveGlow 4.5s ease-in-out infinite}
 .cover-art.cover-live .cover-ring{animation:coverDrift 24s linear infinite;transform-origin:center}
@@ -1435,14 +1461,14 @@ body.light .expand-item{background:none}
 .cover-collage{
   display:grid;
   grid-template-columns:repeat(2,1fr);
-  gap:6px;
   width:100%;
   aspect-ratio:1/1;
-  padding:8px;
-  border-radius:24px;
-  background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-  border:1px solid var(--rim);
+  gap:4px;
+  padding:0;
+  border-radius:20px;
+  overflow:hidden;
 }
+.cover-collage .cover-art{border-radius:4px}
 .cover-collage .cover-art{width:100%;height:100%}
 
 .playlist-hero-grid{
@@ -1549,34 +1575,29 @@ body.light .playlist-track-pill{background:rgba(0,0,0,.03)}
 .upload-drop:hover,.upload-drop.dragover{border-color:var(--accent-ghost);background:linear-gradient(180deg, var(--accent-dynamic-soft), rgba(255,255,255,.02))}
 .upload-drop input[type="file"]{display:none}
 .upload-mark{
-  width:82px;
-  height:82px;
+  width:72px;
+  height:72px;
   margin:0 auto 1rem;
   border-radius:50%;
   display:flex;
   align-items:center;
   justify-content:center;
   background:var(--accent-dynamic-soft);
-  border:1px solid var(--accent-ghost);
   color:var(--accent-dynamic);
-  font-family:var(--display);font-weight:700;
-  font-size:24px;
 }
+.upload-mark .ic{width:30px;height:30px}
 .upload-title{font-family:var(--display);font-weight:700;font-size:28px;line-height:1}
 .upload-copy{font-size:14px;color:var(--muted);line-height:1.75;max-width:520px;margin:.8rem auto 0}
 .upload-foot{margin-top:1rem;font-family:var(--mono);font-size:11px;color:var(--muted2);letter-spacing:.12em;text-transform:uppercase}
 .upload-info-card,.upload-form-card{
   padding:1.2rem;
   border-radius:26px;
-  border:1px solid var(--rim);
-  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  background:var(--surface);
 }
 .upload-grid{display:grid;gap:1rem}
 .pending-preview{display:grid;gap:.9rem}
 .pending-preview-empty{
-  padding:1.2rem;
-  border-radius:22px;
-  border:1px dashed var(--rim2);
+  padding:.2rem 0 0;
   color:var(--muted2);
   font-size:13px;
   line-height:1.7;
@@ -2207,7 +2228,7 @@ body.light .public-hero{
 .public-empty{
   padding:1.2rem;
   border-radius:22px;
-  border:1px dashed var(--rim2);
+  background:var(--surface);
   color:var(--muted);
   line-height:1.8;
   text-align:center;
@@ -2283,31 +2304,27 @@ body.light .player-modal{
 }
 .player-layout{
   display:grid;
-  grid-template-columns:minmax(360px, 520px) minmax(0, 1fr);
-  gap:1.2rem;
+  grid-template-columns:minmax(320px, 440px) minmax(0, 1fr);
+  gap:2.6rem;
   align-items:start;
 }
-.player-stage,
-.player-side{
-  display:grid;
-  gap:1rem;
-}
-.player-stage-card,
-.player-side-card{
-  padding:1.2rem;
-  border-radius:28px;
-  border:1px solid var(--rim);
-  background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
-  box-shadow:var(--shadow);
-}
-.player-stage-card{position:sticky;top:1rem}
+.player-stage{display:grid;gap:1rem}
+.player-side{display:grid;gap:2.4rem}
+.player-stage-card > .section-action-row{justify-content:center}
+/* Open columns, not cards: the cover and the copy blocks inside are the only
+   surfaces. */
+.player-stage-card{display:grid;gap:1.15rem}
+/* Sticky only when the whole column fits; a sticky column taller than the
+   viewport hides its own bottom (volume, share) until the page runs out. */
+@media (min-height:960px){.player-stage-card{position:sticky;top:1rem}}
+.player-cover-wrap .cover-lg{max-width:min(100%, 44vh)}
+.player-side-card{padding:.4rem 0 0}
 /* Auto-sized implicit column again: the 72-bar waveform's min-content (72
    bars at 3px plus 2px gaps = 358px) forced this column wider than the
    viewport, and .cover-lg{width:100%} then stretched the cover to match. */
 .player-cover-wrap{display:grid;grid-template-columns:minmax(0, 1fr);gap:1rem}
-.player-cover-wrap .cover-lg{max-width:none}
 .player-title{
-  font-family:var(--display);font-weight:800;
+  font-family:var(--display);font-weight:700;
   /* Was up to 48px, the largest text in the app and enough to wrap most
      titles onto two lines. Capped at the 34px hero step. */
   font-size:clamp(1.65rem, 3vw, 2.125rem);
@@ -2336,7 +2353,7 @@ body.light .player-modal{
 .player-copy-card{
   padding:1rem 1.05rem;
   border-radius:20px;
-  background:rgba(255,255,255,.03);
+  background:var(--surface);
   display:grid;
   gap:.7rem;
 }
@@ -2435,28 +2452,26 @@ body.light .player-modal{
 .player-wave-shell{
   display:grid;
   gap:.85rem;
-  padding:1rem;
-  border-radius:22px;
-  border:1px solid var(--rim);
-  background:rgba(255,255,255,.035);
 }
 .player-wave{
   display:flex;
   align-items:flex-end;
   gap:3px;
-  height:120px;
+  height:72px;
 }
 .player-wave .pbar{
   flex:1;
   min-width:3px;
   border-radius:999px;
-  background:rgba(255,255,255,.12);
+  background:rgba(255,255,255,.14);
   transition:background .16s ease, opacity .16s ease, transform .16s ease;
 }
 .player-wave .pbar.active{
   background:linear-gradient(180deg, var(--violet), var(--accent-dynamic));
   box-shadow:0 0 18px var(--accent-dynamic-soft);
 }
+body.light .player-wave .pbar{background:rgba(0,0,0,.12)}
+body.light .player-wave .pbar.active{background:linear-gradient(180deg, var(--violet), var(--accent-dynamic))}
 .player-wave .pbar.current{transform:scaleY(1.04)}
 @keyframes wavePulseCurrent{0%,100%{transform:scaleY(1.05)}50%{transform:scaleY(1.32)}}
 .player-wave.playing .pbar.current{animation:wavePulseCurrent .9s ease-in-out infinite}
@@ -2464,13 +2479,15 @@ body.light .player-modal{
 @media (prefers-reduced-motion:reduce){.player-wave.playing .pbar.current{animation:none}}
 .player-progress-line{
   position:relative;
-  height:12px;
+  height:5px;
   border-radius:999px;
-  border:1px solid var(--rim);
-  background:rgba(255,255,255,.08);
-  overflow:hidden;
+  background:rgba(255,255,255,.12);
   cursor:pointer;
 }
+/* A 5px line is a thin target; the pseudo-element widens what the pointer
+   can hit without changing what is drawn. */
+.player-progress-line::before{content:'';position:absolute;inset:-9px 0}
+body.light .player-progress-line{background:rgba(0,0,0,.1)}
 .player-progress-fill{
   position:absolute;
   inset:0 auto 0 0;
@@ -2482,36 +2499,63 @@ body.light .player-modal{
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:.7rem;
-  flex-wrap:wrap;
+  gap:1.1rem;
 }
 .player-btn{
-  padding:.88rem 1.05rem;
-  border-radius:999px;
-  border:1px solid transparent;
-  background:rgba(255,255,255,.05);
+  position:relative;
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
   color:var(--muted);
   cursor:pointer;
   font-family:var(--sans);
-  font-size:12.5px;
-  letter-spacing:normal;
-  transition:all .18s ease;
+  font-size:13px;
   font-weight:500;
+  transition:background .16s ease,color .16s ease,transform .16s ease;
 }
-.player-btn:hover{color:var(--accent-dynamic);background:var(--accent-dynamic-soft)}
-body.light .player-btn{background:rgba(0,0,0,.05)}
+.player-btn .ic{width:24px;height:24px}
+.player-btn:hover{color:var(--text);background:var(--surface)}
 .player-btn.primary{
-  min-width:104px;
-  background:rgba(255,255,255,.94);
+  width:68px;
+  height:68px;
+  background:rgba(255,255,255,.95);
   color:#10121c;
-  border-color:transparent;
+  box-shadow:0 18px 40px -16px rgba(0,0,0,.6);
 }
-.player-btn.primary:hover{background:#fff;color:#10121c}
+.player-btn.primary .ic{width:28px;height:28px}
+.player-btn.primary:hover{background:#fff;color:#10121c;transform:scale(1.04)}
 body.light .player-btn.primary{background:#171420;color:#f7f2eb}
-.player-btn.mode-on{
-  color:var(--accent-dynamic);
-  background:var(--accent-dynamic-soft);
+/* On/off is colour plus a dot, so the state does not rest on hue alone. */
+.player-btn.mode-on,.np-btn.mode-on{color:var(--accent-dynamic)}
+.player-btn.mode-on::after,.np-btn.mode-on::after{
+  content:'';
+  position:absolute;
+  bottom:5px;
+  left:50%;
+  width:4px;
+  height:4px;
+  margin-left:-2px;
+  border-radius:50%;
+  background:currentColor;
 }
+#xp-rate-btn{width:auto;min-width:48px;padding:0 .7rem;border-radius:999px;font-family:var(--mono);font-size:12px}
+.player-close{
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--muted);
+  background:var(--surface);
+  cursor:pointer;
+  transition:background .16s ease,color .16s ease;
+}
+.player-close .ic{width:24px;height:24px}
+.player-close:hover{color:var(--text);background:var(--surface-hover)}
 .player-sound-row{
   display:flex;
   align-items:center;
@@ -2527,6 +2571,7 @@ body.light .player-btn.primary{background:#171420;color:#f7f2eb}
   text-transform:uppercase;
   color:var(--muted);
 }
+.player-sound-label .ic{width:18px;height:18px}
 .vol-slider{
   -webkit-appearance:none;
   appearance:none;
@@ -2659,7 +2704,7 @@ body.light .smart-mix-card{background:linear-gradient(180deg,rgba(0,0,0,.03),rgb
   gap:.8rem;
   padding:.72rem .82rem;
   border-radius:18px;
-  background:rgba(255,255,255,.035);
+  background:var(--surface);
 }
 .playlist-chip-copy{min-width:0}
 .playlist-chip-title{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2669,15 +2714,14 @@ body.light .smart-mix-card{background:linear-gradient(180deg,rgba(0,0,0,.03),rgb
 }
 .related-card{
   display:grid;
-  gap:.8rem;
-  padding:.85rem;
+  gap:.7rem;
+  padding:.5rem;
   border-radius:20px;
-  background:rgba(255,255,255,.035);
   cursor:pointer;
-  transition:transform .16s ease,background .16s ease;
+  transition:background .16s ease;
 }
-.related-card:hover{transform:translateY(-2px);background:rgba(255,255,255,.055)}
-.related-card .cover-art{width:100%;aspect-ratio:1/1}
+.related-card:hover{background:var(--surface)}
+.related-card .cover-art{width:100%;height:auto;aspect-ratio:1/1;border-radius:16px}
 .related-title{
   font-size:14px;
   font-weight:700;
@@ -2687,22 +2731,25 @@ body.light .smart-mix-card{background:linear-gradient(180deg,rgba(0,0,0,.03),rgb
 }
 .related-sub{font-size:11px;color:var(--muted2);line-height:1.6}
 
+/* Pinned to the bottom edge with the docked player stacked on top of it, the
+   order every music app uses. It used to float above the player, so the two
+   together stood ~300px tall on a phone. */
 .mobile-nav{
   display:none;
   position:fixed;
-  left:14px;
-  right:14px;
-  bottom:14px;
-  transition:bottom .22s ease;
-  padding:.42rem;
-  border-radius:999px;
+  left:10px;
+  right:10px;
+  bottom:10px;
+  height:var(--mobile-nav-h);
+  padding:.3rem;
+  gap:.2rem;
+  border-radius:22px;
   border:1px solid var(--rim);
-  background:rgba(9,11,18,.86);
+  background:rgba(9,11,18,.82);
   backdrop-filter:blur(18px);
   z-index:35;
 }
-body.light .mobile-nav{background:rgba(255,255,255,.9)}
-.mobile-nav.player-active{bottom:calc(var(--player-height) + .7rem)}
+body.light .mobile-nav{background:rgba(255,255,255,.88)}
 .mobile-nav-pulse{
   display:none;
   position:absolute;
@@ -2721,17 +2768,23 @@ body.light .mobile-nav{background:rgba(255,255,255,.9)}
 }
 .mobile-tab{
   flex:1;
-  padding:.72rem .35rem;
-  border-radius:999px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:.22rem;
+  border-radius:16px;
   color:var(--muted2);
   cursor:pointer;
   font-family:var(--sans);
-  font-size:12px;
+  font-size:11px;
   letter-spacing:normal;
-  transition:all .16s ease;
+  transition:background .16s ease,color .16s ease;
   font-weight:500;
 }
-.mobile-tab.active{color:var(--accent-dynamic);background:var(--accent-dynamic-soft)}
+.mobile-tab .ic{width:21px;height:21px}
+.mobile-tab.active{color:var(--text);background:var(--surface-hover)}
+.mobile-tab.active .ic{color:var(--accent-dynamic)}
 
 .now-playing-bar{
   position:fixed;
@@ -2740,50 +2793,53 @@ body.light .mobile-nav{background:rgba(255,255,255,.9)}
   bottom:14px;
   z-index:60;
   display:grid;
-  grid-template-columns:88px minmax(0,1.05fr) minmax(220px,.9fr) auto;
+  grid-template-columns:64px minmax(0,1fr) minmax(220px,1.1fr) auto;
   gap:1rem;
   align-items:center;
-  padding:.85rem 1rem;
-  border-radius:28px;
-  border:1px solid var(--rim2);
+  padding:.65rem 1rem .65rem .65rem;
+  border-radius:24px;
+  border:1px solid var(--rim);
   background:
-    linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.028)),
-    radial-gradient(circle at 12% 16%, var(--accent-dynamic-soft), transparent 24%),
-    rgba(9,11,18,.9);
+    radial-gradient(60% 140% at 0% 50%, var(--accent-dynamic-soft), transparent 70%),
+    rgba(10,12,20,.86);
   box-shadow:0 26px 70px rgba(0,0,0,.38);
   backdrop-filter:blur(20px);
+  /* Hidden, not just slid down: above the phone nav a 120% slide no longer
+     clears the screen, and an idle bar's buttons should not be tab stops. */
   transform:translateY(120%);
-  transition:transform .22s ease,border-color .22s ease,background .22s ease;
+  opacity:0;
+  visibility:hidden;
+  transition:transform .22s ease,opacity .22s ease,visibility 0s linear .22s;
 }
 body.light .now-playing-bar{
   background:
     linear-gradient(135deg, rgba(255,255,255,.92), rgba(255,255,255,.84)),
     radial-gradient(circle at 12% 16%, var(--accent-dynamic-soft), transparent 24%);
 }
-.now-playing-bar.active{transform:translateY(0);border-color:var(--accent-ghost)}
+.now-playing-bar.active{transform:translateY(0);opacity:1;visibility:visible;transition:transform .22s ease,opacity .22s ease}
 .np-cover-wrap{display:flex;align-items:center;justify-content:center}
-.np-main{min-width:0;display:grid;gap:.3rem}
-.np-kicker{
-  font-family:var(--mono);
-  font-size:9px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
-  color:var(--accent-dynamic);
-}
+.np-cover-wrap .cover-art{width:64px;height:64px;border-radius:14px}
+.np-main{min-width:0;display:grid;gap:.18rem}
+/* The bar is self-evidently what is playing. */
+.np-kicker{display:none}
 .np-track-name{
   font-family:var(--sans);
-  font-size:24px;
-  font-weight:700;
-  line-height:1;
+  font-size:16px;
+  font-weight:600;
+  line-height:1.2;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 .np-meta,.np-queue{
   color:var(--muted);
-  font-size:12px;
-  line-height:1.55;
+  font-size:12.5px;
+  line-height:1.4;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
+.np-queue{color:var(--muted2);font-size:12px}
 .np-progress-area{display:grid;gap:.5rem}
 .np-progress-top{
   display:flex;
@@ -2798,13 +2854,13 @@ body.light .now-playing-bar{
 }
 .np-bar-wrap{
   position:relative;
-  height:10px;
+  height:4px;
   border-radius:999px;
-  overflow:hidden;
-  background:rgba(255,255,255,.08);
-  border:1px solid var(--rim);
+  background:rgba(255,255,255,.12);
   cursor:pointer;
 }
+.np-bar-wrap::before{content:'';position:absolute;inset:-9px 0}
+body.light .np-bar-wrap{background:rgba(0,0,0,.1)}
 .np-bar-fill{
   position:absolute;
   inset:0 auto 0 0;
@@ -2815,39 +2871,32 @@ body.light .now-playing-bar{
 /* Wrap is a backstop, not the plan: at any width where the row still cannot
    fit, controls move to a second line instead of overflowing the card. The
    player reports its own height now, so an extra line is absorbed correctly. */
-.np-controls{display:flex;align-items:center;gap:.45rem;justify-content:flex-end;flex-wrap:wrap}
+.np-controls{display:flex;align-items:center;gap:.25rem;justify-content:flex-end;flex-wrap:wrap}
 .np-btn{
-  width:44px;
-  height:44px;
+  position:relative;
+  width:42px;
+  height:42px;
   border-radius:50%;
   display:flex;
   align-items:center;
   justify-content:center;
-  border:1px solid transparent;
-  background:rgba(255,255,255,.06);
   color:var(--muted);
   cursor:pointer;
-  transition:all .18s ease;
-  font-family:var(--sans);
-  font-size:12.5px;
-  font-weight:500;
+  transition:background .16s ease,color .16s ease,transform .16s ease;
 }
-.np-btn:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
-body.light .np-btn{background:rgba(0,0,0,.05)}
+.np-btn .ic{width:21px;height:21px}
+.np-btn:hover{background:var(--surface);color:var(--text)}
 .np-btn.primary{
-  width:56px;
-  height:56px;
-  background:rgba(255,255,255,.94);
+  width:50px;
+  height:50px;
+  margin:0 .2rem;
+  background:rgba(255,255,255,.95);
   color:#10121c;
-  border-color:transparent;
 }
-.np-btn.primary:hover{background:#fff;color:#10121c}
+.np-btn.primary .ic{width:22px;height:22px}
+.np-btn.primary:hover{background:#fff;color:#10121c;transform:scale(1.05)}
 body.light .np-btn.primary{background:#171420;color:#f7f2eb}
-.np-btn.mode-btn{width:40px;height:40px;font-size:10px}
-.np-btn.mode-on{
-  color:var(--accent-dynamic);
-  background:var(--accent-dynamic-soft);
-}
+.np-btn.mode-btn .ic{width:18px;height:18px}
 
 #sv-toast{
   position:fixed;
@@ -2874,8 +2923,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .empty-state{
   padding:2.4rem 1.5rem;
   border-radius:24px;
-  border:1px dashed var(--rim2);
-  background:rgba(255,255,255,.02);
+  background:var(--surface);
   text-align:center;
   color:var(--muted);
   line-height:1.8;
@@ -2890,9 +2938,9 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .spotlight-card{grid-template-columns:96px minmax(0,1fr)}
   .player-layout{grid-template-columns:minmax(0, 1fr)}
   .player-stage-card{position:relative;top:auto}
-  .now-playing-bar{grid-template-columns:74px minmax(0,1fr);gap:.75rem}
-  .np-progress-area{grid-column:1 / -1}
-  .np-controls{grid-column:2 / -1;justify-content:flex-start}
+  .now-playing-bar{grid-template-columns:56px minmax(0,1fr) auto;gap:.85rem}
+  .np-cover-wrap .cover-art{width:56px;height:56px;border-radius:12px}
+  .np-progress-area{grid-column:1 / -1;grid-row:2}
 }
 /* Four sentence-case tabs plus the brand plus three controls need ~1000px.
    Below that, hand navigation to the bottom bar that already exists rather
@@ -2902,7 +2950,11 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 @media (max-width:1000px){
   .nav-groups{display:none}
   .mobile-nav{display:flex}
-  .page{padding-bottom:calc(var(--player-height) + 5.4rem)}
+  .now-playing-bar{bottom:calc(var(--mobile-nav-h) + 18px)}
+  /* --player-height already includes the nav under it once the player is
+     up; with no player, the nav alone still needs clearing. */
+  .page{padding-bottom:calc(max(var(--player-height), var(--mobile-nav-h) + 10px) + 1.6rem)}
+  #sv-toast{bottom:calc(max(var(--player-height), var(--mobile-nav-h) + 10px) + 1rem)}
 }
 
 /* ── App shell ──────────────────────────────────────────────────────────
@@ -2925,11 +2977,11 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
     height:calc(100vh - var(--sync-banner-h));
     overflow-y:auto;
     border-bottom:none;
-    border-right:1px solid var(--rim);
-    backdrop-filter:none;
-    background:var(--bg2);
+    border-right:1px solid rgba(255,255,255,.05);
+    backdrop-filter:blur(24px);
+    background:rgba(7,9,16,.5);
   }
-  body.light .nav{background:var(--bg2)}
+  body.light .nav{background:rgba(255,255,255,.5);border-right-color:var(--rim)}
   .nav-row{
     flex-direction:column;
     align-items:stretch;
@@ -2939,24 +2991,24 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
     padding:1.3rem 1.05rem;
     gap:0;
   }
-  .nav-left{flex-direction:column;align-items:stretch;gap:1.7rem;min-height:0}
-  .nav-brand-wrap{padding:0 .1rem}
-  .nav-groups{flex-direction:column;flex-wrap:nowrap;gap:.2rem;width:100%}
-  .group-tab{width:100%;text-align:left;justify-content:flex-start;padding:.62rem .8rem}
+  .nav-left{flex-direction:column;align-items:stretch;gap:2rem;min-height:0}
+  .nav-brand-wrap{padding:0 .35rem;gap:.75rem}
+  .nav-groups{flex-direction:column;flex-wrap:nowrap;gap:.15rem;width:100%}
+  .group-tab{width:100%;text-align:left;justify-content:flex-start;padding:.66rem .8rem}
   /* nav-right carries the sync/theme/keys controls. In the top bar these
      sat inline after the tabs; in the sidebar they anchor to the bottom so
      the tabs stay pinned under the brand regardless of viewport height. */
   .nav-right{
-    flex-direction:column;
-    align-items:stretch;
-    gap:.4rem;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:.55rem .5rem;
     margin-top:auto;
-    padding-top:1rem;
-    border-top:1px solid var(--rim);
+    padding:0 .35rem;
   }
-  .theme-toggle{width:100%;text-align:center}
-  .clock-nav{display:block;text-align:center;opacity:.6}
-  .status-pill{justify-content:center;padding:.3rem 0}
+  .nav-tools{grid-column:1 / -1;margin-left:-.65rem}
+  .status-pill{grid-row:2;grid-column:1}
+  .clock-nav{display:block;grid-row:2;grid-column:2;opacity:.6}
 
   .app-main{
     flex:1;
@@ -2976,12 +3028,12 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
      row they overlapped by 65px at 375px -- the Keys button sat on top of the
      wordmark. Letting the row wrap puts the controls on their own line when
      they no longer fit beside the brand, and leaves them inline when they do. */
-  .nav-row{padding:.9rem 1rem;flex-wrap:wrap;gap:.65rem 1rem}
+  .nav-row{padding:.7rem 1rem;flex-wrap:wrap;gap:.5rem 1rem}
   .nav-left{flex-direction:column;align-items:flex-start;flex:1 1 auto;min-width:0}
-  .nav-right{flex:1 1 auto;justify-content:flex-end}
+  .nav-right{flex:0 1 auto;justify-content:flex-end;gap:.4rem}
   .nav-groups{display:none}
   .mobile-nav{display:flex}
-  .page{padding:1.1rem 1rem calc(var(--player-height) + 5.4rem)}
+  .page{padding:1.2rem 1rem calc(max(var(--player-height), var(--mobile-nav-h) + 10px) + 1.6rem)}
   .hero-main{min-height:0}
   .rail-grid,.track-grid,.playlist-grid{grid-template-columns:1fr}
   .public-track-row{grid-template-columns:auto 44px minmax(0,1fr) auto}
@@ -3002,27 +3054,45 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .now-playing-bar{
     left:10px;
     right:10px;
-    bottom:10px;
-    padding:.78rem;
-    border-radius:24px;
+    padding:.6rem .7rem .6rem .6rem;
+    border-radius:20px;
   }
-  .np-track-name{font-size:24px}
-  #sv-toast{bottom:calc(var(--player-height) + 5.2rem)}
 }
 @media (max-width:640px){
   .hero-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
   .snapshot-grid{grid-template-columns:1fr 1fr}
   .search-shell{grid-template-columns:1fr}
+  /* Import has its own tab and "clear" lives in the summary row; the sort
+     chips scroll sideways instead of wrapping onto a second line. */
+  .browse-panel .section-head .section-action-row{display:none}
+  #sort-filter{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -1rem;padding:0 1rem}
+  #sort-filter::-webkit-scrollbar{display:none}
+  #sort-filter .filter-chip{flex:none}
+  .browse-summary:not(.has-filters) > div + div{display:none}
+  .player-topbar .section-action-row{width:auto}
   .public-title{font-size:2.7rem}
   .public-meta-grid,.public-related-grid{grid-template-columns:1fr}
   .public-track-row,.public-link-row{grid-template-columns:1fr}
   .public-track-index,.public-track-time,.public-row-action{display:none}
-  /* Six controls need ~304px; the docked bar's control column is only ~229px
-     at 375px, which pushed "Open" clean off the screen. Shuffle and Repeat
-     drop out here -- the expanded player carries both with fuller labels
-     ("Shuffle: On", "Repeat: Queue"), and Open is how you get there. */
-  .np-controls .mode-btn{display:none}
-  .player-topbar{align-items:flex-start;flex-direction:column}
+  /* One row, like every phone mini-player: cover, title, play, next, open.
+     Shuffle, repeat and previous live in the expanded player, and the
+     progress bar shrinks to a hairline along the bottom edge. */
+  .now-playing-bar{grid-template-columns:44px minmax(0,1fr) auto;gap:.7rem;padding:.45rem .45rem .45rem .45rem;border-radius:18px}
+  .np-cover-wrap .cover-art{width:44px;height:44px;border-radius:10px}
+  .np-track-name{font-size:14.5px}
+  .np-meta{font-size:12px}
+  .np-queue,.np-progress-top{display:none}
+  .np-progress-area{position:absolute;left:16px;right:16px;bottom:0;grid-row:auto;grid-column:auto}
+  .np-bar-wrap{height:2px;background:rgba(255,255,255,.1)}
+  .np-controls{flex-wrap:nowrap;gap:0}
+  .np-controls .mode-btn,.np-controls .np-prev{display:none}
+  .np-btn{width:44px;height:44px}
+  .np-btn.primary{width:44px;height:44px;margin:0}
+  .np-btn.primary .ic{width:19px;height:19px}
+  /* Status shrinks to its coloured dot; the words stay for screen readers. */
+  .status-pill{font-size:0;gap:0}
+  .nav-brand-title{font-size:19px}
+  .player-topbar{align-items:center}
   /* 72 bars at 3px + 2px gaps needs 358px, which no phone has. Thinner bars
      and tighter gaps bring the floor to ~215px. */
   .player-wave{height:92px;gap:1px}
@@ -3045,7 +3115,6 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .action-btn,.icon-btn,.sec-action,.filter-chip,.prompt-chip{min-height:44px;min-width:44px}
   .action-btn,.icon-btn,.filter-chip,.prompt-chip{display:inline-flex;align-items:center;justify-content:center}
   .card-menu-btn{min-width:44px}
-  .np-btn{min-width:44px;min-height:44px}
-  .theme-toggle{min-height:44px;display:inline-flex;align-items:center}
+  .theme-toggle{width:44px;height:44px}
   .queue-reorder button,.playlist-seq-btn{min-height:44px;min-width:44px}
 }

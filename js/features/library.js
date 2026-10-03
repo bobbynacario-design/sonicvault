@@ -315,7 +315,7 @@ function buildTrackCard(track) {
     +             '<button class="icon-btn card-menu-btn" id="menubtn-' + esc(track.id) + '"'
     +               ' aria-haspopup="menu" aria-expanded="false"'
     +               ' aria-label="' + attr('More actions for ' + (track.title || 'this track')) + '"'
-    +               ' onclick="toggleCardMenu(' + jsq(track.id) + ', event)">&#8943;</button>'
+    +               ' onclick="toggleCardMenu(' + jsq(track.id) + ', event)">' + icon('more') + '</button>'
     +             '<div class="card-menu" id="menu-' + esc(track.id) + '" role="menu" aria-label="Track actions">'
     +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();cycleTrackCover(' + jsq(track.id) + ')">Change cover</button>'
     +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();openEditTrack(' + jsq(track.id) + ')">Edit details</button>'
@@ -367,6 +367,13 @@ function renderTrackList() {
 
   var el = document.getElementById('track-list');
   if (!el) return;
+  // An empty vault has nothing to search or filter: the welcome card above is
+  // the whole page until the first track lands, not a search box over
+  // "No tracks match this shelf".
+  var vaultEmpty = !tracks.length && !window.svBootPending;
+  var panel = document.getElementById('browse-panel');
+  if (panel) panel.hidden = vaultEmpty;
+  el.hidden = vaultEmpty;
   if (!filtered.length) {
     _shelfRendered = 0;
     _shelfTracks = [];
@@ -434,7 +441,7 @@ function buildTrackRow(track, index) {
     +       (!hasLyrics(track) ? ' &middot; <span class="row-warn">No lyrics</span>' : '')
     +     '</div>'
     +   '</div>'
-    +   '<div class="row-plays">' + fmtCompactNumber(track.plays || 0) + '</div>'
+    +   '<div class="row-plays">' + fmtCompactNumber(track.plays || 0) + (Number(track.plays) === 1 ? ' play' : ' plays') + '</div>'
     +   '<div class="row-time">' + fmtTime(track.duration || 0) + '</div>'
     +   '<div class="row-actions">'
     +     '<button class="icon-btn js-notes-btn" aria-expanded="' + (expanded ? 'true' : 'false') + '" aria-controls="notes-' + esc(track.id) + '" onclick="event.stopPropagation();toggleExpand(' + jsq(track.id) + ')" aria-label="' + attr('Notes for ' + (track.title || 'track')) + '">Notes</button>'
@@ -442,8 +449,10 @@ function buildTrackRow(track, index) {
     +       '<button class="icon-btn card-menu-btn" id="menubtn-' + esc(track.id) + '"'
     +         ' aria-haspopup="menu" aria-expanded="false"'
     +         ' aria-label="' + attr('More actions for ' + (track.title || 'this track')) + '"'
-    +         ' onclick="toggleCardMenu(' + jsq(track.id) + ', event)">&#8943;</button>'
+    +         ' onclick="toggleCardMenu(' + jsq(track.id) + ', event)">' + icon('more') + '</button>'
     +       '<div class="card-menu" id="menu-' + esc(track.id) + '" role="menu" aria-label="Track actions">'
+    // On a phone the row has no room for the Notes button, so it moves in here.
+    +         '<button role="menuitem" class="menu-notes" onclick="event.stopPropagation();closeAllCardMenus();toggleExpand(' + jsq(track.id) + ')">Notes</button>'
     +         '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();cycleTrackCover(' + jsq(track.id) + ')">Change cover</button>'
     +         '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();openEditTrack(' + jsq(track.id) + ')">Edit details</button>'
     +         (track.shared

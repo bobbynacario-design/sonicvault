@@ -224,8 +224,11 @@ function getPlaylistRelatedTracks(pl, limit) {
 function renderPlaylistHero() {
   var el = document.getElementById('playlist-hero');
   if (!el) return;
+  // The Playlists section below carries the empty state and the New
+  // playlist button; a second "No playlists yet" up here only repeated it.
+  el.hidden = !playlists.length;
   if (!playlists.length) {
-    el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="empty-state"><strong>No playlists yet.</strong>Create your first curated mix to turn the vault into a set of editorial rooms.</div></div></div>';
+    el.innerHTML = '';
     return;
   }
   var featured = getFeaturedPlaylist();

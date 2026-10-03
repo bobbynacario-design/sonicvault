@@ -104,7 +104,7 @@ function buildMiniTrackCard(track, queueLabel, queueIds) {
             // onclick -- so the pill was a non-interactive label repeating
             // that, and at four rails it cost the title more width than the
             // title had. It now appears only to mark the current track.
-            ? '<div class="mini-track-play" aria-hidden="true">' + (_isPlaying ? 'II' : '&#9654;') + '</div>'
+            ? '<div class="mini-track-play" aria-hidden="true">' + icon(_isPlaying ? 'pause' : 'play') + '</div>'
             : '')
     + '</div>';
 }
@@ -151,6 +151,9 @@ function renderLibraryHome() {
 
   var featuredTrack = getFeaturedTrack();
   var continueTrack = getContinueTrack() || featuredTrack;
+  // The resume strip glows in its own track's colours, the same blooms the
+  // cover is painted with.
+  var heroPalette = getTrackPalette(continueTrack);
   var recentTracks = getNewestTracks(4);
   var hiddenGems = getLeastPlayedTracks(4);
   var mostPlayed = getMostPlayedTracks(4);
@@ -164,16 +167,16 @@ function renderLibraryHome() {
   // resume strip and three rails that are genuinely shortcuts, not restatements.
   el.innerHTML = ''
     + '<div class="library-home-stack">'
-    +   (_coverDemoActive ? '<div class="browse-summary has-filters"><div><strong>Cover demo mode</strong></div><div>These tracks are memory-only previews and will not be saved.</div><button class="browse-clear-pill" onclick="exitCoverDemo()">Exit demo</button></div>' : '')
-    +   '<div class="resume-strip">'
-    +     buildCoverArt(continueTrack, 'sm', true)
+    +   (_coverDemoActive ? '<div class="demo-banner"><span><strong>Cover demo.</strong> These tracks live in memory only and are never saved.</span><button class="sec-action" onclick="exitCoverDemo()">Exit demo</button></div>' : '')
+    +   '<div class="resume-strip" style="--hero-a:' + heroPalette.a + ';--hero-b:' + heroPalette.b + '">'
+    +     buildCoverArt(continueTrack, 'md', true)
     +     '<div class="resume-copy">'
     +       '<div class="resume-kicker">' + (getContinueTrack() ? 'Continue listening' : 'Featured') + '</div>'
     +       '<div class="resume-title">' + esc(continueTrack.title) + '</div>'
     +       '<div class="resume-meta">' + esc(continueTrack.genre || 'Other') + ' &middot; ' + esc(continueTrack.mood || 'Mood') + ' &middot; ' + fmtTime(continueTrack.duration || 0) + '</div>'
     +     '</div>'
     +     '<div class="resume-actions">'
-    +       '<button class="sec-action primary" onclick="playTrack(' + jsq(continueTrack.id) + ')">Play</button>'
+    +       '<button class="sec-action primary has-icon" onclick="playTrack(' + jsq(continueTrack.id) + ')">' + icon('play') + 'Play</button>'
     +       '<button class="sec-action" onclick="switchView(\'upload\')">Import</button>'
     +     '</div>'
     +   '</div>'

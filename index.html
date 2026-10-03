@@ -21,10 +21,37 @@
 <meta name="twitter:description" content="Curate tracks, build mixtapes, and stream your AI-generated music from anywhere.">
 <title>SonicVault - Private AI Music Vault</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<script type="module" src="js/app.js?v=20261003d"></script>
-<link rel="stylesheet" href="styles/app.css?v=20261003d">
+<script type="module" src="js/app.js?v=20261003e"></script>
+<link rel="stylesheet" href="styles/app.css?v=20261003e">
 </head>
 <body>
+<!-- Icon sprite. Every glyph in the app is <svg class="ic"><use href="#i-NAME"/></svg>,
+     written by hand here or by icon() in js/features/shell.js. Stroke icons
+     inherit currentColor; the transport glyphs are filled. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4.2" height="15" rx="1.3"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.3"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24" fill="currentColor"><rect x="4.5" y="5" width="2.6" height="14" rx="1.1"/><path d="M19.5 6.27v11.46a1 1 0 0 1-1.55.84L9.3 12.84a1 1 0 0 1 0-1.68l8.65-5.73a1 1 0 0 1 1.55.84z"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24" fill="currentColor"><rect x="16.9" y="5" width="2.6" height="14" rx="1.1"/><path d="M4.5 6.27v11.46a1 1 0 0 0 1.55.84l8.65-5.73a1 1 0 0 0 0-1.68L6.05 5.43a1 1 0 0 0-1.55.84z"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h2.2a4 4 0 0 0 3.3-1.75l5-7.5A4 4 0 0 1 16.8 6H21"/><path d="m18 3 3 3-3 3"/><path d="M3 7h2.2a4 4 0 0 1 3 1.4"/><path d="M21 17h-4.2a4 4 0 0 1-3-1.4"/><path d="m18 14 3 3-3 3"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+    <symbol id="i-repeat-one" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/><path d="M11 10.5h1.2V14"/></symbol>
+    <symbol id="i-chevron-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.2 12 3.5l8.5 6.7"/><path d="M5.5 9v10.5a1 1 0 0 0 1 1H10v-5.5h4v5.5h3.5a1 1 0 0 0 1-1V9"/></symbol>
+    <symbol id="i-playlists" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h12"/><path d="M3 12h9"/><path d="M3 18h7"/><path d="M20 15V5l-3 1"/><circle cx="17.5" cy="16.5" r="2.5"/></symbol>
+    <symbol id="i-import" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3.5"/><path d="m7 8.5 5-5 5 5"/><path d="M20.5 14.5v4a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-4"/></symbol>
+    <symbol id="i-insights" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M21 20H3"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M6.5 9.5h.01M10 9.5h.01M14 9.5h.01M17.5 9.5h.01M6.5 13h.01M17.5 13h.01M9.5 15h5"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6.5 9H3.5v6h3L11 19z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></symbol>
+  </defs>
+</svg>
 <!-- Unsynced writes are a data-loss state, so they get a persistent bar with
      an action rather than the 10px status pill, which the next operation
      overwrites within a second. -->
@@ -42,23 +69,25 @@
   <div class="nav-row">
     <div class="nav-left">
       <div class="nav-brand-wrap">
-        <div class="nav-mark">SV</div>
+        <div class="nav-mark" aria-hidden="true"></div>
         <div class="nav-brand">
           <div class="nav-brand-title">SonicVault</div>
           <div class="nav-brand-sub">Private AI listening room</div>
         </div>
       </div>
       <div class="nav-groups">
-        <button class="group-tab active" id="gtab-library" onclick="switchView('library')">Home</button>
-        <button class="group-tab" id="gtab-playlists" onclick="switchView('playlists')">Playlists</button>
-        <button class="group-tab" id="gtab-upload" onclick="switchView('upload')">Import</button>
-        <button class="group-tab" id="gtab-insights" onclick="switchView('insights')">Insights</button>
+        <button class="group-tab active" id="gtab-library" onclick="switchView('library')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-home"/></svg>Home</button>
+        <button class="group-tab" id="gtab-playlists" onclick="switchView('playlists')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-playlists"/></svg>Playlists</button>
+        <button class="group-tab" id="gtab-upload" onclick="switchView('upload')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-import"/></svg>Import</button>
+        <button class="group-tab" id="gtab-insights" onclick="switchView('insights')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-insights"/></svg>Insights</button>
       </div>
     </div>
     <div class="nav-right">
-      <button class="theme-toggle" id="auth-toggle" onclick="toggleOwnerAuth()" title="Owner sign-in">Owner</button>
-      <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light and dark">Moon</button>
-      <button class="theme-toggle" id="shortcuts-toggle" onclick="openModal('modal-shortcuts')" title="Keyboard shortcuts (press ?)">Keys</button>
+      <div class="nav-tools">
+        <button class="theme-toggle" id="auth-toggle" onclick="toggleOwnerAuth()" title="Owner sign-in" aria-label="Owner sign-in"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-user"/></svg></button>
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Switch to light theme" aria-label="Switch to light theme"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg></button>
+        <button class="theme-toggle" id="shortcuts-toggle" onclick="openModal('modal-shortcuts')" title="Keyboard shortcuts (press ?)" aria-label="Keyboard shortcuts"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-keyboard"/></svg></button>
+      </div>
       <div class="clock-nav" id="clock" aria-hidden="true">--:--</div>
       <div class="status-pill" id="sync-status" role="status" aria-live="polite">OFF Loading</div>
     </div>
@@ -81,14 +110,13 @@
             <div class="section-title">Library</div>
           </div>
           <div class="section-action-row">
-            <button class="sec-action" onclick="clearFilters()">Clear filters</button>
             <button class="sec-action" onclick="switchView('upload')">Import new music</button>
           </div>
         </div>
 
         <div class="search-shell">
           <div class="search-input-wrap">
-            <div class="search-icon">FND</div>
+            <div class="search-icon" aria-hidden="true"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-search"/></svg></div>
             <label class="sr-only" for="search-input">Search the vault</label>
             <input type="text" id="search-input" placeholder="Search titles, prompts, lyrics, moods, or tags..." oninput="onSearchInput()">
           </div>
@@ -167,7 +195,7 @@
         <div class="upload-shell">
           <div class="upload-grid">
             <div class="upload-drop" id="upload-drop" role="button" tabindex="0" aria-label="Choose audio files to import, or drop them here" aria-controls="file-picker" onclick="document.getElementById('file-picker').click()">
-              <div class="upload-mark" aria-hidden="true">IN</div>
+              <div class="upload-mark" aria-hidden="true"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-import"/></svg></div>
               <div class="upload-title">Drop tracks here</div>
               <div class="upload-copy">MP3, WAV, or M4A &middot; up to 100MB each</div>
               <input type="file" id="file-picker" accept="audio/*" multiple onchange="handleFileUpload(this.files)">
@@ -461,10 +489,9 @@
       <div class="player-topbar">
         <div class="player-topbar-copy">
           <div class="player-topbar-title">Now Playing</div>
-          <div class="player-topbar-sub">Expanded listening state</div>
         </div>
         <div class="section-action-row">
-          <button class="sec-action" onclick="closeModal('modal-now-playing')">Close player</button>
+          <button class="player-close" aria-label="Close player" title="Close player" onclick="closeModal('modal-now-playing')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg></button>
         </div>
       </div>
 
@@ -477,26 +504,6 @@
                 <div class="section-kicker" id="xp-kicker">Listening room</div>
                 <div class="player-title" id="xp-title">Choose a track</div>
                 <div class="player-meta" id="xp-meta">Genre / mood / source will appear here.</div>
-              </div>
-              <div class="player-copy-stack">
-                <div class="player-copy-card">
-                  <div class="player-copy-kicker">Lyrics</div>
-                  <div class="player-lyrics empty" id="xp-lyrics">Lyrics appear here once a track is active.</div>
-                </div>
-                <div class="player-copy-grid">
-                  <div class="player-copy-card">
-                    <div class="player-copy-kicker">Prompt / notes</div>
-                    <div class="player-prompt" id="xp-prompt">Prompt and notes appear here once a track is active.</div>
-                  </div>
-                  <div class="player-copy-card">
-                    <div class="player-copy-kicker">AI summary</div>
-                    <div class="player-ai-summary" id="xp-ai-summary">AI summary and curation tags will appear here after metadata generation.</div>
-                    <div class="player-ai-meta">
-                      <div class="player-ai-meta-row" id="xp-ai-tags"></div>
-                      <div class="player-ai-meta-row" id="xp-ai-facts"></div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -515,15 +522,15 @@
             </div>
 
             <div class="player-controls">
-              <button class="player-btn" id="xp-shuffle-btn" onclick="toggleShuffle()">Shuffle: Off</button>
-              <button class="player-btn" onclick="playPrevious()">Prev</button>
-              <button class="player-btn primary" id="xp-play-btn" onclick="togglePlayback()">Play</button>
-              <button class="player-btn" onclick="playNext()">Next</button>
-              <button class="player-btn" id="xp-repeat-btn" onclick="cycleRepeat()">Repeat: Off</button>
+              <button class="player-btn" id="xp-shuffle-btn" aria-pressed="false" aria-label="Shuffle" title="Shuffle" onclick="toggleShuffle()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-shuffle"/></svg></button>
+              <button class="player-btn" aria-label="Previous track" title="Previous" onclick="playPrevious()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
+              <button class="player-btn primary" id="xp-play-btn" aria-label="Play" onclick="togglePlayback()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-play"/></svg></button>
+              <button class="player-btn" aria-label="Next track" title="Next" onclick="playNext()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></button>
+              <button class="player-btn" id="xp-repeat-btn" aria-label="Repeat: off" title="Repeat: off" onclick="cycleRepeat()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-repeat"/></svg></button>
             </div>
 
             <div class="player-sound-row">
-              <span class="player-sound-label">Vol</span>
+              <span class="player-sound-label" aria-hidden="true"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-volume"/></svg></span>
               <input type="range" class="vol-slider" id="xp-volume" min="0" max="100" step="1" value="100" oninput="setPlayerVolume(this.value / 100)" aria-label="Volume">
               <span class="player-sound-label" id="xp-volume-pct">100%</span>
               <button class="player-btn" id="xp-rate-btn" onclick="cyclePlaybackRate()" title="Playback speed">1x</button>
@@ -536,7 +543,30 @@
           </div>
         </div>
 
+        <!-- Lyrics and notes lead the right column, so the cover, title and
+             transport stay together on the left instead of the controls
+             sitting below three cards of text. -->
         <div class="player-side">
+          <div class="player-copy-stack">
+            <div class="player-copy-card">
+              <div class="player-copy-kicker">Lyrics</div>
+              <div class="player-lyrics empty" id="xp-lyrics">Lyrics appear here once a track is active.</div>
+            </div>
+            <div class="player-copy-grid">
+              <div class="player-copy-card">
+                <div class="player-copy-kicker">Prompt / notes</div>
+                <div class="player-prompt" id="xp-prompt">Prompt and notes appear here once a track is active.</div>
+              </div>
+              <div class="player-copy-card">
+                <div class="player-copy-kicker">AI summary</div>
+                <div class="player-ai-summary" id="xp-ai-summary">AI summary and curation tags will appear here after metadata generation.</div>
+                <div class="player-ai-meta">
+                  <div class="player-ai-meta-row" id="xp-ai-tags"></div>
+                  <div class="player-ai-meta-row" id="xp-ai-facts"></div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="player-side-card">
             <div class="section-kicker">Queue</div>
             <div class="section-title">What plays next</div>
@@ -566,10 +596,10 @@
 
 <div class="mobile-nav" id="mobile-nav">
   <span class="mobile-nav-pulse" id="mobile-nav-pulse" aria-hidden="true"></span>
-  <button class="mobile-tab active" id="mob-library" onclick="switchView('library')">Home</button>
-  <button class="mobile-tab" id="mob-playlists" onclick="switchView('playlists')">Playlists</button>
-  <button class="mobile-tab" id="mob-upload" onclick="switchView('upload')">Import</button>
-  <button class="mobile-tab" id="mob-insights" onclick="switchView('insights')">Insights</button>
+  <button class="mobile-tab active" id="mob-library" onclick="switchView('library')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span>Home</span></button>
+  <button class="mobile-tab" id="mob-playlists" onclick="switchView('playlists')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-playlists"/></svg><span>Playlists</span></button>
+  <button class="mobile-tab" id="mob-upload" onclick="switchView('upload')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-import"/></svg><span>Import</span></button>
+  <button class="mobile-tab" id="mob-insights" onclick="switchView('insights')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-insights"/></svg><span>Insights</span></button>
 </div>
 
 <!-- The bar itself stays a pointer shortcut for opening the expanded player;
@@ -597,12 +627,12 @@
     </div>
   </div>
   <div class="np-controls">
-    <button class="np-btn mode-btn" id="np-shuffle-btn" title="Shuffle" aria-label="Toggle shuffle" onclick="event.stopPropagation();toggleShuffle()">Shuf</button>
-    <button class="np-btn" aria-label="Previous track" onclick="event.stopPropagation();playPrevious()">Prev</button>
-    <button class="np-btn primary" id="np-play-btn" aria-label="Play or pause" onclick="event.stopPropagation();togglePlayback()">Play</button>
-    <button class="np-btn" aria-label="Next track" onclick="event.stopPropagation();playNext()">Next</button>
-    <button class="np-btn mode-btn" id="np-repeat-btn" title="Repeat" aria-label="Cycle repeat mode" onclick="event.stopPropagation();cycleRepeat()">Rep</button>
-    <button class="np-btn" id="np-expand-btn" title="Open the expanded player" aria-label="Open expanded player" onclick="event.stopPropagation();openExpandedPlayer()">Open</button>
+    <button class="np-btn mode-btn" id="np-shuffle-btn" title="Shuffle" aria-label="Shuffle" aria-pressed="false" onclick="event.stopPropagation();toggleShuffle()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-shuffle"/></svg></button>
+    <button class="np-btn np-prev" aria-label="Previous track" title="Previous" onclick="event.stopPropagation();playPrevious()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
+    <button class="np-btn primary" id="np-play-btn" aria-label="Play" onclick="event.stopPropagation();togglePlayback()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-play"/></svg></button>
+    <button class="np-btn" aria-label="Next track" title="Next" onclick="event.stopPropagation();playNext()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></button>
+    <button class="np-btn mode-btn" id="np-repeat-btn" title="Repeat: off" aria-label="Repeat: off" onclick="event.stopPropagation();cycleRepeat()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-repeat"/></svg></button>
+    <button class="np-btn np-expand" id="np-expand-btn" title="Open the expanded player" aria-label="Open expanded player" onclick="event.stopPropagation();openExpandedPlayer()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-chevron-up"/></svg></button>
   </div>
 </div>
 <!-- Classic scripts, in dependency order: the pure js/data helpers, then the
@@ -610,33 +640,33 @@
      global scope, which is what lets the inline onclick handlers above reach
      feature functions. On deploy, bump the ?v= token on every local asset
      together; sw.js serves them cache-first. -->
-<script src="js/data/util.js?v=20261003d"></script>
-<script src="js/data/tracks.js?v=20261003d"></script>
-<script src="js/data/covers.js?v=20261003d"></script>
-<script src="js/data/metadata.js?v=20261003d"></script>
-<script src="js/data/waveform.js?v=20261003d"></script>
-<script src="js/data/routes.js?v=20261003d"></script>
-<script src="js/data/backup-format.js?v=20261003d"></script>
-<script src="js/features/vault.js?v=20261003d"></script>
-<script src="js/features/sync.js?v=20261003d"></script>
-<script src="js/features/shell.js?v=20261003d"></script>
-<script src="js/features/modals.js?v=20261003d"></script>
-<script src="js/features/routes.js?v=20261003d"></script>
-<script src="js/features/covers.js?v=20261003d"></script>
-<script src="js/features/waveform.js?v=20261003d"></script>
-<script src="js/features/media-session.js?v=20261003d"></script>
-<script src="js/features/player.js?v=20261003d"></script>
-<script src="js/features/expanded-player.js?v=20261003d"></script>
-<script src="js/features/library.js?v=20261003d"></script>
-<script src="js/features/home.js?v=20261003d"></script>
-<script src="js/features/insights.js?v=20261003d"></script>
-<script src="js/features/playlists.js?v=20261003d"></script>
-<script src="js/features/share.js?v=20261003d"></script>
-<script src="js/features/edit-track.js?v=20261003d"></script>
-<script src="js/features/ai-metadata.js?v=20261003d"></script>
-<script src="js/features/upload.js?v=20261003d"></script>
-<script src="js/features/backup.js?v=20261003d"></script>
-<script src="js/features/keyboard.js?v=20261003d"></script>
-<script src="js/boot.js?v=20261003d"></script>
+<script src="js/data/util.js?v=20261003e"></script>
+<script src="js/data/tracks.js?v=20261003e"></script>
+<script src="js/data/covers.js?v=20261003e"></script>
+<script src="js/data/metadata.js?v=20261003e"></script>
+<script src="js/data/waveform.js?v=20261003e"></script>
+<script src="js/data/routes.js?v=20261003e"></script>
+<script src="js/data/backup-format.js?v=20261003e"></script>
+<script src="js/features/vault.js?v=20261003e"></script>
+<script src="js/features/sync.js?v=20261003e"></script>
+<script src="js/features/shell.js?v=20261003e"></script>
+<script src="js/features/modals.js?v=20261003e"></script>
+<script src="js/features/routes.js?v=20261003e"></script>
+<script src="js/features/covers.js?v=20261003e"></script>
+<script src="js/features/waveform.js?v=20261003e"></script>
+<script src="js/features/media-session.js?v=20261003e"></script>
+<script src="js/features/player.js?v=20261003e"></script>
+<script src="js/features/expanded-player.js?v=20261003e"></script>
+<script src="js/features/library.js?v=20261003e"></script>
+<script src="js/features/home.js?v=20261003e"></script>
+<script src="js/features/insights.js?v=20261003e"></script>
+<script src="js/features/playlists.js?v=20261003e"></script>
+<script src="js/features/share.js?v=20261003e"></script>
+<script src="js/features/edit-track.js?v=20261003e"></script>
+<script src="js/features/ai-metadata.js?v=20261003e"></script>
+<script src="js/features/upload.js?v=20261003e"></script>
+<script src="js/features/backup.js?v=20261003e"></script>
+<script src="js/features/keyboard.js?v=20261003e"></script>
+<script src="js/boot.js?v=20261003e"></script>
 </body>
 </html>

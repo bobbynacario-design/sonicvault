@@ -24,6 +24,20 @@ function observeChromeHeights() {
   window.addEventListener('resize', syncChromeHeightVars);
 }
 
+// Markup for one glyph from the sprite at the top of index.html. Decorative:
+// the button or row that holds it carries the accessible name.
+function icon(name) {
+  return '<svg class="ic" aria-hidden="true" focusable="false"><use href="#i-' + name + '"/></svg>';
+}
+
+// Transport buttons show the action they will take, and say it, since the
+// glyph is all a sighted user gets.
+function setPlayButton(btn, playing) {
+  if (!btn) return;
+  btn.innerHTML = icon(playing ? 'pause' : 'play');
+  btn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+}
+
 function showToast(msg) {
   var el = document.getElementById('sv-toast');
   el.textContent = msg;
@@ -38,22 +52,34 @@ function tickClock() {
 tickClock();
 setInterval(tickClock, 1000);
 
+// The button shows the theme it switches to.
+function paintThemeToggle() {
+  var btn = document.getElementById('theme-toggle');
+  var isLight = document.body.classList.contains('light');
+  var label = isLight ? 'Switch to dark theme' : 'Switch to light theme';
+  btn.innerHTML = icon(isLight ? 'moon' : 'sun');
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+}
+
 function toggleTheme() {
   var isLight = document.body.classList.toggle('light');
-  document.getElementById('theme-toggle').textContent = isLight ? 'Sun' : 'Moon';
+  paintThemeToggle();
   localStorage.setItem('sv_theme', isLight ? 'light' : 'dark');
 }
 if (localStorage.getItem('sv_theme') === 'light') {
   document.body.classList.add('light');
-  document.getElementById('theme-toggle').textContent = 'Sun';
+  paintThemeToggle();
 }
 
 function updateAuthButton() {
   var btn = document.getElementById('auth-toggle');
   if (!btn) return;
   var user = window.fbOwnerUser;
-  btn.textContent = user && user.email ? trimText(user.email, 16) : 'Owner';
-  btn.title = user && user.email ? ('Signed in as ' + user.email) : 'Owner sign-in';
+  var signedIn = !!(user && user.email);
+  btn.classList.toggle('signed-in', signedIn);
+  btn.title = signedIn ? ('Signed in as ' + user.email + ' - select to sign out') : 'Owner sign-in';
+  btn.setAttribute('aria-label', btn.title);
 }
 
 function toggleOwnerAuth() {

@@ -149,19 +149,19 @@ function updatePlayerModeUI() {
   var xpVolume = document.getElementById('xp-volume');
   var xpVolumePct = document.getElementById('xp-volume-pct');
   var xpRate = document.getElementById('xp-rate-btn');
-  if (npShuffle) npShuffle.classList.toggle('mode-on', _shuffleMode);
-  if (npRepeat) {
-    npRepeat.textContent = _repeatMode === 'one' ? 'Rep1' : 'Rep';
-    npRepeat.classList.toggle('mode-on', _repeatMode !== 'off');
-  }
-  if (xpShuffle) {
-    xpShuffle.textContent = _shuffleMode ? 'Shuffle: On' : 'Shuffle: Off';
-    xpShuffle.classList.toggle('mode-on', _shuffleMode);
-  }
-  if (xpRepeat) {
-    xpRepeat.textContent = _repeatMode === 'off' ? 'Repeat: Off' : (_repeatMode === 'all' ? 'Repeat: Queue' : 'Repeat: One');
-    xpRepeat.classList.toggle('mode-on', _repeatMode !== 'off');
-  }
+  var repeatLabel = _repeatMode === 'off' ? 'Repeat: off' : (_repeatMode === 'all' ? 'Repeat: queue' : 'Repeat: one track');
+  [npShuffle, xpShuffle].forEach(function(btn) {
+    if (!btn) return;
+    btn.classList.toggle('mode-on', _shuffleMode);
+    btn.setAttribute('aria-pressed', _shuffleMode ? 'true' : 'false');
+  });
+  [npRepeat, xpRepeat].forEach(function(btn) {
+    if (!btn) return;
+    btn.innerHTML = icon(_repeatMode === 'one' ? 'repeat-one' : 'repeat');
+    btn.classList.toggle('mode-on', _repeatMode !== 'off');
+    btn.title = repeatLabel;
+    btn.setAttribute('aria-label', repeatLabel);
+  });
   var volPct = Math.round((_audio.volume || 0) * 100);
   if (xpVolume && Number(xpVolume.value) !== volPct) xpVolume.value = volPct;
   if (xpVolumePct) xpVolumePct.textContent = volPct + '%';
@@ -199,7 +199,7 @@ function updateNowPlaying() {
     document.getElementById('np-name').textContent = 'Choose a track';
     document.getElementById('np-genre').textContent = 'Your private AI label is ready.';
     document.getElementById('np-queue').textContent = 'Queue awareness activates when playback starts.';
-    document.getElementById('np-play-btn').textContent = 'Play';
+    setPlayButton(document.getElementById('np-play-btn'), false);
     document.getElementById('np-current').textContent = '0:00';
     document.getElementById('np-total').textContent = '0:00';
     document.getElementById('np-bar-fill').style.width = '0%';
@@ -223,7 +223,7 @@ function updateNowPlaying() {
   if (queueCount) queueLine += ' / ' + (orderedQueue.findIndex(function(track) { return track.id === _currentTrack.id; }) + 1) + ' of ' + queueCount;
   if (next) queueLine += ' / Next: ' + next.title;
   document.getElementById('np-queue').textContent = queueLine;
-  document.getElementById('np-play-btn').textContent = _isPlaying ? 'Pause' : 'Play';
+  setPlayButton(document.getElementById('np-play-btn'), _isPlaying);
   applyTrackTint(_currentTrack);
   updateMobileNavPulse();
   updateMediaSession();

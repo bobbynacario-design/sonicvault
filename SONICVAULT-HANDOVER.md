@@ -184,6 +184,10 @@ Applied via `body.light` class toggle. All component overrides use `body.light .
 - Primary buttons are solid white pills with dark text (inverted to dark pills in light theme). Coral/accent lives in highlights, blooms, and waveforms — not CTAs.
 - Waveforms and progress fills use a violet-to-accent gradient.
 - Interior card elements are borderless (typographic pills/tags, ghost secondary buttons); only outer structural cards keep 1px rims.
+- `.section-card` is a grouping, not a box (no rim, fill or padding). The cards inside a section are the only chrome; hover rows and inputs use the `--surface` / `--surface-hover` fills instead of borders.
+- Icons come from the SVG sprite at the top of `index.html` (`<svg class="ic"><use href="#i-NAME"/></svg>`), or `icon(name)` / `setPlayButton(btn, playing)` in `js/features/shell.js` for JS-built markup. Never label an icon button with a text abbreviation ("Shuf", "Rep", "FND"); give it an `aria-label` instead.
+- Covers: `getTrackPalette` snaps each track's hue to one of `COVER_HUE_PAIRS` (neighbouring hues, nothing in the olive 60-130 band), painted as two blooms over a deep ground (`--cover-mesh`). Warm pairs fade into plum, because dark orange reads as brown. Only `lg` covers carry text labels; `md` keeps the monogram; `xs`/`sm` are artwork only.
+- Phones: the docked player collapses to one row (cover, title, play, next, open) sitting on top of the bottom tab bar (`--mobile-nav-h`).
 
 ### Design Conventions (matching PokerHQ)
 - Monospace uppercase labels for metadata (font-family:var(--mono); font-size:9-11px; letter-spacing:.08-.14em)
