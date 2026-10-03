@@ -1,8 +1,9 @@
 {
   "name": "sonicvault-watcher",
   "version": "1.0.0",
-  "description": "Folder watcher that auto-imports Suno downloads into SonicVault via Firebase",
+  "description": "SonicVault's test runner and the Suno folder watcher. The web app itself is buildless and needs no install.",
   "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
     "watch": "node watcher.js",
     "test:rules": "firebase emulators:exec --only firestore --project demo-shared-rules \"node tests/firestore-rules.test.mjs\""
   },

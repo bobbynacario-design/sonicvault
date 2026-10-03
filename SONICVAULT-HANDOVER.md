@@ -1,13 +1,21 @@
 # SonicVault — Claude Code Handover
 
 ## What This Is
-SonicVault is a personal music curation web app for managing AI-generated songs (primarily from Suno). It's a single-file vanilla HTML/CSS/JS app deployed on GitHub Pages with Firebase (Firestore) + Cloudinary backend. Built to match the architecture of an existing app (PokerHQ) by the same developer.
+SonicVault is a personal music curation web app for managing AI-generated songs (primarily from Suno). It's a buildless vanilla HTML/CSS/JS app deployed on GitHub Pages with Firebase (Firestore) + Cloudinary backend. Built to match the architecture of an existing app (PokerHQ) by the same developer, including PokerHQ's `js/data` + `js/features` file layout.
 
 ## Repository Setup
-- **Hosting:** GitHub Pages (static single-file deployment)
-- **Structure:** Single `index.html` file — all HTML, CSS, and JS in one file
-- **No build tools** — no npm, no bundler, no React. Pure vanilla.
+- **Hosting:** GitHub Pages (static files, served as-is)
+- **Structure:** `index.html` (markup only) + `styles/app.css` + scripts under `js/` — see **Code Layout** below
+- **No build tools** — no bundler, no transpiler, no React. Pure vanilla. `package.json` exists only for the tests and the watcher.
 - **Watcher:** `watcher.js` — separate Node.js script, runs locally, NOT deployed to GitHub Pages
+
+## Code Layout
+- `js/app.js` — the only ES module: Firebase auth, private vault sync, public share docs. It runs after every classic script and talks to them only through `window.*` (`fbSave`, `svApplyRemoteTracks`, `refreshAll`, ...).
+- `js/data/*.js` — pure helpers (formatting, ordering, cover identity, metadata inference, waveform math, routes, backup format). No DOM, no app state, nothing outside `js/data`. Unit-tested in Node (`tests/*.test.js`).
+- `js/features/*.js` — one file per feature, each owning its own state (`player.js` owns `_audio` and the queue, `library.js` the filters and shelf, `vault.js` the `tracks`/`playlists`/`appSettings` arrays, ...).
+- `js/boot.js` — loads last; paints the first frame, so everything it calls must already be defined.
+- All classic scripts share one global scope. That is what lets inline `onclick="playTrack(...)"` handlers reach feature functions, so: top-level `var`/`function` only (never `let`/`const`/`class`), and no name declared in two files. Code that *runs* while a file loads may only use files loaded before it; code inside functions can call anything.
+- Every local script and `styles/app.css` carry one shared `?v=` token in `index.html`. Bump it on every deploy — `sw.js` serves same-origin files cache-first. A new script must also be listed in `sw.js` `SHELL_ASSETS`. `npm test` checks all of this.
 
 ## Tech Stack
 - **Frontend:** Vanilla HTML/CSS/JS, no frameworks
@@ -45,7 +53,7 @@ Note: Firebase Storage is NOT used. Audio files are stored in Cloudinary.
 
 ## Cloudinary Config
 ```javascript
-// In index.html (web UI — unsigned upload via preset)
+// In js/features/upload.js (web UI — unsigned upload via preset)
 var CLOUDINARY_CLOUD_NAME    = 'dtw4em0ob';
 var CLOUDINARY_UPLOAD_PRESET = 'sonicvault_web';  // unsigned preset
 
@@ -154,7 +162,7 @@ function load(key, def) {
 - Resource type: `auto`
 - Progress bar shown during upload (`#upload-progress`, `#upload-progress-bar`, `#upload-progress-pct`)
 - File size limit: 100MB
-- `saveTrack()` is async — uploads first, then saves metadata to Firestore
+- `saveAllUploads()` is async — uploads each queued file first, then saves its metadata to Firestore
 
 ## Design System
 
@@ -272,11 +280,11 @@ These are data-layer problems the UI work did not touch:
 - Developer's timezone: PHT (Philippine Time)
 
 ## How to Work on This
-1. The entire web app is ONE file: `index.html`
-2. Edit the file, commit, push to GitHub Pages — that's the deploy
+1. The web app is `index.html` + `styles/app.css` + `js/` (see **Code Layout**). Put new logic in the feature file it belongs to; pure, DOM-free helpers go in `js/data/` with a test.
+2. Edit, run `npm test`, bump the `?v=` token in `index.html`, commit, push to GitHub Pages — that's the deploy
 3. Firebase Firestore and Cloudinary are already configured — no setup needed
-4. Test locally by opening `index.html` in a browser (Firestore will connect, Cloudinary uploads will work)
-5. Keep the single-file vanilla approach — DO NOT introduce build tools, npm, React, or any framework
+4. Test locally through a server, not `file://` — browsers refuse to load `js/app.js` as a module from `file://`, so sync would silently stay off. `npx http-server -c-1 .` (the `.claude/launch.json` config) serves it on localhost.
+5. Keep the vanilla, buildless approach — DO NOT introduce bundlers, transpilers, React, or any framework
 6. Follow the existing code style: `var` declarations, function expressions, DOM manipulation via `getElementById` and `innerHTML`
 7. All new features should use the existing `save(key, val)` / `load(key, def)` pattern for persistence
 8. New tracks must use `audioURL` (Cloudinary link) — never write `audioData` (base64) to Firestore
