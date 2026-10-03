@@ -342,10 +342,9 @@ function renderSmartMixes() {
     var dur = getCollectionDuration(items);
     var plays = items.reduce(function(s, t) { return s + Number(t.plays || 0); }, 0);
     return '<div class="smart-mix-card" style="--sm-accent:' + m.color + '">'
-      + '<div class="smart-mix-head"><span class="smart-mix-badge">Smart mix</span><span class="smart-mix-count">' + m.trackIds.length + ' tracks</span></div>'
       + '<div class="smart-mix-name">' + esc(m.name) + '</div>'
       + '<div class="smart-mix-desc">' + esc(m.desc) + '</div>'
-      + '<div class="pill-row" style="margin-top:.6rem"><span class="meta-pill">' + fmtTime(dur) + '</span><span class="meta-pill">' + fmtCompactNumber(plays) + ' plays</span></div>'
+      + '<div class="pill-row" style="margin-top:.6rem"><span class="meta-pill">' + m.trackIds.length + ' tracks</span><span class="meta-pill">' + fmtTime(dur) + '</span><span class="meta-pill">' + fmtCompactNumber(plays) + (plays === 1 ? ' play' : ' plays') + '</span></div>'
       + '<div class="section-action-row" style="margin-top:.9rem"><button class="sec-action primary" onclick="playSmartMix(' + jsq(m.id) + ')">Play</button><button class="sec-action" onclick="saveSmartMixAsPlaylist(' + jsq(m.id) + ')">Save as playlist</button></div>'
       + '</div>';
   }).join('');
@@ -366,7 +365,7 @@ function renderPlaylists() {
   }).map(function(pl) {
     var items = getPlaylistTracks(pl);
     var totalDuration = getCollectionDuration(items);
-    return '<div class="playlist-card" style="' + playlistAccentVars(pl) + '" onclick="viewPlaylist(' + jsq(pl.id) + ')"><div class="playlist-card-top">' + buildPlaylistCover(pl, 'sm') + '<div><div class="section-kicker" style="margin-bottom:.35rem;color:var(--pl-accent)">Curated playlist</div><div class="playlist-name">' + esc(pl.name) + '</div><div class="playlist-desc">' + esc(pl.desc || 'An editorial mix from the vault.') + '</div><div class="pill-row" style="margin-top:.7rem"><span class="meta-pill highlight" style="color:var(--pl-accent);border-color:var(--pl-accent-rim);background:var(--pl-accent-soft)">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(totalDuration) + '</span><span class="meta-pill">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + ' plays</span></div></div></div><div class="playlist-track-list">' + (items.slice(0, 3).map(function(track, index) {
+    return '<div class="playlist-card" style="' + playlistAccentVars(pl) + '" onclick="viewPlaylist(' + jsq(pl.id) + ')"><div class="playlist-card-top">' + buildPlaylistCover(pl, 'sm') + '<div><div class="playlist-name">' + esc(pl.name) + '</div><div class="playlist-desc">' + esc(pl.desc || 'An editorial mix from the vault.') + '</div><div class="pill-row" style="margin-top:.7rem"><span class="meta-pill highlight" style="color:var(--pl-accent);border-color:var(--pl-accent-rim);background:var(--pl-accent-soft)">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(totalDuration) + '</span><span class="meta-pill">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + ' plays</span></div></div></div><div class="playlist-track-list">' + (items.slice(0, 3).map(function(track, index) {
       return '<div class="playlist-track-pill"><div class="playlist-track-pill-main"><span class="playlist-track-order">' + (index + 1) + '</span><span>' + esc(track.title) + '</span></div><span>' + esc(track.mood || 'Mood') + '</span></div>';
     }).join('') || '<div class="playlist-track-pill"><span>Empty playlist</span><span>Ready for curation</span></div>') + '</div><div class="section-action-row"><button class="sec-action primary" onclick="event.stopPropagation();playPlaylist(' + jsq(pl.id) + ')">Play</button><button class="sec-action" onclick="event.stopPropagation();viewPlaylist(' + jsq(pl.id) + ')">Open</button>' + (pl.shared ? '<button class="sec-action is-shared" title="This playlist has a live public link" onclick="event.stopPropagation();unsharePlaylist(' + jsq(pl.id) + ')">Unshare</button>' : '<button class="sec-action" onclick="event.stopPropagation();sharePlaylist(' + jsq(pl.id) + ')">Share</button>') + '<button class="sec-action" onclick="event.stopPropagation();deletePlaylist(' + jsq(pl.id) + ')">Delete</button></div></div>';
   }).join('');
@@ -374,7 +373,7 @@ function renderPlaylists() {
   // The card stays clickable for pointers, but the keyboard path is the real
   // button inside it — a focusable card wrapping focusable buttons would be a
   // duplicate tab stop for the same action.
-  html += '<div class="playlist-card playlist-card-new" onclick="openModal(\'modal-playlist\')"><div class="section-kicker">New room</div><div class="playlist-name">Create another playlist</div><div class="playlist-desc">Turn a cluster of tracks into a stronger editorial sequence.</div><div class="section-action-row"><button class="sec-action primary" onclick="event.stopPropagation();openModal(\'modal-playlist\')">Start playlist</button></div></div>';
+  html += '<div class="playlist-card playlist-card-new" onclick="openModal(\'modal-playlist\')"><div class="playlist-name">Create another playlist</div><div class="playlist-desc">Turn a cluster of tracks into a stronger editorial sequence.</div><div class="section-action-row"><button class="sec-action primary" onclick="event.stopPropagation();openModal(\'modal-playlist\')">Start playlist</button></div></div>';
   el.innerHTML = html;
 }
 

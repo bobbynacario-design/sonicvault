@@ -344,13 +344,17 @@ body.public-route .clock-nav{display:none !important}
   margin-bottom:1rem;
   flex-wrap:wrap;
 }
+/* A block's own label, where it has no heading. Labels that only repeated
+   the heading below them are gone; the ones left read as quiet text rather
+   than coloured, tracked-out capitals competing with the content. */
 .section-kicker{
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
-  color:var(--accent-dynamic);
-  margin-bottom:.45rem;
+  font-family:var(--sans);
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:normal;
+  text-transform:none;
+  color:var(--muted);
+  margin-bottom:.4rem;
 }
 /* One heading scale. .section-title is 24px here and was then overridden
    inline at 26, 28, 30 and 42px, so the same element rendered four different
@@ -558,11 +562,12 @@ body.light .hero-main{
   background:var(--surface);
 }
 .side-card .side-kicker{
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.16em;
-  text-transform:uppercase;
-  color:var(--accent-dynamic);
+  font-family:var(--sans);
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:normal;
+  text-transform:none;
+  color:var(--muted);
   margin-bottom:.5rem;
 }
 .side-card .side-title{
@@ -952,12 +957,13 @@ body.light .side-item{background:rgba(0,0,0,.03)}
 }
 .resume-strip .cover-art{width:168px;height:168px;border-radius:22px;box-shadow:0 30px 60px -24px rgba(0,0,0,.7)}
 .resume-kicker{
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
+  font-family:var(--sans);
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:normal;
+  text-transform:none;
   color:var(--muted);
-  margin-bottom:.6rem;
+  margin-bottom:.55rem;
 }
 .resume-title{font-family:var(--display);font-weight:700;font-size:clamp(30px,3.6vw,46px);line-height:1;letter-spacing:-.02em}
 .resume-meta{font-size:14px;color:var(--muted);margin-top:.6rem}
@@ -2049,215 +2055,84 @@ body.light .playlist-modal-item{background:rgba(0,0,0,.03)}
 .playlist-seq-btn:hover{border-color:var(--accent-ghost);background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 .playlist-seq-btn[disabled]{opacity:.35;pointer-events:none}
 
-.public-shell{display:grid;gap:1.2rem}
+/* ── Shared pages ─────────────────────────────────────────────────────────
+   What someone sees from a share link: one hero lit in the cover's colours,
+   then plain sections -- lyrics, more like this, playlists -- each shown only
+   when it has something in it. No boxes inside the hero, and no notes meant
+   for the owner. */
+.public-shell{display:grid;gap:2.6rem;max-width:1180px}
 .public-hero{
   position:relative;
+  display:grid;
+  grid-template-columns:minmax(220px,340px) minmax(0,1fr);
+  gap:2.2rem;
+  align-items:end;
+  padding:2rem;
+  border-radius:32px;
   overflow:hidden;
-  padding:1.4rem;
-  border-radius:30px;
-  border:1px solid var(--rim);
   background:
-    linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)),
-    radial-gradient(circle at 14% 20%, var(--accent-dynamic-soft), transparent 26%),
-    linear-gradient(135deg, rgba(15,18,29,.96), rgba(9,12,20,.98));
-  box-shadow:var(--shadow);
+    radial-gradient(80% 140% at 0% 0%, color-mix(in srgb, var(--hero-a, var(--accent-dynamic)) 34%, transparent), transparent 70%),
+    radial-gradient(70% 120% at 100% 100%, color-mix(in srgb, var(--hero-b, var(--violet)) 20%, transparent), transparent 70%),
+    var(--surface);
 }
-body.light .public-hero{
-  background:
-    linear-gradient(135deg, rgba(255,255,255,.84), rgba(255,255,255,.76)),
-    radial-gradient(circle at 14% 20%, var(--accent-dynamic-soft), transparent 28%);
-}
-.public-hero::before{
-  content:'';
-  position:absolute;
-  inset:auto -8% -14% auto;
-  width:360px;
-  height:360px;
-  border-radius:50%;
-  background:radial-gradient(circle, var(--accent-dynamic-soft), transparent 68%);
-  filter:blur(12px);
-  pointer-events:none;
-}
-.public-grid{
-  position:relative;
-  display:grid;
-  grid-template-columns:minmax(300px,430px) minmax(0,1fr);
-  gap:1.2rem;
-  align-items:start;
-}
-.public-cover-card,
-.public-info-card{
-  padding:1.1rem;
-  border-radius:28px;
-  border:1px solid var(--rim);
-  background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
-  backdrop-filter:blur(14px);
-}
-.public-cover-card .cover-art,
-.public-cover-card .cover-collage{width:100%}
-.public-info-card{display:grid;gap:1rem}
-.public-kicker{
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
-  color:var(--accent-dynamic);
-}
+.public-cover .cover-art,
+.public-cover .cover-collage{width:100%;max-width:none;box-shadow:0 40px 80px -30px rgba(0,0,0,.75)}
+.public-cover .cover-collage{border-radius:24px}
+.public-info{display:grid;gap:.85rem;min-width:0}
+.public-eyebrow{font-size:13px;font-weight:600;color:var(--muted)}
 .public-title{
-  font-family:var(--display);font-weight:800;
-  font-size:clamp(3rem, 6vw, 5.4rem);
-  line-height:.92;
-  letter-spacing:-.04em;
-  max-width:880px;
+  font-family:var(--display);
+  font-weight:700;
+  font-size:clamp(2.4rem, 5vw, 4.2rem);
+  line-height:.95;
+  letter-spacing:-.03em;
+  overflow-wrap:break-word;
 }
-.public-sub{
-  max-width:780px;
-  color:var(--muted);
-  font-size:15px;
-  line-height:1.75;
-}
-.public-pill-strip{display:flex;gap:.55rem;flex-wrap:wrap}
-.public-meta-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
-  gap:.8rem;
-}
-.public-meta-card{
-  padding:.9rem 1rem;
-  border-radius:18px;
-  border:1px solid var(--rim);
-  background:rgba(255,255,255,.035);
-}
-.public-meta-label{
-  font-family:var(--mono);
-  font-size:9px;
-  letter-spacing:.16em;
-  text-transform:uppercase;
-  color:var(--muted2);
-  margin-bottom:.35rem;
-}
-.public-meta-value{
-  font-family:var(--display);font-weight:700;
-  font-size:24px;
-  line-height:1;
-}
-.public-meta-copy{
-  margin-top:.28rem;
-  color:var(--muted2);
-  font-size:11px;
-  line-height:1.6;
-}
-.public-context-grid{
-  display:grid;
-  grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);
-  gap:1.1rem;
-}
-.public-list-card,
-.public-side-note{
-  padding:1.2rem;
-  border-radius:26px;
-  border:1px solid var(--rim);
-  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-  box-shadow:var(--shadow);
-}
-.public-list-head{
-  display:flex;
-  align-items:flex-end;
-  justify-content:space-between;
-  gap:1rem;
-  flex-wrap:wrap;
-  margin-bottom:.95rem;
-}
-.public-list-title{
-  font-family:var(--display);font-weight:700;
-  font-size:30px;
-  line-height:1;
-}
-.public-list-copy{
-  color:var(--muted);
-  font-size:13px;
-  line-height:1.7;
-  max-width:620px;
-}
-.public-track-list,
-.public-link-list{display:grid;gap:.7rem}
+.public-facts{font-size:15px;color:var(--muted)}
+.public-sub{max-width:640px;color:var(--muted);font-size:15px;line-height:1.7}
+.public-tags{font-size:13px;color:var(--muted2)}
+.public-actions{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:.4rem}
+.public-section{display:grid;gap:1rem}
+.public-section-title{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:-.01em;line-height:1.05}
+.public-lyrics{max-width:720px;font-size:15px;line-height:1.85;color:var(--text)}
+.public-lyrics .lyric-line{font-size:15px}
+.public-lyrics-text{color:var(--muted)}
+.public-related-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem}
+.public-related-grid .cover-art{width:100%;height:auto;aspect-ratio:1/1}
+.public-track-list,.public-link-list{display:flex;flex-direction:column;gap:2px}
 .public-track-row,
 .public-link-row{
   display:grid;
-  gap:.8rem;
   align-items:center;
-  padding:.76rem;
-  border-radius:20px;
-  border:1px solid var(--rim);
-  background:rgba(255,255,255,.035);
-}
-.public-track-row{
-  grid-template-columns:auto 60px minmax(0,1fr) auto auto;
+  gap:.85rem;
+  padding:.45rem .7rem;
+  border-radius:12px;
   cursor:pointer;
-  transition:transform .16s ease,border-color .16s ease,background .16s ease;
+  transition:background .14s ease;
 }
-.public-track-row:hover,
-.public-link-row:hover{
-  transform:translateY(-1px);
-  border-color:var(--rim2);
-  background:rgba(255,255,255,.05);
-}
-.public-link-row{
-  grid-template-columns:82px minmax(0,1fr) auto;
-  cursor:pointer;
-}
+.public-track-row{grid-template-columns:30px 42px minmax(0,1fr) auto}
+.public-link-row{grid-template-columns:54px minmax(0,1fr)}
+.public-track-row:hover,.public-link-row:hover{background:var(--surface)}
+.public-track-row .cover-art{width:42px;height:42px;border-radius:9px}
+.public-link-row .cover-collage{width:54px;border-radius:10px}
+.public-track-row.current .public-track-name{color:var(--accent-dynamic)}
 .public-track-index,
-.public-track-time{
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-  color:var(--muted2);
-}
-.public-track-main,
-.public-link-main{min-width:0}
+.public-track-time{font-family:var(--mono);font-size:11px;color:var(--muted2);text-align:right;font-variant-numeric:tabular-nums}
+.public-track-main,.public-link-main{min-width:0}
 .public-track-name,
-.public-link-title{
-  font-size:14px;
-  font-weight:700;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
+.public-link-title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .public-track-sub,
-.public-link-sub{
-  margin-top:.2rem;
-  color:var(--muted2);
-  font-size:11px;
-  line-height:1.6;
+.public-link-sub{margin-top:.1rem;color:var(--muted2);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.public-missing{max-width:560px}
+@media (max-width:900px){
+  .public-hero{grid-template-columns:1fr;align-items:start;padding:1.3rem;gap:1.4rem;border-radius:26px}
+  .public-cover{max-width:300px}
 }
-.public-row-action{
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-  color:var(--accent-dynamic);
-}
-.public-related-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
-  gap:.8rem;
-}
-.public-empty{
-  padding:1.2rem;
-  border-radius:22px;
-  background:var(--surface);
-  color:var(--muted);
-  line-height:1.8;
-  text-align:center;
-}
-.public-empty strong{
-  display:block;
-  margin-bottom:.35rem;
-  font-family:var(--display);font-weight:700;
-  font-size:26px;
-  line-height:1;
-  color:var(--text);
+@media (max-width:640px){
+  .public-cover{max-width:none}
+  .public-actions .sec-action{flex:1;justify-content:center}
+  .public-related-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .public-track-row{grid-template-columns:22px 42px minmax(0,1fr) auto;gap:.6rem}
 }
 
 .player-modal-overlay{
@@ -2427,11 +2302,12 @@ body.light .player-modal .player-close{background:rgba(255,255,255,.5)}
   gap:.7rem;
 }
 .player-copy-kicker{
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.16em;
-  text-transform:uppercase;
-  color:var(--accent-dynamic);
+  font-family:var(--sans);
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:normal;
+  text-transform:none;
+  color:var(--muted);
 }
 .player-lyrics{
   max-height:320px;
@@ -2445,7 +2321,7 @@ body.light .player-modal .player-close{background:rgba(255,255,255,.5)}
 .player-lyrics.empty{color:var(--muted2)}
 .lyric-section-header{
   margin-top:1.15rem;
-  color:var(--accent-dynamic);
+  color:var(--muted2);
   font-family:var(--mono);
   font-size:10px;
   font-weight:500;
@@ -2677,7 +2553,6 @@ body.light .player-btn.primary{background:#171420;color:#f7f2eb}
   background:var(--accent-dynamic);
   border:none;
 }
-.player-side-card .section-kicker{margin-bottom:.35rem}
 .queue-list,
 .playlist-chip-list,
 .related-row{display:grid;gap:.7rem}
@@ -2760,7 +2635,7 @@ body.light .queue-reorder button{background:rgba(0,0,0,.05)}
 .health-tile{padding:1.1rem 1rem;border-radius:20px;background:rgba(255,255,255,.03)}
 /* Secondary metrics, below the stat tiles they sit under. */
 .health-val{font-family:var(--display);font-weight:700;font-size:1.4rem;line-height:1;letter-spacing:-.02em}
-.health-label{margin-top:.4rem;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-dynamic)}
+.health-label{margin-top:.4rem;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted2)}
 .health-sub{margin-top:.3rem;font-size:11px;color:var(--muted2);line-height:1.5}
 .insight-empty-row{padding:.8rem;color:var(--muted2);font-size:13px}
 body.light .dist-track,body.light .rank-bar{background:rgba(0,0,0,.06)}
@@ -2769,9 +2644,6 @@ body.light .health-tile{background:rgba(0,0,0,.03)}
 /* ── Smart mixes ──────────────────────────────────────────────── */
 .smart-mix-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:1rem;margin-top:1.2rem}
 .smart-mix-card{position:relative;overflow:hidden;padding:1.1rem;border-radius:22px;background:radial-gradient(90% 70% at 0% 0%, color-mix(in srgb, var(--sm-accent,var(--accent-dynamic)) 16%, transparent), transparent 70%),var(--surface)}
-.smart-mix-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.55rem}
-.smart-mix-badge{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--sm-accent,var(--accent-dynamic))}
-.smart-mix-count{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted2)}
 .smart-mix-name{font-family:var(--display);font-weight:700;font-size:26px;line-height:1;letter-spacing:-.02em}
 .smart-mix-desc{margin-top:.45rem;color:var(--muted);font-size:13px;line-height:1.55}
 .playlist-chip{
@@ -3011,7 +2883,6 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .hero-stage,.playlist-hero-grid,.upload-shell{grid-template-columns:1fr}
   .hero-grid,.playlist-hero-card{grid-template-columns:1fr}
   .playlist-hero-card .cover-collage{max-width:220px}
-  .public-grid,.public-context-grid{grid-template-columns:1fr}
   .upload-batch-layout{grid-template-columns:1fr}
   .spotlight-card{grid-template-columns:96px minmax(0,1fr)}
   .player-layout{grid-template-columns:minmax(0, 1fr)}
@@ -3114,9 +2985,6 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .page{padding:1.2rem 1rem calc(max(var(--player-height), var(--mobile-nav-h) + 10px) + 1.6rem)}
   .hero-main{min-height:0}
   .rail-grid,.track-grid,.playlist-grid{grid-template-columns:1fr}
-  .public-track-row{grid-template-columns:auto 44px minmax(0,1fr) auto}
-  .public-track-time{grid-column:1 / -1}
-  .public-row-action{display:none}
   .upload-queue-item{grid-template-columns:52px minmax(0,1fr)}
   .upload-queue-actions{grid-column:1 / -1;justify-items:start}
   .track-card-top{grid-template-columns:88px minmax(0,1fr)}
@@ -3151,11 +3019,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   #sort-filter .filter-chip{flex:none}
   .browse-summary:not(.has-filters) > div + div{display:none}
   .player-topbar .section-action-row{width:auto}
-  .public-title{font-size:2.7rem}
   .playlist-hero-card .cover-collage{max-width:168px}
-  .public-meta-grid,.public-related-grid{grid-template-columns:1fr}
-  .public-track-row,.public-link-row{grid-template-columns:1fr}
-  .public-track-index,.public-track-time,.public-row-action{display:none}
   /* One row, like every phone mini-player: cover, title, play, next, open.
      Shuffle, repeat and previous live in the expanded player, and the
      progress bar shrinks to a hairline along the bottom edge. */

@@ -34,7 +34,7 @@ function makeTrackSnapshot(track) {
     aiTheme: getTrackAITheme(track),
     aiEnergy: track.aiEnergy || '',
     aiEra: track.aiEra || '',
-    lyricsExcerpt: getLyricsExcerpt(track, 900),
+    lyricsExcerpt: trimLyricsPreview(getTrackLyrics(track), 900),
     hasLyrics: hasLyrics(track)
   };
 }
@@ -108,16 +108,54 @@ function openShareLinkModal(title, subtitle, url) {
   openModal('modal-share');
 }
 
+// What a shared page shows of a lyric sheet: the opening lines, cut at a line
+// break, with line breaks kept. (Shares published before this carry a
+// one-line excerpt; publicLyricsHTML still renders those as a paragraph.)
+function trimLyricsPreview(lyrics, max) {
+  var text = String(lyrics || '').replace(/\r\n?/g, '\n').trim();
+  var limit = max || 900;
+  if (text.length <= limit) return text;
+  var cut = text.lastIndexOf('\n', limit);
+  return text.slice(0, cut > limit * .5 ? cut : limit).replace(/\s+$/, '') + '\n…';
+}
+
+function publicLyricsHTML(text) {
+  var value = String(text || '').trim();
+  if (!value) return '';
+  if (value.indexOf('\n') === -1) return '<p class="public-lyrics-text">' + esc(value) + '</p>';
+  return parseLyricSheet(value).map(function(row) {
+    if (row.kind === 'gap') return '<div class="lyric-gap"></div>';
+    if (row.kind === 'header') return '<div class="lyric-section-header">' + esc(row.text) + '</div>';
+    return '<div class="lyric-line">' + esc(row.text) + '</div>';
+  }).join('');
+}
+
+// Visitors cannot open a private vault, so the way back into the app is
+// offered only to the signed-in owner.
+function publicOwnerAction(view) {
+  return window.fbOwnerUser ? '<button class="sec-action" onclick="navigateToApp(' + jsq(view) + ')">Open vault</button>' : '';
+}
+
+function publicPlayButton(label, onclick) {
+  return '<button class="sec-action primary has-icon" onclick="' + onclick + '">' + icon(/pause/i.test(label) ? 'pause' : 'play') + esc(label) + '</button>';
+}
+
+function publicRelatedCards(list) {
+  return list.map(function(item) {
+    return '<div class="related-card" role="button" tabindex="0" aria-label="' + attr('Open shared track ' + (item.title || 'track')) + '" onclick="openSharedRoute(\'track\', ' + jsq(item.id) + ')">' + buildCoverArt(item, 'md', false) + '<div><div class="related-title">' + esc(item.title) + '</div><div class="related-sub">' + esc(item.genre || 'Other') + ' &middot; ' + esc(item.mood || 'Mood') + '</div></div></div>';
+  }).join('');
+}
+
 function renderPublicTrackPage(track) {
   var el = document.getElementById('public-page');
   if (!el) return;
   if (_publicRouteLoading && !track) {
-    el.innerHTML = '<div class="public-shell" aria-busy="true" aria-label="Loading shared track"><div class="public-list-card"><div class="skel skel-cover" style="max-width:220px"></div><div class="skel skel-title"></div><div class="skel skel-title short"></div><div class="skel skel-line"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div><div class="skel skel-row" style="margin-top:1.2rem"></div><div class="skel skel-row"></div></div></div>';
+    el.innerHTML = '<div class="public-shell" aria-busy="true" aria-label="Loading shared track"><div class="public-hero"><div class="skel skel-cover"></div><div><div class="skel skel-line short"></div><div class="skel skel-title"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div></div></div></div>';
     updatePageChrome('Loading track | SonicVault', null);
     return;
   }
   if (!track) {
-    el.innerHTML = '<div class="public-shell"><div class="public-list-card"><div class="public-empty"><strong>Track not found</strong>This share link does not point to a track that exists in the current SonicVault library.<div class="modal-actions" style="justify-content:center;margin-top:1rem"><button class="sec-action primary" onclick="navigateToApp(\'library\')">Open SonicVault</button></div></div></div></div>';
+    el.innerHTML = '<div class="public-shell"><div class="empty-state public-missing"><strong>This track isn’t shared anymore</strong>The link may have been turned off by its owner.</div></div>';
     updatePageChrome('Track not found | SonicVault', null);
     return;
   }
@@ -127,27 +165,38 @@ function renderPublicTrackPage(track) {
   var collections = Array.isArray(track.playlists) ? track.playlists : playlists.filter(function(pl) {
     return (pl.trackIds || []).indexOf(track.id) !== -1;
   }).slice(0, 4);
-  var playLabel = _currentTrack && _currentTrack.id === track.id && _isPlaying ? 'Pause track' : 'Play track';
+  var playLabel = _currentTrack && _currentTrack.id === track.id && _isPlaying ? 'Pause' : 'Play';
   var summary = getTrackSummary(track);
-  var tags = sanitizeMetadataArray(track.aiTags || getTrackAITags(track), 8);
-  var lyricsExcerpt = String(track.lyricsExcerpt || getLyricsExcerpt(track, 900) || '').trim();
+  var tags = sanitizeMetadataArray(track.aiTags || getTrackAITags(track), 6);
+  var lyrics = String(track.lyricsExcerpt || trimLyricsPreview(getTrackLyrics(track), 900) || '').trim();
+  var palette = getCoverPalette(track);
+  var plays = Number(track.plays || 0);
+  var facts = [track.genre || track.aiGenre || 'Other', track.mood || track.aiMood || 'Mood', fmtTime(track.duration || 0)];
+  if (plays) facts.push(fmtCompactNumber(plays) + (plays === 1 ? ' play' : ' plays'));
 
   el.innerHTML = ''
     + '<div class="public-shell">'
-    +   '<div class="public-hero"><div class="public-grid">'
-    +     '<div class="public-cover-card">' + buildCoverArt(track, 'lg', true) + '</div>'
-    +     '<div class="public-info-card"><div class="public-kicker">Shared track / SonicVault</div><div class="public-title">' + esc(track.title) + '</div><div class="public-sub">' + esc(summary || getTrackPromptExcerpt(track, 260)) + '</div><div class="public-pill-strip"><span class="meta-pill highlight">' + esc(track.genre || track.aiGenre || 'Other') + '</span><span class="meta-pill">' + esc(track.mood || track.aiMood || 'Mood') + '</span><span class="meta-pill">' + esc(track.source || 'Suno') + '</span><span class="meta-pill">' + fmtTime(track.duration || 0) + '</span></div>' + (tags.length ? '<div class="ai-chip-row" style="margin-top:.9rem">' + tags.map(function(tag) { return '<span class="ai-chip">' + esc(tag) + '</span>'; }).join('') + '</div>' : '') + '<div class="section-action-row"><button class="sec-action primary" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(queueIds) + ', ' + jsq('Shared track') + ')">' + playLabel + '</button><button class="sec-action" onclick="openShareLinkModal(' + jsq('Share \"' + track.title + '\"') + ', ' + jsq('Anyone with the link can jump straight into this track.') + ', ' + jsq(buildShareURL('track', track.id)) + ')">Copy share link</button><button class="sec-action" onclick="navigateToApp(\'library\')">Open vault</button></div><div class="public-meta-grid"><div class="public-meta-card"><div class="public-meta-label">Plays</div><div class="public-meta-value">' + fmtCompactNumber(track.plays || 0) + '</div><div class="public-meta-copy">Total listens on this release.</div></div><div class="public-meta-card"><div class="public-meta-label">Published</div><div class="public-meta-value">' + esc(track.created || 'Undated') + '</div><div class="public-meta-copy">Saved into SonicVault.</div></div><div class="public-meta-card"><div class="public-meta-label">Theme</div><div class="public-meta-value">' + esc(getTrackAITheme(track) || 'Curated') + '</div><div class="public-meta-copy">A concise read on the track mood and subject.</div></div></div></div>'
-    +   '</div></div>'
-    +   '<div class="public-context-grid">'
-    +     '<div class="public-list-card"><div class="public-list-head"><div><div class="public-kicker">Editorial read</div><div class="public-list-title">Lyrics and summary</div><div class="public-list-copy">Shared pages keep the listening context intact without exposing your whole private metadata footprint.</div></div></div>' + (summary ? '<div class="player-ai-summary" style="margin-bottom:1rem">' + esc(summary) + '</div>' : '') + '<div class="player-copy-card" style="background:rgba(255,255,255,.02)"><div class="player-copy-kicker">Lyrics excerpt</div><div class="player-lyrics' + (lyricsExcerpt ? '' : ' empty') + '" style="max-height:220px">' + esc(lyricsExcerpt || 'Lyrics are not included on this shared page yet.') + '</div></div></div>'
-    +     '<div class="public-list-card"><div class="public-list-head"><div><div class="public-kicker">Similar vibe</div><div class="public-list-title">Stay in this lane</div><div class="public-list-copy">Related tracks are pulled from genre, mood, prompt, lyrics, and AI metadata already living in the vault.</div></div></div><div class="public-related-grid">' + (related.length ? related.map(function(item) {
-          return '<div class="related-card" role="button" tabindex="0" aria-label="' + attr('Open shared track ' + (item.title || 'track')) + '" onclick="openSharedRoute(\'track\', ' + jsq(item.id) + ')">' + buildCoverArt(item, 'sm', false) + '<div><div class="related-title">' + esc(item.title) + '</div><div class="related-sub">' + esc(item.genre || 'Other') + ' / ' + esc(item.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(item, 76), 76) + '</div></div></div>';
-        }).join('') : '<div class="public-empty"><strong>No related tracks yet</strong>Add more music with mood and prompt metadata to strengthen similarity matching.</div>') + '</div></div>'
-    +     '<div class="public-side-note"><div class="public-kicker">Playlist context</div><div class="public-list-title">Appears in curated mixes</div><div class="public-list-copy" style="margin-top:.45rem">' + esc(collections.length ? 'This track already anchors one or more mixtapes in the vault.' : 'This track is not in a playlist yet, so it is standing on its own as a shared single.') + '</div><div class="public-link-list" style="margin-top:1rem">' + (collections.length ? collections.map(function(pl) {
+    +   '<section class="public-hero" style="--hero-a:' + palette.a + ';--hero-b:' + palette.b + '">'
+    +     '<div class="public-cover">' + buildCoverArt(track, 'lg', true) + '</div>'
+    +     '<div class="public-info">'
+    +       '<div class="public-eyebrow">Shared from SonicVault</div>'
+    +       '<h1 class="public-title">' + esc(track.title) + '</h1>'
+    +       '<div class="public-facts">' + facts.map(esc).join(' &middot; ') + '</div>'
+    +       ((summary || track.prompt) ? '<p class="public-sub">' + esc(summary || getTrackPromptExcerpt(track, 260)) + '</p>' : '')
+    +       (tags.length ? '<div class="public-tags">' + tags.map(esc).join(' &middot; ') + '</div>' : '')
+    +       '<div class="public-actions">'
+    +         publicPlayButton(playLabel, 'startPlayback(' + jsq(track.id) + ', ' + jsv(queueIds) + ', ' + jsq('Shared track') + ')')
+    +         '<button class="sec-action" onclick="openShareLinkModal(' + jsq('Share “' + track.title + '”') + ', ' + jsq('Anyone with the link can listen to this track.') + ', ' + jsq(buildShareURL('track', track.id)) + ')">Copy link</button>'
+    +         publicOwnerAction('library')
+    +       '</div>'
+    +     '</div>'
+    +   '</section>'
+    +   (lyrics ? '<section class="public-section"><h2 class="public-section-title">Lyrics</h2><div class="public-lyrics">' + publicLyricsHTML(lyrics) + '</div></section>' : '')
+    +   (related.length ? '<section class="public-section"><h2 class="public-section-title">More like this</h2><div class="public-related-grid">' + publicRelatedCards(related) + '</div></section>' : '')
+    +   (collections.length ? '<section class="public-section"><h2 class="public-section-title">In playlists</h2><div class="public-link-list">' + collections.map(function(pl) {
           var items = getPlaylistTracks(pl);
-          return '<div class="public-link-row" role="button" tabindex="0" aria-label="' + attr('Open shared playlist ' + (pl.name || 'playlist')) + '" onclick="openSharedRoute(\'playlist\', ' + jsq(pl.id) + ')">' + buildPlaylistCover(pl, 'xs') + '<div class="public-link-main"><div class="public-link-title">' + esc(pl.name) + '</div><div class="public-link-sub">' + esc(pl.desc || items.length + ' track mix') + '</div></div><div class="public-row-action">Open mix</div></div>';
-        }).join('') : '<div class="public-empty"><strong>No playlist context</strong>Create a playlist from the vault if you want this shared track to sit inside a bigger narrative.</div>') + '</div></div>'
-    +   '</div>'
+          return '<div class="public-link-row" role="button" tabindex="0" aria-label="' + attr('Open shared playlist ' + (pl.name || 'playlist')) + '" onclick="openSharedRoute(\'playlist\', ' + jsq(pl.id) + ')">' + buildPlaylistCover(pl, 'xs') + '<div class="public-link-main"><div class="public-link-title">' + esc(pl.name) + '</div><div class="public-link-sub">' + esc(pl.desc || (items.length + ' tracks')) + '</div></div></div>';
+        }).join('') + '</div></section>' : '')
     + '</div>';
 
   updatePageChrome(track.title + ' | SonicVault', track);
@@ -157,12 +206,12 @@ function renderPublicPlaylistPage(pl) {
   var el = document.getElementById('public-page');
   if (!el) return;
   if (_publicRouteLoading && !pl) {
-    el.innerHTML = '<div class="public-shell" aria-busy="true" aria-label="Loading shared playlist"><div class="public-list-card"><div class="skel skel-cover" style="max-width:220px"></div><div class="skel skel-title"></div><div class="skel skel-title short"></div><div class="skel skel-line"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div><div class="skel skel-row" style="margin-top:1.2rem"></div><div class="skel skel-row"></div></div></div>';
+    el.innerHTML = '<div class="public-shell" aria-busy="true" aria-label="Loading shared playlist"><div class="public-hero"><div class="skel skel-cover"></div><div><div class="skel skel-line short"></div><div class="skel skel-title"></div><div class="skel skel-line"></div><div class="skel skel-line short"></div></div></div></div>';
     updatePageChrome('Loading playlist | SonicVault', null);
     return;
   }
   if (!pl) {
-    el.innerHTML = '<div class="public-shell"><div class="public-list-card"><div class="public-empty"><strong>Playlist not found</strong>This share link does not point to a playlist that exists in the current SonicVault library.<div class="modal-actions" style="justify-content:center;margin-top:1rem"><button class="sec-action primary" onclick="navigateToApp(\'playlists\')">Open SonicVault</button></div></div></div></div>';
+    el.innerHTML = '<div class="public-shell"><div class="empty-state public-missing"><strong>This playlist isn’t shared anymore</strong>The link may have been turned off by its owner.</div></div>';
     updatePageChrome('Playlist not found | SonicVault', null);
     return;
   }
@@ -170,22 +219,33 @@ function renderPublicPlaylistPage(pl) {
   var items = getPlaylistTracks(pl);
   var anchor = getPlaylistAnchorTrack(pl);
   var related = Array.isArray(pl.related) ? pl.related : getPlaylistRelatedTracks(pl, 4);
-  var playLabel = items.length && _currentTrack && (pl.trackIds || []).indexOf(_currentTrack.id) !== -1 && _isPlaying ? 'Resume playlist' : 'Play playlist';
+  var playing = items.length && _currentTrack && (pl.trackIds || []).indexOf(_currentTrack.id) !== -1 && _isPlaying;
+  var palette = getCoverPalette(anchor);
+  var plays = items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0);
+  var facts = [items.length + (items.length === 1 ? ' track' : ' tracks'), fmtTime(Number(pl.totalDuration) || getCollectionDuration(items))];
+  if (plays) facts.push(fmtCompactNumber(plays) + ' plays');
 
   el.innerHTML = ''
     + '<div class="public-shell">'
-    +   '<div class="public-hero"><div class="public-grid">'
-    +     '<div class="public-cover-card">' + buildPlaylistCover(pl, 'md') + '</div>'
-    +     '<div class="public-info-card"><div class="public-kicker">Shared playlist / SonicVault</div><div class="public-title">' + esc(pl.name) + '</div><div class="public-sub">' + esc(pl.desc || 'A front-to-back curated sequence built from this private AI music vault.') + '</div><div class="public-pill-strip"><span class="meta-pill highlight">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(items)) + '</span><span class="meta-pill">' + esc(anchor.source || 'Mixed') + '</span></div><div class="section-action-row"><button class="sec-action primary" onclick="playPlaylist(' + jsq(pl.id) + ')">' + playLabel + '</button><button class="sec-action" onclick="openShareLinkModal(' + jsq('Share \"' + pl.name + '\"') + ', ' + jsq('Send the playlist link for a front-to-back listen.') + ', ' + jsq(buildShareURL('playlist', pl.id)) + ')">Copy share link</button><button class="sec-action" onclick="navigateToApp(\'playlists\')">Open vault</button></div><div class="public-meta-grid"><div class="public-meta-card"><div class="public-meta-label">Playlist tone</div><div class="public-meta-value">' + esc(anchor.mood || 'Mixed') + '</div><div class="public-meta-copy">Dominant mood from the opener.</div></div><div class="public-meta-card"><div class="public-meta-label">Lead source</div><div class="public-meta-value">' + esc(anchor.source || 'Mixed') + '</div><div class="public-meta-copy">Source shaping the first impression.</div></div><div class="public-meta-card"><div class="public-meta-label">Total plays</div><div class="public-meta-value">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + '</div><div class="public-meta-copy">Combined plays across this sequence.</div></div></div></div>'
-    +   '</div></div>'
-    +   '<div class="public-context-grid">'
-    +     '<div class="public-list-card"><div class="public-list-head"><div><div class="public-kicker">Track list</div><div class="public-list-title">Front-to-back sequence</div><div class="public-list-copy">The share page keeps the playlist feel intact, with direct play access on every track in the mix.</div></div><div class="section-action-row"><button class="sec-action" onclick="viewPlaylist(' + jsq(pl.id) + ')">Open detail modal</button></div></div><div class="public-track-list">' + (items.length ? items.map(function(track, index) {
-          return '<div class="public-track-row" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ', position ' + (index + 1) + ' of ' + (pl.name || 'playlist')) + '" onclick="playPlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ')"><div class="public-track-index" aria-hidden="true">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="public-track-main"><div class="public-track-name">' + esc(track.title) + '</div><div class="public-track-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 90), 90) + '</div></div><div class="public-track-time">' + fmtTime(track.duration || 0) + '</div><div class="public-row-action">' + ((_currentTrack && _currentTrack.id === track.id && _isPlaying) ? 'Playing' : 'Play') + '</div></div>';
-        }).join('') : '<div class="public-empty"><strong>Empty playlist</strong>This shared playlist does not contain tracks yet.</div>') + '</div></div>'
-    +     '<div class="public-side-note"><div class="public-kicker">Related context</div><div class="public-list-title">More from this lane</div><div class="public-list-copy" style="margin-top:.45rem">' + esc(related.length ? 'These tracks sit near the same mood, source, or genre profile as this playlist.' : 'Add more tracks nearby in tone if you want a stronger related shelf here.') + '</div><div class="public-related-grid" style="margin-top:1rem">' + (related.length ? related.map(function(track) {
-          return '<div class="related-card" role="button" tabindex="0" aria-label="' + attr('Open shared track ' + (track.title || 'track')) + '" onclick="openSharedRoute(\'track\', ' + jsq(track.id) + ')">' + buildCoverArt(track, 'sm', false) + '<div><div class="related-title">' + esc(track.title) + '</div><div class="related-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 76), 76) + '</div></div></div>';
-        }).join('') : '<div class="public-empty"><strong>No nearby tracks yet</strong>More music in the vault will make playlist-adjacent discovery stronger.</div>') + '</div></div>'
-    +   '</div>'
+    +   '<section class="public-hero" style="--hero-a:' + palette.a + ';--hero-b:' + palette.b + '">'
+    +     '<div class="public-cover">' + buildPlaylistCover(pl, 'md') + '</div>'
+    +     '<div class="public-info">'
+    +       '<div class="public-eyebrow">Shared playlist from SonicVault</div>'
+    +       '<h1 class="public-title">' + esc(pl.name) + '</h1>'
+    +       '<div class="public-facts">' + facts.map(esc).join(' &middot; ') + '</div>'
+    +       (pl.desc ? '<p class="public-sub">' + esc(pl.desc) + '</p>' : '')
+    +       '<div class="public-actions">'
+    +         publicPlayButton(playing ? 'Pause' : 'Play', 'playPlaylist(' + jsq(pl.id) + ')')
+    +         '<button class="sec-action" onclick="openShareLinkModal(' + jsq('Share “' + pl.name + '”') + ', ' + jsq('Anyone with the link can listen to this playlist.') + ', ' + jsq(buildShareURL('playlist', pl.id)) + ')">Copy link</button>'
+    +         publicOwnerAction('playlists')
+    +       '</div>'
+    +     '</div>'
+    +   '</section>'
+    +   (items.length ? '<section class="public-section"><h2 class="public-section-title">Tracks</h2><div class="public-track-list">' + items.map(function(track, index) {
+          var current = _currentTrack && _currentTrack.id === track.id;
+          return '<div class="public-track-row' + (current ? ' current' : '') + '" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ', track ' + (index + 1) + ' of ' + items.length) + '" onclick="playPlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ')"><div class="public-track-index" aria-hidden="true">' + (current ? eqBars() : (index + 1)) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="public-track-main"><div class="public-track-name">' + esc(track.title) + '</div><div class="public-track-sub">' + esc(track.genre || 'Other') + ' &middot; ' + esc(track.mood || 'Mood') + '</div></div><div class="public-track-time">' + fmtTime(track.duration || 0) + '</div></div>';
+        }).join('') + '</div></section>' : '<div class="empty-state public-missing"><strong>Nothing here yet</strong>This playlist doesn’t have any tracks.</div>')
+    +   (related.length ? '<section class="public-section"><h2 class="public-section-title">More like this</h2><div class="public-related-grid">' + publicRelatedCards(related) + '</div></section>' : '')
     + '</div>';
 
   updatePageChrome(pl.name + ' | SonicVault', anchor);
