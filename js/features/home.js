@@ -153,7 +153,7 @@ function renderLibraryHome() {
   var continueTrack = getContinueTrack() || featuredTrack;
   // The resume strip glows in its own track's colours, the same blooms the
   // cover is painted with.
-  var heroPalette = getTrackPalette(continueTrack);
+  var heroPalette = getCoverPalette(continueTrack);
   var recentTracks = getNewestTracks(4);
   var hiddenGems = getLeastPlayedTracks(4);
   var mostPlayed = getMostPlayedTracks(4);

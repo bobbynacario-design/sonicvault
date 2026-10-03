@@ -140,6 +140,7 @@ function updateExpandedPlayer() {
   if (!_currentTrack) {
     title.textContent = 'Choose a track';
     document.getElementById('xp-cover').innerHTML = '';
+    paintPlayerBackdrop();
     document.getElementById('xp-kicker').textContent = 'Listening room';
     document.getElementById('xp-meta').textContent = 'Genre / mood / source will appear here.';
     document.getElementById('xp-prompt').textContent = 'Prompt and notes appear here once a track is active.';
@@ -162,9 +163,10 @@ function updateExpandedPlayer() {
 
   ensureWaveformForTrack(_currentTrack);
   document.getElementById('xp-cover').innerHTML = buildCoverArt(_currentTrack, 'lg', true);
+  paintPlayerBackdrop();
   document.getElementById('xp-kicker').textContent = 'Playing from ' + (_playQueueLabel || 'your vault');
   document.getElementById('xp-title').textContent = _currentTrack.title;
-  document.getElementById('xp-meta').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno') + ' / ' + fmtCompactNumber(_currentTrack.plays || 0) + ' plays';
+  document.getElementById('xp-meta').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno') + ' / ' + fmtCompactNumber(_currentTrack.plays || 0) + (Number(_currentTrack.plays) === 1 ? ' play' : ' plays');
   document.getElementById('xp-prompt').textContent = _currentTrack.prompt || promptFallback(_currentTrack);
   document.getElementById('xp-lyrics').innerHTML = hasLyrics(_currentTrack) ? formatLyricsHTML(getTrackLyrics(_currentTrack)) : 'Lyrics have not been added yet for this track.';
   document.getElementById('xp-lyrics').className = 'player-lyrics' + (hasLyrics(_currentTrack) ? ' synced' : ' empty');

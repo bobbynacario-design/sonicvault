@@ -1461,6 +1461,24 @@ body.light .expand-item{background:none}
 .cover-art.cover-live{animation:coverBreathe 6s ease-in-out infinite, coverLiveGlow 4.5s ease-in-out infinite}
 .cover-art.cover-live .cover-ring{animation:coverDrift 24s linear infinite;transform-origin:center}
 @media (prefers-reduced-motion:reduce){.cover-art.cover-live,.cover-art.cover-live .cover-ring{animation:none}}
+/* Real artwork (js/features/artwork.js). Placed after every cover style so
+   it wins on source order: no style pattern, mono filter or label sits on a
+   real picture. Until the image is read back, the tile shows the art's own
+   deep colour rather than a generated cover that would then swap out. */
+.cover-img{
+  position:absolute;
+  inset:0;
+  z-index:3;
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  border-radius:inherit;
+}
+.cover-art.has-art{filter:none;background:var(--cover-c)}
+.cover-art.has-art::before,
+.cover-art.has-art::after,
+.cover-art.has-art > div{display:none}
 .cover-collage{
   display:grid;
   grid-template-columns:repeat(2,1fr);
@@ -2250,25 +2268,76 @@ body.light .public-hero{
   align-items:stretch;
   justify-content:center;
   padding:0;
-  background:rgba(3,5,10,.7);
-  backdrop-filter:blur(18px);
+  background:var(--bg);
   z-index:95;
 }
 .player-modal-overlay.open{display:flex}
+/* The cover, scaled past the viewport and blurred until only its colours
+   are left, drifting slowly. The veil on top keeps text legible whatever
+   the art is. */
+.player-backdrop{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+  pointer-events:none;
+  z-index:0;
+}
+.player-backdrop-art{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:max(115vw, 115vh);
+  height:max(115vw, 115vh);
+  transform:translate(-50%,-50%);
+  object-fit:cover;
+  filter:blur(80px) saturate(1.5);
+  opacity:.9;
+  animation:backdropDrift 48s ease-in-out infinite alternate;
+}
+.player-backdrop-art.is-generated{
+  background:
+    radial-gradient(45% 45% at 30% 30%, var(--cover-a), transparent 72%),
+    radial-gradient(45% 45% at 70% 66%, var(--cover-b), transparent 72%),
+    var(--cover-c);
+}
+.player-backdrop::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(120% 90% at 25% 15%, rgba(5,6,12,.1), rgba(5,6,12,.5) 75%),
+    linear-gradient(180deg, rgba(5,6,12,.2), rgba(5,6,12,.62));
+}
+body.light .player-backdrop-art{opacity:.6}
+body.light .player-backdrop::after{background:linear-gradient(180deg, rgba(241,236,226,.4), rgba(241,236,226,.78))}
+@keyframes backdropDrift{
+  from{transform:translate(-50%,-50%) scale(1) rotate(0deg)}
+  to{transform:translate(-50%,-50%) scale(1.14) rotate(9deg)}
+}
+@media (prefers-reduced-motion:reduce){.player-backdrop-art{animation:none}}
 .player-modal{
+  position:relative;
+  z-index:1;
   width:100%;
   min-height:100vh;
   overflow:auto;
-  background:
-    radial-gradient(circle at 18% 20%, var(--accent-dynamic-soft), transparent 18%),
-    radial-gradient(circle at 82% 12%, rgba(255,255,255,.035), transparent 16%),
-    linear-gradient(180deg, rgba(11,14,22,.98), rgba(8,10,17,.98));
+  background:transparent;
 }
-body.light .player-modal{
-  background:
-    radial-gradient(circle at 18% 20%, var(--accent-dynamic-soft), transparent 20%),
-    linear-gradient(180deg, rgba(255,255,255,.98), rgba(244,239,230,.98));
+/* Glass over the backdrop: the plain --surface tint disappears against a
+   bright cover. */
+/* A light lift over a dark wash, so the panels read on bright art and on
+   dark art alike. */
+.player-modal .player-copy-card,
+.player-modal .empty-state,
+.player-modal .playlist-chip,
+.player-modal .player-close{
+  background:linear-gradient(rgba(255,255,255,.06), rgba(255,255,255,.06)), rgba(8,10,18,.26);
+  backdrop-filter:blur(16px);
 }
+body.light .player-modal .player-copy-card,
+body.light .player-modal .empty-state,
+body.light .player-modal .playlist-chip,
+body.light .player-modal .player-close{background:rgba(255,255,255,.5)}
 .player-modal-shell{
   max-width:1460px;
   margin:0 auto;

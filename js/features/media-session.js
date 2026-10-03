@@ -89,6 +89,12 @@ function buildMediaSessionArtwork(track, size) {
 }
 
 function getMediaSessionArtworkList(track) {
+  // The real cover once its data URL is ready (Suno's are 360px); the
+  // generated one until then and for tracks without art.
+  var artData = track && track.id ? getArtDataURL(track.id) : '';
+  if (artData) {
+    return [{ src:artData, sizes:'360x360', type:artData.slice(5, artData.indexOf(';')) || 'image/jpeg' }];
+  }
   return [96, 192, 256, 384, 512].map(function(size) {
     return {
       src: buildMediaSessionArtwork(track, size),

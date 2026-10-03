@@ -114,7 +114,7 @@ function updatePageChrome(title, tintTrack) {
   document.title = title || 'SonicVault - Private AI Music Vault';
   var themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) {
-    themeMeta.setAttribute('content', tintTrack ? getTrackPalette(tintTrack).a : '#090b12');
+    themeMeta.setAttribute('content', tintTrack ? getCoverPalette(tintTrack).a : '#090b12');
   }
   if (tintTrack) applyTrackTint(tintTrack);
 }

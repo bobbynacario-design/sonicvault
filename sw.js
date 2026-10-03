@@ -7,6 +7,9 @@ var SHELL_CACHE = 'sv-shell-' + VERSION;
 var STATIC_CACHE = 'sv-static-' + VERSION;
 var AUDIO_CACHE = 'sv-audio-' + VERSION;
 var AUDIO_MAX_ENTRIES = 30;
+// Written by the page (js/features/artwork.js), never by this worker; listed
+// so activate does not discard it.
+var ART_CACHE = 'sv-art-v1';
 
 var SHELL_ASSETS = [
   './',
@@ -17,6 +20,7 @@ var SHELL_ASSETS = [
   './js/data/util.js',
   './js/data/tracks.js',
   './js/data/covers.js',
+  './js/data/artwork.js',
   './js/data/metadata.js',
   './js/data/waveform.js',
   './js/data/routes.js',
@@ -27,6 +31,7 @@ var SHELL_ASSETS = [
   './js/features/modals.js',
   './js/features/routes.js',
   './js/features/covers.js',
+  './js/features/artwork.js',
   './js/features/waveform.js',
   './js/features/media-session.js',
   './js/features/player.js',
@@ -61,7 +66,7 @@ self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.filter(function(key) {
-        return key.indexOf('sv-') === 0 && [SHELL_CACHE, STATIC_CACHE, AUDIO_CACHE].indexOf(key) === -1;
+        return key.indexOf('sv-') === 0 && [SHELL_CACHE, STATIC_CACHE, AUDIO_CACHE, ART_CACHE].indexOf(key) === -1;
       }).map(function(key) { return caches.delete(key); }));
     }).then(function() { return self.clients.claim(); })
   );
@@ -212,10 +217,23 @@ function sameOriginStrategy(request) {
   });
 }
 
+// The page asks before reading artwork from audio files, because a worker
+// without the pass-through below would turn each read into a full download.
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'sv-capabilities' && event.ports && event.ports[0]) {
+    event.ports[0].postMessage({ artProbe: true });
+  }
+});
+
 self.addEventListener('fetch', function(event) {
   var request = event.request;
   if (request.method !== 'GET') return;
   var url = new URL(request.url);
+
+  // Artwork probes read the first few KB of a song for its embedded cover.
+  // Through audioStrategy they would fetch and cache the whole file, and
+  // push recently played songs out of the audio cache.
+  if (url.searchParams.has('sv-art')) return;
 
   if (isAudioRequest(url, request)) {
     event.respondWith(audioStrategy(request));

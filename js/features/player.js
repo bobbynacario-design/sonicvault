@@ -169,7 +169,7 @@ function updatePlayerModeUI() {
 }
 
 function applyTrackTint(track) {
-  var palette = getTrackPalette(track || {});
+  var palette = getCoverPalette(track || {});
   document.documentElement.style.setProperty('--accent-dynamic', palette.accent);
   document.documentElement.style.setProperty('--accent-dynamic-soft', palette.soft);
   document.documentElement.style.setProperty('--accent-dynamic-deep', palette.deep);

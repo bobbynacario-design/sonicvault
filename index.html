@@ -21,8 +21,8 @@
 <meta name="twitter:description" content="Curate tracks, build mixtapes, and stream your AI-generated music from anywhere.">
 <title>SonicVault - Private AI Music Vault</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<script type="module" src="js/app.js?v=20261003f"></script>
-<link rel="stylesheet" href="styles/app.css?v=20261003f">
+<script type="module" src="js/app.js?v=20261003g"></script>
+<link rel="stylesheet" href="styles/app.css?v=20261003g">
 </head>
 <body>
 <!-- Icon sprite. Every glyph in the app is <svg class="ic"><use href="#i-NAME"/></svg>,
@@ -484,6 +484,9 @@
 </div>
 
 <div class="player-modal-overlay" id="modal-now-playing" role="dialog" aria-modal="true" aria-label="Expanded player">
+  <!-- The current cover, blown up and blurred behind everything: painted by
+       paintPlayerBackdrop() in js/features/artwork.js. -->
+  <div class="player-backdrop" id="xp-backdrop" aria-hidden="true"></div>
   <div class="player-modal" onclick="if(event.target===this) closeModal('modal-now-playing')">
     <div class="player-modal-shell">
       <div class="player-topbar">
@@ -640,33 +643,35 @@
      global scope, which is what lets the inline onclick handlers above reach
      feature functions. On deploy, bump the ?v= token on every local asset
      together; sw.js serves them cache-first. -->
-<script src="js/data/util.js?v=20261003f"></script>
-<script src="js/data/tracks.js?v=20261003f"></script>
-<script src="js/data/covers.js?v=20261003f"></script>
-<script src="js/data/metadata.js?v=20261003f"></script>
-<script src="js/data/waveform.js?v=20261003f"></script>
-<script src="js/data/routes.js?v=20261003f"></script>
-<script src="js/data/backup-format.js?v=20261003f"></script>
-<script src="js/features/vault.js?v=20261003f"></script>
-<script src="js/features/sync.js?v=20261003f"></script>
-<script src="js/features/shell.js?v=20261003f"></script>
-<script src="js/features/modals.js?v=20261003f"></script>
-<script src="js/features/routes.js?v=20261003f"></script>
-<script src="js/features/covers.js?v=20261003f"></script>
-<script src="js/features/waveform.js?v=20261003f"></script>
-<script src="js/features/media-session.js?v=20261003f"></script>
-<script src="js/features/player.js?v=20261003f"></script>
-<script src="js/features/expanded-player.js?v=20261003f"></script>
-<script src="js/features/library.js?v=20261003f"></script>
-<script src="js/features/home.js?v=20261003f"></script>
-<script src="js/features/insights.js?v=20261003f"></script>
-<script src="js/features/playlists.js?v=20261003f"></script>
-<script src="js/features/share.js?v=20261003f"></script>
-<script src="js/features/edit-track.js?v=20261003f"></script>
-<script src="js/features/ai-metadata.js?v=20261003f"></script>
-<script src="js/features/upload.js?v=20261003f"></script>
-<script src="js/features/backup.js?v=20261003f"></script>
-<script src="js/features/keyboard.js?v=20261003f"></script>
-<script src="js/boot.js?v=20261003f"></script>
+<script src="js/data/util.js?v=20261003g"></script>
+<script src="js/data/tracks.js?v=20261003g"></script>
+<script src="js/data/covers.js?v=20261003g"></script>
+<script src="js/data/artwork.js?v=20261003g"></script>
+<script src="js/data/metadata.js?v=20261003g"></script>
+<script src="js/data/waveform.js?v=20261003g"></script>
+<script src="js/data/routes.js?v=20261003g"></script>
+<script src="js/data/backup-format.js?v=20261003g"></script>
+<script src="js/features/vault.js?v=20261003g"></script>
+<script src="js/features/sync.js?v=20261003g"></script>
+<script src="js/features/shell.js?v=20261003g"></script>
+<script src="js/features/modals.js?v=20261003g"></script>
+<script src="js/features/routes.js?v=20261003g"></script>
+<script src="js/features/covers.js?v=20261003g"></script>
+<script src="js/features/artwork.js?v=20261003g"></script>
+<script src="js/features/waveform.js?v=20261003g"></script>
+<script src="js/features/media-session.js?v=20261003g"></script>
+<script src="js/features/player.js?v=20261003g"></script>
+<script src="js/features/expanded-player.js?v=20261003g"></script>
+<script src="js/features/library.js?v=20261003g"></script>
+<script src="js/features/home.js?v=20261003g"></script>
+<script src="js/features/insights.js?v=20261003g"></script>
+<script src="js/features/playlists.js?v=20261003g"></script>
+<script src="js/features/share.js?v=20261003g"></script>
+<script src="js/features/edit-track.js?v=20261003g"></script>
+<script src="js/features/ai-metadata.js?v=20261003g"></script>
+<script src="js/features/upload.js?v=20261003g"></script>
+<script src="js/features/backup.js?v=20261003g"></script>
+<script src="js/features/keyboard.js?v=20261003g"></script>
+<script src="js/boot.js?v=20261003g"></script>
 </body>
 </html>

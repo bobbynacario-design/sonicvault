@@ -72,9 +72,14 @@ function exitCoverDemo() {
   showToast('Cover demo cleared');
 }
 
+// Tracks with embedded artwork (js/features/artwork.js) show the real
+// picture over the generated layers; data-art-id lets paintArt() drop it in
+// later without re-rendering the view.
 function buildCoverArt(track, size, includeWords) {
   if (!track) track = { title:'SonicVault', genre:'Other', mood:'Dreamy', source:'Vault' };
-  var palette = getTrackPalette(track);
+  var palette = getCoverPalette(track);
+  var artURL = track.id ? getArtURL(track.id) : '';
+  var hasArt = !!track.id && trackHasArt(track);
   var style = getCoverStyle(track);
   var tags = getTrackTags(track);
   var top = track.source || 'Vault';
@@ -82,7 +87,7 @@ function buildCoverArt(track, size, includeWords) {
   var sizeClass = size || 'md';
   var words = includeWords === false ? '' : '<div class="cover-mark">' + esc(getTrackMonogram(track.title)) + '</div>';
   return ''
-    + '<div class="cover-art cover-' + esc(sizeClass) + ' cover-style-' + esc(style) + '" style="--cover-a:' + palette.a + ';--cover-b:' + palette.b + ';--cover-c:' + palette.c + ';--cover-angle:' + palette.angle + 'deg">'
+    + '<div class="cover-art cover-' + esc(sizeClass) + ' cover-style-' + esc(style) + (hasArt ? ' has-art' : '') + '"' + (track.id ? ' data-art-id="' + attr(track.id) + '"' : '') + ' style="--cover-a:' + palette.a + ';--cover-b:' + palette.b + ';--cover-c:' + palette.c + ';--cover-angle:' + palette.angle + 'deg">'
     +   '<div class="cover-grid"></div>'
     +   '<div class="cover-wave"></div>'
     +   '<div class="cover-ring"></div>'
@@ -90,6 +95,7 @@ function buildCoverArt(track, size, includeWords) {
     +   '<div class="cover-topline"><span>' + esc(top) + '</span><span>' + esc(track.genre || 'Other') + '</span></div>'
     +   words
     +   '<div class="cover-bottomline"><span>' + esc(track.mood || 'Mood') + '</span><span>' + esc(String(bottom).slice(0, 10).toUpperCase()) + '</span></div>'
+    +   (artURL ? '<img class="cover-img" src="' + attr(artURL) + '" alt="">' : '')
     + '</div>';
 }
 

@@ -17,6 +17,7 @@ window.refreshAll = function() {
   renderSyncBanner();
   renderBackupPanel();
   renderRouteAwareView(true);
+  scheduleArtSweep(2000);
 };
 
 applyRedirectedShareRoute();
@@ -37,6 +38,11 @@ observeChromeHeights();
 // writes the server never took. Surface it, and retry once sync is up.
 renderSyncBanner();
 scheduleRetry();
+
+// Cached cover art paints over the generated covers as soon as it is read
+// back; tracks not yet checked are probed once things have settled.
+loadCachedArt();
+scheduleArtSweep(5000);
 
 // Backfill real waveforms for any tracks still missing decoded peaks,
 // after initial render and first sync have had a moment to settle.
