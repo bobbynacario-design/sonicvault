@@ -8,8 +8,21 @@
 // The web UI posts { title, prompt, lyrics, model, fallback } and expects a raw
 // metadata object back (the ai* schema below). Lyrics are optional so
 // instrumentals and watcher imports can be tagged too.
+//
+// POST /transcribe times a song's lyrics: Whisper (Workers AI, the "AI"
+// binding in wrangler.toml) listens to the audio and returns every word it
+// hears with its start and end. The app lines those words up against the
+// lyric sheet it already has (js/data/lyric-sync.js). Send JSON
+// { audioURL } for a file in the SonicVault Cloudinary folder -- the worker
+// streams it straight to the model -- or the audio itself as the body.
 
 const MODEL_NAME = "claude-haiku-4-5";
+const WHISPER_MODEL = "@cf/openai/whisper-large-v3-turbo";
+// Only the vault's own Cloudinary files: the worker must not become a way
+// to run paid transcription on anything on the internet.
+const AUDIO_HOST = "res.cloudinary.com";
+const AUDIO_PATH_PREFIX = "/dtw4em0ob/";
+const MAX_AUDIO_BYTES = 30 * 1024 * 1024;
 const ANTHROPIC_VERSION = "2023-06-01";
 const MAX_TOKENS = 1024;
 
@@ -52,6 +65,10 @@ export default {
 
     if (!isAuthorized(request, env)) {
       return jsonResponse({ error: "Unauthorized." }, 401, request, env);
+    }
+
+    if (new URL(request.url).pathname.replace(/\/+$/, "") === "/transcribe") {
+      return handleTranscribe(request, env);
     }
 
     let payload;
@@ -198,6 +215,90 @@ export default {
     return jsonResponse(metadata, 200, request, env);
   }
 };
+
+async function handleTranscribe(request, env) {
+  if (!env.AI) {
+    return jsonResponse({ error: "Workers AI binding \"AI\" is not configured." }, 500, request, env);
+  }
+
+  let audio;
+  const type = cleanString(request.headers.get("Content-Type")).toLowerCase();
+  if (type.startsWith("audio/") || type === "application/octet-stream") {
+    const length = Number(request.headers.get("Content-Length") || 0);
+    if (length > MAX_AUDIO_BYTES) {
+      return jsonResponse({ error: "Audio is larger than 30MB." }, 413, request, env);
+    }
+    audio = { body: request.body, contentType: type.startsWith("audio/") ? type : "audio/mpeg" };
+  } else {
+    let payload;
+    try {
+      payload = await request.json();
+    } catch (err) {
+      return jsonResponse({ error: "Send JSON { audioURL } or the audio itself." }, 400, request, env);
+    }
+    let url;
+    try {
+      url = new URL(cleanString(payload.audioURL));
+    } catch (err) {
+      return jsonResponse({ error: 'Missing or invalid "audioURL".' }, 400, request, env);
+    }
+    if (url.protocol !== "https:" || url.hostname !== AUDIO_HOST || !url.pathname.startsWith(AUDIO_PATH_PREFIX)) {
+      return jsonResponse({ error: "audioURL must be a SonicVault Cloudinary file." }, 400, request, env);
+    }
+    let file;
+    try {
+      file = await fetch(url.toString());
+    } catch (err) {
+      return jsonResponse({ error: "Could not fetch the audio." }, 502, request, env);
+    }
+    if (!file.ok || !file.body) {
+      return jsonResponse({ error: "Audio fetch failed.", status: file.status }, 502, request, env);
+    }
+    if (Number(file.headers.get("Content-Length") || 0) > MAX_AUDIO_BYTES) {
+      return jsonResponse({ error: "Audio is larger than 30MB." }, 413, request, env);
+    }
+    audio = { body: file.body, contentType: cleanString(file.headers.get("Content-Type")) || "audio/mpeg" };
+  }
+
+  let result;
+  try {
+    result = await env.AI.run(WHISPER_MODEL, {
+      audio: audio,
+      task: "transcribe",
+      // Music loops easily when each window is conditioned on the last.
+      condition_on_previous_text: false
+    });
+  } catch (err) {
+    return jsonResponse(
+      { error: "Transcription failed.", details: cleanString(err && err.message) },
+      502,
+      request,
+      env
+    );
+  }
+
+  // Words only, as compact [text, start, end] triples -- all the app needs.
+  const words = [];
+  (Array.isArray(result && result.segments) ? result.segments : []).forEach(function (segment) {
+    (Array.isArray(segment && segment.words) ? segment.words : []).forEach(function (w) {
+      const text = cleanString(w && w.word);
+      if (!text || typeof w.start !== "number" || typeof w.end !== "number") return;
+      words.push([text, Math.round(w.start * 100) / 100, Math.round(w.end * 100) / 100]);
+    });
+  });
+
+  return jsonResponse(
+    {
+      model: WHISPER_MODEL,
+      language: cleanString(result && result.transcription_info && result.transcription_info.language),
+      duration: Number(result && result.transcription_info && result.transcription_info.duration) || 0,
+      words: words
+    },
+    200,
+    request,
+    env
+  );
+}
 
 function handleOptions(request, env) {
   return new Response(null, {

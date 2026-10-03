@@ -30,6 +30,34 @@ function icon(name) {
   return '<svg class="ic" aria-hidden="true" focusable="false"><use href="#i-' + name + '"/></svg>';
 }
 
+// Animated equaliser marking the current track. It moves only while
+// body.is-playing is set (syncPlayerLiveState), so a pause from anywhere --
+// the lock screen included -- freezes it in place.
+function eqBars() {
+  return '<span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>';
+}
+
+function motionAllowed() {
+  return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+// Replace a cover only when it is a different picture, then fade the new one
+// in. The players re-render on every play/pause and timer tick; rebuilding
+// the cover each time restarted its image load and its animations.
+function swapCover(host, track, size, includeWords) {
+  if (!host) return;
+  var key = track.id + '|' + size + '|' + (getArtURL(track.id) ? 'art' : getCoverStyle(track));
+  if (host.getAttribute('data-cover') === key) return;
+  var hadCover = !!host.getAttribute('data-cover');
+  host.setAttribute('data-cover', key);
+  host.innerHTML = buildCoverArt(track, size, includeWords);
+  if (hadCover && motionAllowed()) {
+    host.classList.remove('cover-swap');
+    void host.offsetWidth;
+    host.classList.add('cover-swap');
+  }
+}
+
 // Transport buttons show the action they will take, and say it, since the
 // glyph is all a sighted user gets.
 function setPlayButton(btn, playing) {

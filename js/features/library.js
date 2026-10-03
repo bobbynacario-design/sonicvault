@@ -288,7 +288,7 @@ function buildTrackCard(track) {
     +   '<div class="track-card-top">'
     +     buildCoverArt(track, 'md', true)
     +     '<div class="track-main">'
-    +       '<div class="track-kicker">' + esc(track.source || 'Suno') + ' / ' + esc(track.created || 'Undated') + '</div>'
+    +       '<div class="track-kicker">' + (_currentTrack && _currentTrack.id === track.id ? eqBars() : '') + esc(track.source || 'Suno') + ' / ' + esc(track.created || 'Undated') + '</div>'
     +       '<div class="track-title">' + esc(track.title) + '</div>'
     +       '<div class="track-subtitle">' + esc(getTrackPromptExcerpt(track, 118)) + '</div>'
     +       '<div class="pill-row">'
@@ -432,7 +432,7 @@ function buildTrackRow(track, index) {
     +   (isCurrent ? ' aria-current="true"' : '')
     +   ' role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track')) + '"'
     +   ' onclick="playTrack(' + jsq(track.id) + ')">'
-    +   '<div class="row-index" aria-hidden="true">' + (isPlaying ? '<span class="row-eq"></span>' : (index + 1)) + '</div>'
+    +   '<div class="row-index" aria-hidden="true">' + (isCurrent ? eqBars() : (index + 1)) + '</div>'
     +   buildCoverArt(track, 'xs', false)
     +   '<div class="row-main">'
     +     '<div class="row-title">' + esc(track.title) + '</div>'

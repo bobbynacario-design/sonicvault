@@ -6,6 +6,10 @@ compatibility_date = "2026-04-02"
 [observability]
 enabled = true
 
+# Workers AI, for POST /transcribe (Whisper word timings for lyric sync).
+[ai]
+binding = "AI"
+
 # Secrets (set with `wrangler secret put <NAME>`, never commit these):
 #   ANTHROPIC_API_KEY        required — Anthropic API key the worker calls Claude with
 #   SONICVAULT_CLIENT_TOKEN  optional — bearer token the web UI must send as Authorization

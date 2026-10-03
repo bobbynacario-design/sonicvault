@@ -7,6 +7,7 @@
 // to the page behind, and hand focus back on close.
 var FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [role="button"][tabindex="0"]';
 var _modalReturnFocus = {};
+var _modalCloseTimers = {};
 
 function getVisibleFocusable(root) {
   return Array.prototype.filter.call(root.querySelectorAll(FOCUSABLE_SELECTOR), function(el) {
@@ -18,6 +19,12 @@ function openModal(id) {
   var overlay = document.getElementById(id);
   if (!overlay) return;
   if (id === 'modal-playlist') populatePlaylistCheckboxes();
+  // Reopened mid-close: cancel the close so it stays open.
+  if (_modalCloseTimers[id]) {
+    clearTimeout(_modalCloseTimers[id]);
+    delete _modalCloseTimers[id];
+    overlay.classList.remove('closing');
+  }
   if (!overlay.classList.contains('open')) {
     _modalReturnFocus[id] = document.activeElement;
   }
@@ -42,8 +49,17 @@ function focusFirstIn(overlay) {
 
 function closeModal(id) {
   var overlay = document.getElementById(id);
-  if (!overlay || !overlay.classList.contains('open')) return;
-  overlay.classList.remove('open');
+  if (!overlay || !overlay.classList.contains('open') || overlay.classList.contains('closing')) return;
+  // Play the exit animation, then hide. Focus returns straight away.
+  if (motionAllowed()) {
+    overlay.classList.add('closing');
+    _modalCloseTimers[id] = setTimeout(function() {
+      overlay.classList.remove('open', 'closing');
+      delete _modalCloseTimers[id];
+    }, 240);
+  } else {
+    overlay.classList.remove('open');
+  }
   var returnTo = _modalReturnFocus[id];
   delete _modalReturnFocus[id];
   if (returnTo && returnTo.focus && document.contains(returnTo)) {
@@ -83,6 +99,6 @@ document.querySelectorAll('.modal-overlay, .player-modal-overlay').forEach(funct
 });
 
 function getOpenOverlay() {
-  var overlays = document.querySelectorAll('.modal-overlay.open, .player-modal-overlay.open');
+  var overlays = document.querySelectorAll('.modal-overlay.open:not(.closing), .player-modal-overlay.open:not(.closing)');
   return overlays.length ? overlays[overlays.length - 1] : null;
 }

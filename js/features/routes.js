@@ -82,10 +82,12 @@ function buildShareURL(kind, id) {
   return window.location.origin + (getAppBasePath() || '') + '/' + kind + '/' + encodeURIComponent(id);
 }
 
+// Only pages whose state changes are touched, so re-asserting the current
+// page after a sync does not replay its entrance animation.
 function setActivePage(pageId) {
-  document.querySelectorAll('.page').forEach(function(page) { page.classList.remove('active'); });
-  var target = document.getElementById(pageId);
-  if (target) target.classList.add('active');
+  document.querySelectorAll('.page').forEach(function(page) {
+    page.classList.toggle('active', page.id === pageId);
+  });
 }
 
 // Above the app-shell breakpoint, #app-main is its own scroll container and

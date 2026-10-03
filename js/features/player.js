@@ -196,6 +196,7 @@ function updateNowPlaying() {
     bar.classList.remove('active');
     if (mobileNav) mobileNav.classList.remove('player-active');
     art.innerHTML = '';
+    art.removeAttribute('data-cover');
     document.getElementById('np-name').textContent = 'Choose a track';
     document.getElementById('np-genre').textContent = 'Your private AI label is ready.';
     document.getElementById('np-queue').textContent = 'Queue awareness activates when playback starts.';
@@ -212,7 +213,8 @@ function updateNowPlaying() {
 
   bar.classList.add('active');
   if (mobileNav) mobileNav.classList.add('player-active');
-  art.innerHTML = buildCoverArt(_currentTrack, 'sm', false);
+  swapCover(art, _currentTrack, 'sm', false);
+  syncPlayerLiveState();
   document.getElementById('np-name').textContent = _currentTrack.title;
   document.getElementById('np-genre').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno');
   var next = _repeatMode === 'one' ? null : getNextTrack();
@@ -284,6 +286,7 @@ _audio.addEventListener('timeupdate', function() {
     }
   }
   updateMediaSessionPosition();
+  maybeSyncLyrics();
 });
 
 _audio.addEventListener('loadedmetadata', function() {

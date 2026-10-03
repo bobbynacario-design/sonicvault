@@ -1,20 +1,15 @@
 // The full-screen player: lyrics scroll-along, the large waveform, the
 // paged queue panel, add-to-playlist, and the similar-vibe row.
 
+// Section labels and blank gaps are layout; only sung lines are numbered,
+// timed and tappable (js/features/lyric-sync.js).
 function formatLyricsHTML(rawLyrics) {
-  var text = String(rawLyrics || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  if (!text.trim()) return '';
-  return text.split('\n').map(function(line) {
-    var clean = String(line || '');
-    var trimmed = clean.trim();
-    if (!trimmed) return '<div class="lyric-line">&nbsp;</div>';
-    // Suno labels sections "[Verse 1]" in newer exports and "(Verse 1)" in
-    // older ones. Parenthesised lines only count when they name a section,
-    // so an ad-lib like "(oh-oh)" stays a lyric.
-    if (/^\[[^\]]+\]$/.test(trimmed) || /^\((?:intro|verse|pre-?chorus|chorus|post-?chorus|hook|refrain|bridge|break(?:down)?|interlude|instrumental|solo|drop|build(?:-?up)?|outro|end|fade(?: out)?)\b[^)]*\)$/i.test(trimmed)) {
-      return '<div class="lyric-section-header">' + esc(trimmed) + '</div>';
-    }
-    return '<div class="lyric-line">' + esc(clean) + '</div>';
+  var rows = parseLyricSheet(rawLyrics);
+  if (!rows.some(function(row) { return row.kind !== 'gap'; })) return '';
+  return rows.map(function(row) {
+    if (row.kind === 'gap') return '<div class="lyric-gap"></div>';
+    if (row.kind === 'header') return '<div class="lyric-section-header">' + esc(row.text) + '</div>';
+    return '<div class="lyric-line" role="button" tabindex="0" data-line="' + row.index + '" onclick="onLyricLineTap(' + row.index + ')">' + esc(row.text) + '</div>';
   }).join('');
 }
 
@@ -36,27 +31,34 @@ function openAddToPlaylist() {
 // Toggles the "alive" animations on the expanded player's waveform and cover
 // based on whether audio is actually playing. Cheap; safe to call often.
 function syncPlayerLiveState() {
+  // Read from the audio element itself: a lock-screen pause or the end of a
+  // track changes it before the app's own state catches up.
+  document.body.classList.toggle('is-playing', !!_currentTrack && !_audio.paused);
   var wave = document.getElementById('xp-wave');
   if (wave) wave.classList.toggle('playing', !!_isPlaying);
   var coverEl = document.querySelector('#xp-cover .cover-art');
   if (coverEl) coverEl.classList.toggle('cover-live', !!_isPlaying);
 }
 
-// Approximate lyric scroll-along. Lyrics from Suno are untimed, so the active
-// line is mapped proportionally from playback position across the content
-// lines. force=true re-applies even if the line index hasn't changed (used
-// when the lyric DOM was just rebuilt for a new track).
+// Lyric scroll-along, from the track's lyric timings (lyric-sync.js) or an
+// even spread until it has some. Nothing is lit before the first line or in
+// a long instrumental break. force=true re-applies even if the line has not
+// changed (used when the lyric DOM was just rebuilt).
 var _lyricLineIdx = -1;
 function updateLyricHighlight(force) {
   var container = document.getElementById('xp-lyrics');
   if (!container || !container.classList.contains('synced')) return;
   var lines = container.querySelectorAll('.lyric-line');
-  if (!lines.length || !_audio.duration) return;
-  var frac = Math.max(0, Math.min(1, _audio.currentTime / _audio.duration));
-  var idx = Math.min(lines.length - 1, Math.floor(frac * lines.length));
+  if (!lines.length) return;
+  var times = getCurrentLyricTimes();
+  var idx = times && times.length === lines.length ? currentLyricIndex(times, _audio.currentTime || 0) : -1;
   if (idx === _lyricLineIdx && !force) return;
   _lyricLineIdx = idx;
-  for (var i = 0; i < lines.length; i++) lines[i].classList.toggle('lyric-current', i === idx);
+  for (var i = 0; i < lines.length; i++) {
+    lines[i].classList.toggle('lyric-current', i === idx);
+    lines[i].classList.toggle('lyric-past', idx >= 0 && i < idx);
+  }
+  if (idx < 0) return;
   var line = lines[idx];
   // Scroll within the lyric box only — never the page.
   container.scrollTop = line.offsetTop - (container.clientHeight / 2) + (line.offsetHeight / 2);
@@ -143,12 +145,15 @@ function updateExpandedPlayer() {
   if (!_currentTrack) {
     title.textContent = 'Choose a track';
     document.getElementById('xp-cover').innerHTML = '';
+    document.getElementById('xp-cover').removeAttribute('data-cover');
     paintPlayerBackdrop();
     document.getElementById('xp-kicker').textContent = 'Listening room';
     document.getElementById('xp-meta').textContent = 'Genre / mood / source will appear here.';
     document.getElementById('xp-prompt').textContent = 'Prompt and notes appear here once a track is active.';
     document.getElementById('xp-lyrics').innerHTML = 'Lyrics appear here once a track is active.';
     document.getElementById('xp-lyrics').className = 'player-lyrics empty';
+    document.getElementById('xp-lyrics').removeAttribute('data-key');
+    renderLyricStatus();
     document.getElementById('xp-ai-summary').textContent = 'AI summary and curation tags will appear here after metadata generation.';
     document.getElementById('xp-ai-tags').innerHTML = '';
     document.getElementById('xp-ai-facts').innerHTML = '';
@@ -165,15 +170,28 @@ function updateExpandedPlayer() {
   }
 
   ensureWaveformForTrack(_currentTrack);
-  document.getElementById('xp-cover').innerHTML = buildCoverArt(_currentTrack, 'lg', true);
+  swapCover(document.getElementById('xp-cover'), _currentTrack, 'lg', true);
   paintPlayerBackdrop();
   document.getElementById('xp-kicker').textContent = 'Playing from ' + (_playQueueLabel || 'your vault');
   document.getElementById('xp-title').textContent = _currentTrack.title;
   document.getElementById('xp-meta').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno') + ' / ' + fmtCompactNumber(_currentTrack.plays || 0) + (Number(_currentTrack.plays) === 1 ? ' play' : ' plays');
   document.getElementById('xp-prompt').textContent = _currentTrack.prompt || promptFallback(_currentTrack);
-  document.getElementById('xp-lyrics').innerHTML = hasLyrics(_currentTrack) ? formatLyricsHTML(getTrackLyrics(_currentTrack)) : 'Lyrics have not been added yet for this track.';
-  document.getElementById('xp-lyrics').className = 'player-lyrics' + (hasLyrics(_currentTrack) ? ' synced' : ' empty');
-  _lyricLineIdx = -1;
+  // Rebuilt only when the track or its lyrics change: this runs on every
+  // play/pause, and rebuilding threw away the scroll position each time.
+  // The vault's copy of the track, since lyrics can arrive after playback
+  // started (the artwork sweep fills empty sheets from the file).
+  var lyricTrack = getVaultTrack(_currentTrack.id) || _currentTrack;
+  var lyricsEl = document.getElementById('xp-lyrics');
+  var lyricsKey = _currentTrack.id + '|' + (hasLyrics(lyricTrack) ? lyricSyncKey(getTrackLyrics(lyricTrack)) : 'none');
+  if (lyricsEl.getAttribute('data-key') !== lyricsKey) {
+    lyricsEl.setAttribute('data-key', lyricsKey);
+    lyricsEl.innerHTML = hasLyrics(lyricTrack) ? formatLyricsHTML(getTrackLyrics(lyricTrack)) : 'Lyrics have not been added yet for this track.';
+    lyricsEl.className = 'player-lyrics' + (hasLyrics(lyricTrack) ? ' synced' : ' empty');
+    lyricsEl.scrollTop = 0;
+    _lyricLineIdx = -1;
+    _lyricTimesCache = null;
+  }
+  renderLyricStatus();
   document.getElementById('xp-ai-summary').textContent = getTrackSummary(_currentTrack) || 'No AI summary yet. Generate metadata from the upload flow to add a richer editorial read on this track.';
   document.getElementById('xp-ai-tags').innerHTML = getTrackTags(_currentTrack).slice(0, 8).map(function(tag) {
     return '<span class="player-ai-pill">' + esc(tag) + '</span>';
@@ -226,7 +244,7 @@ function updateExpandedPlayer() {
       + '<button title="Move up" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', -1)"' + (index === 0 ? ' disabled' : '') + '>&#9650;</button>'
       + '<button title="Move down" onclick="event.stopPropagation();moveQueueTrack(' + jsq(track.id) + ', 1)"' + (index === queueTracks.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
       + '</div>';
-    return '<div class="queue-item' + (isActive ? ' active' : '') + '" role="button" tabindex="0"' + (isActive ? ' aria-current="true"' : '') + ' aria-label="' + attr('Play ' + (track.title || 'track') + ', queue position ' + (index + 1) + (state ? ', ' + state.toLowerCase() : '')) + '" onclick="playFromQueue(' + jsq(track.id) + ')"><div class="queue-num" aria-hidden="true">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state' + (isNext ? ' is-next' : '') + '">' + esc(state) + '</div>' + reorder + '</div>';
+    return '<div class="queue-item' + (isActive ? ' active' : '') + '" role="button" tabindex="0"' + (isActive ? ' aria-current="true"' : '') + ' aria-label="' + attr('Play ' + (track.title || 'track') + ', queue position ' + (index + 1) + (state ? ', ' + state.toLowerCase() : '')) + '" onclick="playFromQueue(' + jsq(track.id) + ')"><div class="queue-num" aria-hidden="true">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="queue-copy"><div class="queue-title">' + esc(track.title) + '</div><div class="queue-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="queue-state' + (isNext ? ' is-next' : '') + '">' + (isActive ? eqBars() : '') + esc(state) + '</div>' + reorder + '</div>';
   }).join('') + moreHTML : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">No queue yet</strong>Play something to build the queue.</div>';
   observeQueueSentinel();
 

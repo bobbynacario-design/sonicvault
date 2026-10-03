@@ -862,12 +862,6 @@ body.light .side-item{background:rgba(0,0,0,.03)}
   text-align:right;
   font-variant-numeric:tabular-nums;
 }
-/* Three bars standing in for a playing indicator, so the row does not need
-   an icon font or an inline SVG per track. */
-.row-eq{display:inline-block;width:9px;height:11px;background:
-  linear-gradient(var(--accent-dynamic),var(--accent-dynamic)) 0 100%/2px 60% no-repeat,
-  linear-gradient(var(--accent-dynamic),var(--accent-dynamic)) 50% 100%/2px 100% no-repeat,
-  linear-gradient(var(--accent-dynamic),var(--accent-dynamic)) 100% 100%/2px 40% no-repeat}
 .row-main{min-width:0}
 .row-title{
   /* Every other track-name element in the app (queue-title, related-title,
@@ -2462,9 +2456,18 @@ body.light .player-modal .player-close{background:rgba(255,255,255,.5)}
 }
 .lyric-line + .lyric-line{margin-top:.12rem}
 .lyric-section-header + .lyric-line{margin-top:.4rem}
+.lyric-gap{height:.9rem}
+/* Lines are tap targets: re-time while playing, jump to while paused. */
+.player-lyrics .lyric-line{cursor:pointer;border-radius:8px;transition:color .3s ease,background .3s ease}
+@media (hover:hover){.player-lyrics .lyric-line:hover{background:var(--surface)}}
+.player-lyrics-status{margin-top:-.35rem;font-size:12px;line-height:1.5;color:var(--muted2)}
+.player-lyrics-status:empty{display:none}
+.lyric-undo{margin-left:.35rem;padding:.1rem .55rem;border-radius:999px;color:var(--text);background:var(--surface-hover);font-size:12px;font-weight:600;cursor:pointer}
+.lyric-undo:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 /* Scroll-along: dim non-current lyric lines, highlight the line nearest the
    playhead. Sync is proportional (untimed lyrics), so kept gentle. */
-.player-lyrics.synced .lyric-line{transition:color .3s ease, background .3s ease;color:var(--muted2)}
+.player-lyrics.synced .lyric-line{transition:color .3s ease, background .3s ease;color:var(--muted)}
+.player-lyrics.synced .lyric-line.lyric-past{color:var(--muted2)}
 .player-lyrics.synced .lyric-line.lyric-current{
   color:var(--text);
   font-weight:600;
@@ -3191,4 +3194,96 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .card-menu-btn{min-width:44px}
   .theme-toggle{width:44px;height:44px}
   .queue-reorder button,.playlist-seq-btn{min-height:44px;min-width:44px}
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────
+   Short and eased, never on content that re-renders while you listen:
+   play/pause rebuilds the rails and the shelf, so nothing here animates on
+   insertion except whole pages, dialogs and covers that actually changed.
+   Everything is switched off under prefers-reduced-motion at the end. */
+@keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.page.active{animation:pageIn .42s cubic-bezier(.2,.8,.2,1)}
+
+/* Equaliser on the current track: rows, rails, cards and the queue. */
+.eq{display:inline-flex;align-items:flex-end;gap:2px;width:13px;height:12px;flex:none;vertical-align:-1px}
+.eq i{flex:1;height:100%;border-radius:1px;background:var(--accent-dynamic);transform-origin:50% 100%;transform:scaleY(.45)}
+.eq i:nth-child(2){transform:scaleY(.85)}
+.eq i:nth-child(3){transform:scaleY(.6)}
+@keyframes eqBounce{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+body.is-playing .eq i{animation:eqBounce .9s ease-in-out infinite}
+body.is-playing .eq i:nth-child(2){animation-duration:1.15s;animation-delay:-.45s}
+body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
+.row-index .eq{margin-right:-2px}
+.track-kicker .eq,.queue-state .eq{margin-right:.45rem}
+.mini-track-play .eq{width:14px;height:13px}
+
+/* Covers lift toward the pointer. Hover-capable devices only: on touch a
+   hover state sticks after the tap. */
+.cover-art,.cover-collage{transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s ease}
+@media (hover:hover){
+  .mini-track-card:hover .cover-art,
+  .track-row:hover .cover-art,
+  .rank-row:hover .cover-art,
+  .queue-item:hover .cover-art,
+  .side-item:hover .cover-art,
+  .playlist-modal-item:hover .cover-art{
+    transform:translateY(-2px) scale(1.06);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 12px 24px -10px rgba(0,0,0,.7);
+  }
+  .track-card:hover .track-card-top .cover-art,
+  .related-card:hover .cover-art,
+  .resume-strip:hover .cover-art,
+  .playlist-card:hover .cover-collage,
+  .playlist-hero-main:hover .cover-collage{transform:translateY(-3px) scale(1.025)}
+}
+
+/* Presses give way a little under the finger. */
+.np-btn,.player-btn,.sec-action,.action-btn,.icon-btn,.group-tab,.mobile-tab,.theme-toggle,.player-close,.filter-chip,.view-switch-btn{
+  transition-property:background,color,box-shadow,transform;
+  transition-duration:.18s;
+}
+.np-btn:active,.player-btn:active,.sec-action:active,.action-btn:active,.icon-btn:active,
+.group-tab:active,.mobile-tab:active,.theme-toggle:active,.player-close:active,.filter-chip:active,
+.view-switch-btn:active{transform:scale(.94)}
+.np-btn.primary:active,.player-btn.primary:active{transform:scale(.92)}
+
+/* A new cover fades in where the old one was (swapCover). */
+@keyframes coverSwap{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+.cover-swap{animation:coverSwap .5s cubic-bezier(.2,.8,.2,1)}
+
+/* The expanded player rises like a sheet and drops away on close; dialogs
+   ease in and out. The .closing classes come from closeModal(). */
+@keyframes overlayIn{from{opacity:0}}
+@keyframes overlayOut{to{opacity:0}}
+@keyframes sheetUp{from{opacity:.4;transform:translateY(36px)}to{opacity:1;transform:none}}
+@keyframes sheetDown{to{opacity:0;transform:translateY(36px)}}
+@keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes modalOut{to{opacity:0;transform:translateY(6px) scale(.98)}}
+.player-modal-overlay.open{animation:overlayIn .3s ease}
+.player-modal-overlay.open .player-modal{animation:sheetUp .45s cubic-bezier(.2,.8,.2,1)}
+.player-modal-overlay.closing{animation:overlayOut .24s ease forwards}
+.player-modal-overlay.closing .player-modal{animation:sheetDown .24s ease-in forwards}
+.modal-overlay.open{animation:overlayIn .2s ease}
+.modal-overlay.open .modal{animation:modalIn .3s cubic-bezier(.2,.8,.2,1)}
+.modal-overlay.closing{animation:overlayOut .2s ease forwards}
+.modal-overlay.closing .modal{animation:modalOut .2s ease forwards}
+
+/* A new track's backdrop fades up instead of cutting. */
+@keyframes backdropIn{from{opacity:0}}
+.player-backdrop-art{animation:backdropIn .9s ease,backdropDrift 48s ease-in-out infinite alternate}
+
+/* The lyric box glides to the current line rather than jumping. */
+.player-lyrics{scroll-behavior:smooth}
+
+@media (prefers-reduced-motion:reduce){
+  .page.active,.cover-swap,
+  .player-modal-overlay.open,.player-modal-overlay.open .player-modal,
+  .modal-overlay.open,.modal-overlay.open .modal,
+  body.is-playing .eq i{animation:none}
+  .player-backdrop-art{animation:none}
+  .cover-art,.cover-collage{transition:none}
+  .np-btn:active,.player-btn:active,.sec-action:active,.action-btn:active,.icon-btn:active,
+  .group-tab:active,.mobile-tab:active,.theme-toggle:active,.player-close:active,.filter-chip:active,
+  .view-switch-btn:active{transform:none}
+  .player-lyrics{scroll-behavior:auto}
 }

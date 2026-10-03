@@ -104,7 +104,7 @@ function buildMiniTrackCard(track, queueLabel, queueIds) {
             // onclick -- so the pill was a non-interactive label repeating
             // that, and at four rails it cost the title more width than the
             // title had. It now appears only to mark the current track.
-            ? '<div class="mini-track-play" aria-hidden="true">' + icon(_isPlaying ? 'pause' : 'play') + '</div>'
+            ? '<div class="mini-track-play" aria-hidden="true">' + eqBars() + '</div>'
             : '')
     + '</div>';
 }
