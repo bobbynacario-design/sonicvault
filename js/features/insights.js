@@ -66,7 +66,9 @@ function renderInsights() {
 
   var gems = getLeastPlayedTracks(6);
   var gemsHtml = gems.map(function(t) {
-    return '<div class="rank-row" role="button" tabindex="0" aria-label="' + attr('Play ' + (t.title || 'track') + ', ' + (t.plays || 0) + ' plays') + '" onclick="playTrack(' + jsq(t.id) + ')">' + buildCoverArt(t, 'xs', false) + '<div class="rank-copy"><div class="rank-title">' + esc(t.title) + '</div><div class="rank-sub">' + esc(t.genre || 'Other') + ' / ' + esc(t.mood || 'Mood') + '</div></div><div class="rank-val">' + fmtCompactNumber(t.plays || 0) + ' plays</div></div>';
+    var plays = Number(t.plays || 0);
+    var playsLabel = fmtCompactNumber(plays) + (plays === 1 ? ' play' : ' plays');
+    return '<div class="rank-row is-gem" role="button" tabindex="0" aria-label="' + attr('Play ' + (t.title || 'track') + ', ' + playsLabel) + '" onclick="playTrack(' + jsq(t.id) + ')">' + buildCoverArt(t, 'xs', false) + '<div class="rank-copy"><div class="rank-title">' + esc(t.title) + '</div><div class="rank-sub">' + esc(t.genre || 'Other') + ' / ' + esc(t.mood || 'Mood') + '</div></div><div class="rank-val">' + playsLabel + '</div></div>';
   }).join('');
 
   el.innerHTML = ''
