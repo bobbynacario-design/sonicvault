@@ -29,8 +29,10 @@ function renderAboutSong(track) {
     summaryEl.className = 'player-ai-summary is-empty';
     summaryEl.textContent = 'Play a track to see what it\u2019s about.';
     factsEl.hidden = tagsEl.hidden = true;
+    if (typeof renderSongStory === 'function') renderSongStory();
     return;
   }
+  if (typeof renderSongStory === 'function') renderSongStory();
   var summary = getTrackSummary(track);
   var canEdit = !!getVaultTrack(track.id);
   summaryEl.className = 'player-ai-summary' + (summary ? '' : ' is-empty');

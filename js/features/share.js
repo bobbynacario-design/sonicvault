@@ -65,6 +65,7 @@ function makeTrackSnapshot(track, full) {
     hasLyrics: hasLyrics(track)
   };
   if (full) {
+    snapshot.songStory = String(track.songStory || '');
     snapshot.lyrics = getTrackLyrics(track);
     snapshot.lyricSync = publicLyricSync(track);
     snapshot.translation = publicTranslation(track);
@@ -347,6 +348,7 @@ function renderPublicTrackPage(track) {
     +       '</div>'
     +     '</div>'
     +   '</section>'
+    +   (String(track.songStory || '').trim() ? '<section class="public-section"><h2 class="public-section-title">Behind the song</h2><p class="public-story-text">' + esc(String(track.songStory).trim()) + '</p></section>' : '')
     +   publicLyricsSection(track, lyrics)
     +   (related.length ? '<section class="public-section"><h2 class="public-section-title">More like this</h2><div class="public-related-grid">' + publicRelatedCards(related) + '</div></section>' : '')
     +   (collections.length ? '<section class="public-section"><h2 class="public-section-title">In playlists</h2><div class="public-link-list">' + collections.map(function(pl) {
@@ -424,7 +426,7 @@ function trackShareSignature(track) {
     track.title, track.genre, track.mood, track.audioURL, getCoverStyle(track), getTrackSummary(track),
     getTrackAITags(track).join(','), getTrackLyrics(track),
     sync ? sync.key + sync.at + sync.source + (sync.words ? sync.words.length : 0) : '',
-    tr ? tr.lang + tr.at : '', getRealPeaksForTrack(track).length
+    tr ? tr.lang + tr.at : '', getRealPeaksForTrack(track).length, String(track.songStory || '')
   ].join('|'));
 }
 

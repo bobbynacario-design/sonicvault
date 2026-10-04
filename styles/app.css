@@ -2361,6 +2361,18 @@ body.light .player-modal .player-close{background:rgba(255,255,255,.5)}
 }
 /* About this song: a description, then labelled details, then tags. */
 .player-about{gap:1rem}
+/* The story behind the song (js/features/song-story.js). */
+.song-story{display:grid;gap:.6rem;justify-items:start}
+.song-story[hidden]{display:none}
+.song-story-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted2)}
+.song-story-text{margin:0;max-width:68ch;padding-left:1rem;border-left:2px solid var(--accent-dynamic);font-size:15.5px;line-height:1.7;font-style:italic;color:var(--text);white-space:pre-line}
+.song-story-input{width:100%;min-height:120px;padding:.8rem .95rem;border-radius:14px;border:1px solid var(--rim2);background:var(--bg3);color:var(--text);font-family:var(--sans);font-size:14.5px;line-height:1.6;resize:vertical}
+.song-story-input:focus{outline:2px solid var(--accent-dynamic);outline-offset:1px}
+.song-story-note{display:flex;align-items:center;flex-wrap:wrap;gap:.45rem;font-size:12.5px;line-height:1.5;color:var(--muted2)}
+.song-story-note.is-error{color:var(--danger)}
+.song-story-actions{display:flex;flex-wrap:wrap;gap:.5rem;justify-self:end}
+.song-story-edit,.song-story-add{margin-left:0}
+.public-story-text{max-width:720px;margin:0;padding-left:1.1rem;border-left:3px solid var(--accent-dynamic);font-size:17px;line-height:1.7;font-style:italic;color:var(--text);white-space:pre-line}
 .player-ai-summary{
   margin:0;
   max-width:68ch;

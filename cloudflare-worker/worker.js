@@ -105,6 +105,7 @@ export default {
     if (route === "/cover") return handleCover(request, env);
     if (route === "/embed") return handleEmbed(request, env);
     if (route === "/translate") return handleTranslate(request, env);
+    if (route === "/story") return handleSongStory(request, env);
 
     let payload;
     try {
@@ -695,6 +696,75 @@ async function handleTranslate(request, env) {
     about: cleanString(answer.about).slice(0, 1200),
     notes: notes
   }, 200, request, env);
+}
+
+// ── The story behind a song ──────────────────────────────────────────────
+// POST /story { title, prompt, lyrics, summary, notes } -> { story }
+// A short liner note in the songwriter's voice, drafted from their own notes
+// and the song, for them to edit. Written by the translation model, which
+// writes better than the metadata one; nothing is invented.
+
+const MAX_STORY_NOTES = 1500;
+const STORY_SYSTEM_PROMPT = [
+  "You help a songwriter write the short note that goes with a song, like liner notes: the story behind it.",
+  "Write it in the first person, as the songwriter, in plain and warm words: two to four sentences, under 90 words.",
+  "Use only what you are given. The songwriter's own notes come first; the lyrics, the description and the prompt they gave the music AI show what the song is about and how it feels. Never invent people, places, dates or events that aren't there. If the notes don't say who it's for or when it was written, write about the feeling and what the song says instead.",
+  "Write in the language of the songwriter's notes, or English when there are none.",
+  "No title, no quotation marks around it, no hashtags, no emoji. Reply with the note only."
+].join("\n");
+
+async function handleSongStory(request, env) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return jsonResponse({ error: "Worker secret ANTHROPIC_API_KEY is not configured." }, 500, request, env);
+  }
+  const payload = await readJsonBody(request);
+  if (!payload) {
+    return jsonResponse({ error: "Request body must be valid JSON." }, 400, request, env);
+  }
+  const title = cleanString(payload.title).slice(0, MAX_SONG_TITLE);
+  const lyrics = cleanString(payload.lyrics).slice(0, MAX_SONG_LYRICS);
+  const notes = cleanString(payload.notes).slice(0, MAX_STORY_NOTES);
+  const summary = cleanString(payload.summary).slice(0, 600);
+  const prompt = cleanString(payload.prompt).slice(0, MAX_SONG_STYLE);
+  if (!notes && !lyrics && !summary && !prompt) {
+    return jsonResponse({ error: "Write a few notes, or add lyrics, to draft from." }, 400, request, env);
+  }
+  const userText = [
+    "Title: " + (title || "(untitled)"), "",
+    "My notes:", notes || "(none)", "",
+    "What the song is about:", summary || "(not described)", "",
+    "The prompt I gave the music AI:", prompt || "(none)", "",
+    "Lyrics:", lyrics || "(instrumental)"
+  ].join("\n");
+
+  let response;
+  try {
+    response = await callAnthropic(env, {
+      model: cleanString(payload.model) || cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL,
+      max_tokens: 400,
+      system: STORY_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userText }]
+    });
+  } catch (err) {
+    return jsonResponse({ error: "Could not reach Anthropic." }, 502, request, env);
+  }
+  const rawText = await response.text();
+  const parsed = safeJsonParse(rawText);
+  if (!response.ok) {
+    const apiError = parsed && parsed.error ? parsed.error : {};
+    const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+    return jsonResponse(
+      { error: "Anthropic API request failed (" + response.status + "): " + reason },
+      response.status === 429 ? 429 : 502,
+      request,
+      env
+    );
+  }
+  const story = cleanString(extractAnthropicText(parsed || {})).replace(/^["\u201c]+|["\u201d]+$/g, "").trim().slice(0, 1200);
+  if (!story) {
+    return jsonResponse({ error: "Claude returned nothing. Try again." }, 502, request, env);
+  }
+  return jsonResponse({ story: story }, 200, request, env);
 }
 
 const EMBED_MODEL = "@cf/baai/bge-m3";
