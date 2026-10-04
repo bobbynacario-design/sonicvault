@@ -81,6 +81,40 @@ test("Google's refusal comes back with its reason", async () => {
   assert.equal(JSON.parse(text).error, "Lyria request failed (403 PERMISSION_DENIED): Billing is not enabled.");
 });
 
+test("a key without billing is told so in words, not quota metric names", async () => {
+  const quota = (message) => gemini({ error: { code: 429, status: "RESOURCE_EXHAUSTED", message } }, 429);
+  const free = await call("/generate", { style: "x" }, {
+    env: { GEMINI_API_KEY: "g" },
+    fetchImpl: quota("You exceeded your current quota.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: lyria-3-pro\nPlease retry in 20h38m12s.")
+  });
+  assert.equal(free.res.status, 429);
+  assert.match(JSON.parse(free.text).error, /free tier, which can't make songs\. Turn on billing/);
+  assert.match(JSON.parse(free.text).details, /limit: 0/);
+
+  const busy = await call("/generate", { style: "x" }, {
+    env: { GEMINI_API_KEY: "g" },
+    fetchImpl: quota("Quota exceeded for metric: requests_per_minute, limit: 10, model: lyria-3-pro")
+  });
+  assert.match(JSON.parse(busy.text).error, /Try again in a minute/);
+});
+
+test("an unavailable Lyria is tried once more, then reported as busy", async () => {
+  const unavailable = () => new Response(JSON.stringify({ error: { code: 503, status: "UNAVAILABLE", message: "The service is currently unavailable." } }), { status: 503 });
+  const answer = { candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/mp3", data: "SUQz" } }] } }] };
+  let n = 0;
+  const recovered = await call("/generate", { style: "x" }, {
+    env: { GEMINI_API_KEY: "g" },
+    fetchImpl: async () => (n++ === 0 ? unavailable() : new Response(JSON.stringify(answer), { status: 200 }))
+  });
+  assert.equal(recovered.res.status, 200);
+  assert.equal(recovered.calls.length, 2);
+
+  const down = await call("/generate", { style: "x" }, { env: { GEMINI_API_KEY: "g" }, fetchImpl: async () => unavailable() });
+  assert.equal(down.calls.length, 2);
+  assert.equal(down.res.status, 502);
+  assert.equal(JSON.parse(down.text).error, "Lyria is busy right now. Try again in a minute.");
+});
+
 test("over-long input is refused before Google is asked", async () => {
   const { res, calls } = await call("/generate", { style: "x".repeat(1001) }, { env: { GEMINI_API_KEY: "g" } });
   assert.equal(res.status, 400);

@@ -39,6 +39,7 @@ const WHISPER_MODEL = "@cf/openai/whisper-large-v3-turbo";
 // LYRIA_MODEL var can name another (lyria-3-clip-preview makes 30s clips).
 const LYRIA_MODEL = "lyria-3.5";
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/";
+const LYRIA_RETRY_MS = 1500;
 const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const MAX_SONG_TITLE = 120;
 const MAX_SONG_STYLE = 1000;
@@ -394,19 +395,27 @@ async function handleGenerate(request, env) {
   }
 
   const model = cleanString(env.LYRIA_MODEL) || LYRIA_MODEL;
+  const body = JSON.stringify({
+    contents: [{ role: "user", parts: [{ text: buildSongPrompt(input) }] }],
+    generationConfig: { responseModalities: ["AUDIO", "TEXT"] }
+  });
   let response;
   try {
-    response = await fetch(GEMINI_API + encodeURIComponent(model) + ":generateContent", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": env.GEMINI_API_KEY
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: buildSongPrompt(input) }] }],
-        generationConfig: { responseModalities: ["AUDIO", "TEXT"] }
-      })
-    });
+    // "Unavailable" comes back at once and is not billed, so it is worth
+    // one more try before the app is told.
+    for (let attempt = 0; ; attempt++) {
+      response = await fetch(GEMINI_API + encodeURIComponent(model) + ":generateContent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": env.GEMINI_API_KEY
+        },
+        body: body
+      });
+      if (response.status !== 503 || attempt >= 1) break;
+      await response.body?.cancel();
+      await new Promise(function (resolve) { setTimeout(resolve, LYRIA_RETRY_MS); });
+    }
   } catch (err) {
     return jsonResponse(
       { error: "Could not reach Google's Gemini API.", details: cleanString(err && err.message) },
@@ -425,10 +434,22 @@ async function handleGenerate(request, env) {
     const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
     const kind = cleanString(apiError.status);
     console.error("Lyria request failed", response.status, kind, reason, "model:", model);
+    // Quota errors arrive as a paragraph of metric names. The free tier's
+    // Lyria quota is zero, so on a key without billing every song fails
+    // this way: say what to do instead.
+    let error = "Lyria request failed (" + response.status + (kind ? " " + kind : "") + "): " + reason;
+    if (response.status === 429 && /free_tier/i.test(reason) && /limit:\s*0\b/.test(reason)) {
+      error = "This Gemini key's project is on the free tier, which can't make songs. Turn on billing for it in Google AI Studio, then try again.";
+    } else if (response.status === 429) {
+      error = "Lyria is limiting how fast this key can make songs. Try again in a minute.";
+    } else if (response.status === 503) {
+      error = "Lyria is busy right now. Try again in a minute.";
+    }
     return jsonResponse(
       {
-        error: "Lyria request failed (" + response.status + (kind ? " " + kind : "") + "): " + reason,
-        status: response.status
+        error: error,
+        status: response.status,
+        details: reason
       },
       response.status === 429 ? 429 : 502,
       request,
