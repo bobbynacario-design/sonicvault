@@ -324,7 +324,7 @@ function buildTrackCard(track) {
     +               ' aria-haspopup="menu" aria-expanded="false"'
     +               ' aria-label="' + attr('More actions for ' + (track.title || 'this track')) + '"'
     +               ' onclick="toggleCardMenu(' + jsq(track.id) + ', event)">' + icon('more') + '</button>'
-    +             '<div class="card-menu" id="menu-' + esc(track.id) + '" role="menu" aria-label="Track actions">'
+    +             '<div class="card-menu" id="menu-' + esc(track.id) + '" role="menu" aria-label="Track actions">' + queueMenuItems(track)
     +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();cycleTrackCover(' + jsq(track.id) + ')">Change cover</button>'
     +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();openEditTrack(' + jsq(track.id) + ')">Edit details</button>'
     +               (track.shared
@@ -467,7 +467,7 @@ function buildTrackRow(track, index) {
     +         ' aria-haspopup="menu" aria-expanded="false"'
     +         ' aria-label="' + attr('More actions for ' + (track.title || 'this track')) + '"'
     +         ' onclick="toggleCardMenu(' + jsq(track.id) + ', event)">' + icon('more') + '</button>'
-    +       '<div class="card-menu" id="menu-' + esc(track.id) + '" role="menu" aria-label="Track actions">'
+    +       '<div class="card-menu" id="menu-' + esc(track.id) + '" role="menu" aria-label="Track actions">' + queueMenuItems(track)
     // On a phone the row has no room for the Notes button, so it moves in here.
     +         '<button role="menuitem" class="menu-notes" onclick="event.stopPropagation();closeAllCardMenus();toggleExpand(' + jsq(track.id) + ')">Notes</button>'
     +         '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();cycleTrackCover(' + jsq(track.id) + ')">Change cover</button>'

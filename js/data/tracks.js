@@ -73,3 +73,20 @@ function addPlayDay(playDays, date) {
   if (key) out[key] = (out[key] || 0) + 1;
   return out;
 }
+
+// ── Play next / Add to queue ────────────────────────────────────────────────
+// The queue with a song put right after the one playing ('next') or at the
+// end ('end'). The player finds its place in the queue by song, so a song
+// is in it once: one already queued moves rather than appearing twice. The
+// song playing stays where it is. With nothing playing, 'next' goes first.
+function queueWithSong(ids, currentId, id, where) {
+  var list = (ids || []).filter(function(item) { return item !== id || item === currentId; });
+  if (id === currentId) return list;
+  if (where === 'next') {
+    var at = list.indexOf(currentId);
+    list.splice(at + 1, 0, id);
+  } else {
+    list.push(id);
+  }
+  return list;
+}

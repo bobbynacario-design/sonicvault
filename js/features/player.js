@@ -72,6 +72,36 @@ function moveQueueTrack(id, dir) {
   updateExpandedPlayer();
 }
 
+// Play next / Add to queue (the track menus): the song goes right after the
+// one playing, or at the end, in whichever order playback is walking
+// (queueWithSong in js/data/tracks.js). With nothing playing, it plays.
+function queueSong(id, where) {
+  var track = getTrackById(id);
+  if (!track) return;
+  if (!_currentTrack) {
+    startPlayback(id, [id], 'Your queue');
+    return;
+  }
+  if (_currentTrack.id === id) {
+    showToast('That song is already playing');
+    return;
+  }
+  if (_playQueueIds.indexOf(_currentTrack.id) === -1) _playQueueIds.unshift(_currentTrack.id);
+  var shuffled = _shuffleMode && _shuffleOrder.length === _playQueueIds.length;
+  _playQueueIds = queueWithSong(_playQueueIds, _currentTrack.id, id, where);
+  if (shuffled) _shuffleOrder = queueWithSong(_shuffleOrder, _currentTrack.id, id, where);
+  updateMediaSession();
+  updateNowPlaying();
+  if (typeof updateExpandedPlayer === 'function') updateExpandedPlayer();
+  showToast((where === 'next' ? 'Playing next: ' : 'Added to queue: ') + (track.title || 'Untitled'));
+}
+
+function queueMenuItems(track) {
+  var stop = 'event.stopPropagation();closeAllCardMenus();';
+  return '<button role="menuitem" onclick="' + stop + 'queueSong(' + jsq(track.id) + ', &quot;next&quot;)">Play next</button>'
+    + '<button role="menuitem" onclick="' + stop + 'queueSong(' + jsq(track.id) + ', &quot;end&quot;)">Add to queue</button>';
+}
+
 function getNextTrack() {
   if (!_currentTrack) return null;
   var queue = getOrderedQueueTracks();

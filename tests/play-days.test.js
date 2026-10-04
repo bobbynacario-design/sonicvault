@@ -19,3 +19,15 @@ test("a play adds one to its day and leaves the rest", () => {
   assert.deepEqual(g.addPlayDay(again, new Date(2026, 9, 6)), { "2026-10-05": 2, "2026-10-06": 1 });
   assert.deepEqual(g.addPlayDay(["junk"], new Date(2026, 9, 6)), { "2026-10-06": 1 });
 });
+
+test("play next goes right after the song playing; add to queue goes at the end", () => {
+  assert.deepEqual(g.queueWithSong(["a", "b", "c"], "a", "x", "next"), ["a", "x", "b", "c"]);
+  assert.deepEqual(g.queueWithSong(["a", "b", "c"], "a", "x", "end"), ["a", "b", "c", "x"]);
+  // Already queued: it moves instead of appearing twice.
+  assert.deepEqual(g.queueWithSong(["a", "b", "c"], "a", "c", "next"), ["a", "c", "b"]);
+  assert.deepEqual(g.queueWithSong(["a", "b", "c"], "b", "a", "end"), ["b", "c", "a"]);
+  // The song playing stays put.
+  assert.deepEqual(g.queueWithSong(["a", "b"], "a", "a", "next"), ["a", "b"]);
+  // Nothing playing.
+  assert.deepEqual(g.queueWithSong([], null, "x", "next"), ["x"]);
+});
