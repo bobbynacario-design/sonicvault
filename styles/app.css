@@ -3083,6 +3083,11 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .player-btn.player-pill{width:auto;min-width:0;height:38px;padding:0 .95rem;gap:.45rem;border-radius:999px;background:var(--surface);font-family:var(--sans);font-size:13px;font-weight:500}
 .player-btn.player-pill .ic{width:16px;height:16px}
 
+/* Keep offline (js/features/offline.js), in the playlist dialog's actions. */
+.offline-controls{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;flex-basis:100%;margin-top:.2rem}
+.offline-status{font-size:13px;line-height:1.5;color:var(--muted)}
+.offline-status.is-ready{color:var(--success);font-weight:500}
+
 /* ── Sign-in ────────────────────────────────────────────────────────────
    PokerHQ's and Enclave's layout -- the story on the left, the access card
    on the right, the card first on a phone -- in the vault's aurora glass.

@@ -10,6 +10,9 @@ var AUDIO_MAX_ENTRIES = 30;
 // Written by the page (js/features/artwork.js), never by this worker; listed
 // so activate does not discard it.
 var ART_CACHE = 'sv-art-v1';
+// Playlists kept offline (js/features/offline.js): written by the page,
+// served before the network, never trimmed.
+var OFFLINE_CACHE = 'sv-offline-v1';
 
 var SHELL_ASSETS = [
   './',
@@ -46,6 +49,7 @@ var SHELL_ASSETS = [
   './js/features/home.js',
   './js/features/insights.js',
   './js/features/playlists.js',
+  './js/features/offline.js',
   './js/features/share.js',
   './js/features/edit-track.js',
   './js/features/ai-metadata.js',
@@ -77,7 +81,7 @@ self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.filter(function(key) {
-        return key.indexOf('sv-') === 0 && [SHELL_CACHE, STATIC_CACHE, AUDIO_CACHE, ART_CACHE].indexOf(key) === -1;
+        return key.indexOf('sv-') === 0 && [SHELL_CACHE, STATIC_CACHE, AUDIO_CACHE, ART_CACHE, OFFLINE_CACHE].indexOf(key) === -1;
       }).map(function(key) { return caches.delete(key); }));
     }).then(function() { return self.clients.claim(); })
   );
@@ -137,6 +141,15 @@ function buildRangeResponse(request, response) {
 // fetch the FULL file (a bare GET, no Range header) so the cached copy is
 // complete, then answer the original request — sliced if it was ranged.
 function audioStrategy(request) {
+  return caches.open(OFFLINE_CACHE).then(function(offline) {
+    return offline.match(request.url);
+  }).then(function(kept) {
+    if (kept) return buildRangeResponse(request, kept);
+    return cachedAudio(request);
+  });
+}
+
+function cachedAudio(request) {
   return caches.open(AUDIO_CACHE).then(function(cache) {
     return cache.match(request.url).then(function(cached) {
       if (cached) return buildRangeResponse(request, cached);
@@ -242,8 +255,10 @@ self.addEventListener('message', function(event) {
 function waveStrategy(request, url) {
   var plain = new URL(url.href);
   plain.searchParams.delete('sv-wave');
-  return caches.open(AUDIO_CACHE).then(function(cache) {
-    return cache.match(plain.href);
+  return caches.open(OFFLINE_CACHE).then(function(offline) {
+    return offline.match(plain.href);
+  }).then(function(kept) {
+    return kept || caches.open(AUDIO_CACHE).then(function(cache) { return cache.match(plain.href); });
   }).then(function(cached) {
     return cached || fetch(request);
   });
@@ -258,6 +273,9 @@ self.addEventListener('fetch', function(event) {
   // Through audioStrategy they would fetch and cache the whole file, and
   // push recently played songs out of the audio cache.
   if (url.searchParams.has('sv-art')) return;
+  // Downloads for a playlist kept offline go into their own cache, not this
+  // worker's audio cache.
+  if (url.searchParams.has('sv-offline')) return;
   if (url.searchParams.has('sv-wave')) {
     event.respondWith(waveStrategy(request, url));
     return;
