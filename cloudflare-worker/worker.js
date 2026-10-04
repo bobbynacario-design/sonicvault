@@ -15,6 +15,12 @@
 // lyric sheet it already has (js/data/lyric-sync.js). Send JSON
 // { audioURL } for a file in the SonicVault Cloudinary folder -- the worker
 // streams it straight to the model -- or the audio itself as the body.
+//
+// GET /s/... serves share-link previews to link-preview bots (share.js).
+// Those routes are public by design: they read only the share records the
+// app publishes for anyone to see.
+
+import { handleShareRoute } from "./share.js";
 
 const MODEL_NAME = "claude-haiku-4-5";
 const WHISPER_MODEL = "@cf/openai/whisper-large-v3-turbo";
@@ -46,6 +52,11 @@ const SYSTEM_PROMPT = [
 
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/s/")) {
+      return handleShareRoute(request, env, url);
+    }
+
     if (request.method === "OPTIONS") {
       return handleOptions(request, env);
     }
@@ -67,7 +78,7 @@ export default {
       return jsonResponse({ error: "Unauthorized." }, 401, request, env);
     }
 
-    if (new URL(request.url).pathname.replace(/\/+$/, "") === "/transcribe") {
+    if (url.pathname.replace(/\/+$/, "") === "/transcribe") {
       return handleTranscribe(request, env);
     }
 

@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "SonicVault AI worker (deployed with npx wrangler deploy). type:module lets the tests import its modules."
+}

@@ -18,3 +18,7 @@ binding = "AI"
 [vars]
 # Comma-separated origin allowlist for CORS. The deployed app plus local dev.
 ALLOWED_ORIGIN = "https://bobbynacario-design.github.io,http://localhost:8487,http://127.0.0.1:8487"
+# Share-link previews (share.js): where people are sent on to, and the
+# Firestore project whose public share records the previews read.
+SHARE_APP_URL = "https://bobbynacario-design.github.io/sonicvault"
+FIRESTORE_PROJECT = "pokerhq-a67e4"

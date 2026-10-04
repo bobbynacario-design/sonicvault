@@ -78,7 +78,17 @@ function getAppBasePath() {
   return getRoutePrefixFromPath(window.location.pathname);
 }
 
+// Share links go through the AI worker's public /s/ routes
+// (cloudflare-worker/share.js). Link-preview bots -- Facebook, WhatsApp,
+// X -- get the title, cover and description there; people are sent straight
+// on to the app. The app's own /track/:id URLs only exist as a 404 that
+// redirects in script, which no preview bot runs. Local dev keeps local
+// links. Links sent before this still work, just without a preview.
+var SHARE_PREVIEW_ORIGIN = 'https://sonicvault-ai.bobbynacario.workers.dev';
+
 function buildShareURL(kind, id) {
+  var local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+  if (SHARE_PREVIEW_ORIGIN && !local) return SHARE_PREVIEW_ORIGIN + '/s/' + kind + '/' + encodeURIComponent(id);
   return window.location.origin + (getAppBasePath() || '') + '/' + kind + '/' + encodeURIComponent(id);
 }
 

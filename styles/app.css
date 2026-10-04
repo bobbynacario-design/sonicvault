@@ -1938,6 +1938,8 @@ kbd{display:inline-block;min-width:1.4rem;padding:.15rem .42rem;border-radius:7p
   color:var(--text);
 }
 .share-platforms{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem}
+.share-platforms [hidden]{display:none}
+.share-plat-btn.share-native{color:var(--text);background:var(--surface-hover);border-color:transparent}
 .share-plat-btn{
   padding:.62rem .85rem;
   border-radius:999px;

@@ -101,10 +101,17 @@ function syncSharedPlaylist(pl) {
   });
 }
 
+// What is being shared, for the text the platforms put next to the link:
+// the title without the dialog's "Share “...”" wrapping.
+var _shareSubject = '';
+
 function openShareLinkModal(title, subtitle, url) {
   document.getElementById('share-title').textContent = title;
   document.getElementById('share-subtitle').textContent = subtitle;
   document.getElementById('share-link').value = url;
+  _shareSubject = String(title || '').replace(/^Share\s+/, '').replace(/^["\u201c]|["\u201d]$/g, '');
+  var native = document.getElementById('share-native-btn');
+  if (native) native.hidden = !navigator.share;
   openModal('modal-share');
 }
 
@@ -320,10 +327,20 @@ function copyShareLink() {
 
 function shareExternal(platform) {
   var url = document.getElementById('share-link').value;
-  var text = 'Listen to this SonicVault selection:';
-  if (platform === 'twitter') window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url));
-  if (platform === 'whatsapp') window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + url));
-  if (platform === 'email') window.open('mailto:?subject=' + encodeURIComponent('SonicVault share') + '&body=' + encodeURIComponent(text + '\n\n' + url));
+  var subject = _shareSubject || 'this';
+  var text = 'Listen to \u201c' + subject + '\u201d on SonicVault';
+  if (platform === 'native' && navigator.share) {
+    // Dismissing the sheet rejects with AbortError; that is not a failure.
+    navigator.share({ title:subject, text:text, url:url }).catch(function(e) {
+      if (!e || e.name !== 'AbortError') showToast('Couldn\u2019t open the share menu');
+    });
+    return;
+  }
+  // Facebook takes only the link; the preview card comes from the page.
+  if (platform === 'facebook') window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url), '_blank', 'noopener,width=640,height=560');
+  if (platform === 'twitter') window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url), '_blank', 'noopener');
+  if (platform === 'whatsapp') window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + url), '_blank', 'noopener');
+  if (platform === 'email') window.open('mailto:?subject=' + encodeURIComponent(subject + ' on SonicVault') + '&body=' + encodeURIComponent(text + '\n\n' + url));
 }
 
 async function sharePlaylist(id) {
