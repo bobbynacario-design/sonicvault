@@ -29,8 +29,22 @@ function getTrackAITheme(track) {
   return String(track && track.aiTheme || '').trim();
 }
 
+// Until 2026-10-04, saving the AI's answer padded its tags with the
+// lyrics' most frequent words up to ten, so stored tags read "Love Song,
+// Poetic, got, weather, whole". The padding always trails the AI's own tags
+// and matches the track's top words, so it is dropped when read; nothing in
+// the vault has to be rewritten. The local tagger chose its words on
+// purpose, so its tags are kept as they are.
 function getTrackAITags(track) {
-  return sanitizeMetadataArray(track && track.aiTags, 12);
+  var tags = sanitizeMetadataArray(track && track.aiTags, 12);
+  if (!tags.length || lower(track && track.aiSource) === 'local') return tags;
+  // Padding words are bare lowercase words; skip the scan when the last tag
+  // is anything else (this runs for every track on every render).
+  if (!/^[a-z0-9]+$/.test(tags[tags.length - 1])) return tags;
+  var padding = {};
+  deriveTextTags(getTrackMetadataText(track), 30).forEach(function(word) { padding[word] = 1; });
+  while (tags.length && padding[tags[tags.length - 1]]) tags.pop();
+  return tags;
 }
 
 function getTrackAIInstruments(track) {
@@ -260,7 +274,9 @@ function normalizeAIMetadata(raw, input) {
     aiVocalStyle: String(raw && (raw.aiVocalStyle || raw.vocalStyle) || '').trim() || 'Lead vocal',
     aiEra: String(raw && (raw.aiEra || raw.era) || '').trim() || 'Contemporary',
     aiInstruments: instruments,
-    aiTags: uniqueStrings(tags.concat(deriveTextTags(text, 8)), 10),
+    // The AI's tags as given. Words from the lyrics stand in only when it
+    // gave none: padding a short list with them buried the real tags.
+    aiTags: tags.length ? tags : deriveTextTags(text, 8),
     aiSummary: String(raw && (raw.aiSummary || raw.summary) || '').trim() || 'A curated SonicVault release shaped from the track title, prompt, and lyrics.',
     aiExplicit: raw && typeof raw.aiExplicit === 'boolean' ? !!raw.aiExplicit : detectExplicit(text),
     aiSource: String(raw && (raw.aiSource || raw.aiProvider || raw.provider || raw.source) || '').trim(),

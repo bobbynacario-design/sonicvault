@@ -92,6 +92,28 @@ test("the AI's tags lead, and lyric words only fill the space left", () => {
   assert.ok(!tags.includes("Suno") && !tags.includes("Other"), JSON.stringify(tags));
 });
 
+test("the AI's tags are kept as given, with lyric words only when it gave none", () => {
+  const lyrics = "weather weather weather whole whole got got the background";
+  const given = g.normalizeAIMetadata({ aiTags: ["Introspective", "Love Song"] }, { title: "X", lyrics });
+  assert.deepEqual(given.aiTags, ["Introspective", "Love Song"]);
+  const none = g.normalizeAIMetadata({}, { title: "X", lyrics });
+  assert.deepEqual(none.aiTags.slice(0, 3), ["weather", "whole", "got"]);
+});
+
+test("lyric words padded onto tags saved before the fix are dropped when read", () => {
+  const track = {
+    title: "You Were the Weather",
+    lyrics: "you were the weather I lived in\nthe weather the whole time\nI got it wrong, I got it late, the whole weather",
+    aiTags: ["Introspective", "Acoustic", "Love Song", "Poetic", "Vulnerable", "got", "weather", "whole"],
+    aiSource: "claude",
+  };
+  assert.deepEqual(g.getTrackAITags(track), ["Introspective", "Acoustic", "Love Song", "Poetic", "Vulnerable"]);
+  // A lowercase tag that is not one of the track's words stays.
+  assert.deepEqual(g.getTrackAITags({ ...track, aiTags: ["Poetic", "slow burn", "weather", "rain"] }), ["Poetic", "slow burn", "weather", "rain"]);
+  // The local tagger's words are its tags.
+  assert.deepEqual(g.getTrackAITags({ ...track, aiSource: "local" }), track.aiTags);
+});
+
 test("the prompt excerpt falls back from prompt to summary to lyrics to a stock line", () => {
   assert.equal(g.getTrackPromptExcerpt({ prompt: "p", aiSummary: "s" }), "p");
   assert.equal(g.getTrackPromptExcerpt({ aiSummary: "s", lyrics: "l" }), "s");
