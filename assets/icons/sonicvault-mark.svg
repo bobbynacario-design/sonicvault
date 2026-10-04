@@ -1,10 +1,20 @@
 <svg width="512" height="512" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100" height="100" rx="24" fill="#0F172A"/>
-  <circle cx="50" cy="50" r="42" stroke="#0EA5E9" stroke-width="4"/>
-  <circle cx="50" cy="50" r="34" stroke="#0EA5E9" stroke-width="1" stroke-dasharray="4 4"/>
-  <rect x="34" y="45" width="5" height="15" rx="2.5" fill="#38BDF8"/>
-  <rect x="42" y="35" width="5" height="30" rx="2.5" fill="#38BDF8"/>
-  <rect x="50" y="25" width="5" height="50" rx="2.5" fill="#38BDF8"/>
-  <rect x="58" y="45" width="5" height="20" rx="2.5" fill="#38BDF8"/>
-  <circle cx="52.5" cy="50" r="1.5" fill="#0F172A"/>
+  <defs>
+    <linearGradient id="aurora" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a794ff"/>
+      <stop offset=".6" stop-color="#e98aa0"/>
+      <stop offset="1" stop-color="#f6a06e"/>
+    </linearGradient>
+    <radialGradient id="shine" cx=".28" cy=".2" r=".55">
+      <stop offset="0" stop-color="#fff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="url(#aurora)"/>
+  <rect width="100" height="100" rx="24" fill="url(#shine)"/>
+  <circle cx="50" cy="41" r="18" fill="#fffaf4"/>
+  <path d="M42 52 37 75q-.7 5 4.5 5h17q5.2 0 4.5-5L58 52Z" fill="#fffaf4"/>
+  <rect x="40.5" y="36.5" width="4.4" height="9" rx="2.2" fill="#2a1d45"/>
+  <rect x="47.8" y="31" width="4.4" height="20" rx="2.2" fill="#2a1d45"/>
+  <rect x="55.1" y="34.5" width="4.4" height="13" rx="2.2" fill="#2a1d45"/>
 </svg>

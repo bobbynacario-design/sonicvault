@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SonicVault">
 <meta name="theme-color" content="#090b12">
-<link rel="icon" type="image/svg+xml" href="assets/icons/sonicvault-mark.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="assets/icons/sonicvault-mark.svg?v=20261004s">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=20261004s">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png?v=20261004s">
+<link rel="manifest" href="manifest.webmanifest?v=20261004s">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="A private editorial vault for AI-generated music. Curate tracks, build mixtapes, and stream from anywhere.">
 <meta property="og:type" content="website">
@@ -21,8 +21,8 @@
 <meta name="twitter:description" content="Curate tracks, build mixtapes, and stream your AI-generated music from anywhere.">
 <title>SonicVault - Private AI Music Vault</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<script type="module" src="js/app.js?v=20261004r"></script>
-<link rel="stylesheet" href="styles/app.css?v=20261004r">
+<script type="module" src="js/app.js?v=20261004s"></script>
+<link rel="stylesheet" href="styles/app.css?v=20261004s">
 </head>
 <body>
 <!-- Icon sprite. Every glyph in the app is <svg class="ic"><use href="#i-NAME"/></svg>,
@@ -30,6 +30,13 @@
      inherit currentColor; the transport glyphs are filled. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
+    <!-- The logo: a keyhole with a waveform inside it, on the aurora tile.
+         The tile runs from violet to the playing track's accent, as the
+         sidebar orb it replaced did; assets/icons/sonicvault-mark.svg is
+         the same drawing in the fixed brand colours. -->
+    <linearGradient id="logo-aurora" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--violet)"/><stop offset="1" style="stop-color:var(--accent-dynamic)"/></linearGradient>
+    <radialGradient id="logo-shine" cx=".28" cy=".2" r=".55"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <symbol id="i-logo" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="url(#logo-aurora)"/><rect width="100" height="100" rx="24" fill="url(#logo-shine)"/><circle cx="50" cy="41" r="18" fill="#fffaf4"/><path d="M42 52 37 75q-.7 5 4.5 5h17q5.2 0 4.5-5L58 52Z" fill="#fffaf4"/><rect x="40.5" y="36.5" width="4.4" height="9" rx="2.2" fill="#2a1d45"/><rect x="47.8" y="31" width="4.4" height="20" rx="2.2" fill="#2a1d45"/><rect x="55.1" y="34.5" width="4.4" height="13" rx="2.2" fill="#2a1d45"/></symbol>
     <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z"/></symbol>
     <symbol id="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4.2" height="15" rx="1.3"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.3"/></symbol>
     <symbol id="i-prev" viewBox="0 0 24 24" fill="currentColor"><rect x="4.5" y="5" width="2.6" height="14" rx="1.1"/><path d="M19.5 6.27v11.46a1 1 0 0 1-1.55.84L9.3 12.84a1 1 0 0 1 0-1.68l8.65-5.73a1 1 0 0 1 1.55.84z"/></symbol>
@@ -63,7 +70,7 @@
     <div class="login-shell">
       <section class="login-story">
         <div class="login-brand">
-          <div class="nav-mark login-mark" aria-hidden="true"></div>
+          <svg class="brand-mark login-mark" aria-hidden="true" focusable="false"><use href="#i-logo"/></svg>
           <div>
             <div class="login-logo-text">SonicVault</div>
             <div class="login-tagline">Private AI listening room</div>
@@ -110,7 +117,7 @@
     </div>
   </main>
 </div>
-<script src="js/first-paint.js?v=20261004r"></script>
+<script src="js/first-paint.js?v=20261004s"></script>
 <!-- Unsynced writes are a data-loss state, so they get a persistent bar with
      an action rather than the 10px status pill, which the next operation
      overwrites within a second. -->
@@ -128,7 +135,7 @@
   <div class="nav-row">
     <div class="nav-left">
       <div class="nav-brand-wrap">
-        <div class="nav-mark" aria-hidden="true"></div>
+        <svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#i-logo"/></svg>
         <div class="nav-brand">
           <div class="nav-brand-title">SonicVault</div>
           <div class="nav-brand-sub">Private AI listening room</div>
@@ -772,40 +779,40 @@
      global scope, which is what lets the inline onclick handlers above reach
      feature functions. On deploy, bump the ?v= token on every local asset
      together; sw.js serves them cache-first. -->
-<script src="js/data/util.js?v=20261004r"></script>
-<script src="js/data/tracks.js?v=20261004r"></script>
-<script src="js/data/covers.js?v=20261004r"></script>
-<script src="js/data/artwork.js?v=20261004r"></script>
-<script src="js/data/lyric-sync.js?v=20261004r"></script>
-<script src="js/data/metadata.js?v=20261004r"></script>
-<script src="js/data/waveform.js?v=20261004r"></script>
-<script src="js/data/routes.js?v=20261004r"></script>
-<script src="js/data/backup-format.js?v=20261004r"></script>
-<script src="js/data/create.js?v=20261004r"></script>
-<script src="js/features/vault.js?v=20261004r"></script>
-<script src="js/features/sync.js?v=20261004r"></script>
-<script src="js/features/shell.js?v=20261004r"></script>
-<script src="js/features/modals.js?v=20261004r"></script>
-<script src="js/features/routes.js?v=20261004r"></script>
-<script src="js/features/covers.js?v=20261004r"></script>
-<script src="js/features/artwork.js?v=20261004r"></script>
-<script src="js/features/lyric-sync.js?v=20261004r"></script>
-<script src="js/features/waveform.js?v=20261004r"></script>
-<script src="js/features/media-session.js?v=20261004r"></script>
-<script src="js/features/player.js?v=20261004r"></script>
-<script src="js/features/expanded-player.js?v=20261004r"></script>
-<script src="js/features/library.js?v=20261004r"></script>
-<script src="js/features/home.js?v=20261004r"></script>
-<script src="js/features/insights.js?v=20261004r"></script>
-<script src="js/features/playlists.js?v=20261004r"></script>
-<script src="js/features/share.js?v=20261004r"></script>
-<script src="js/features/edit-track.js?v=20261004r"></script>
-<script src="js/features/ai-metadata.js?v=20261004r"></script>
-<script src="js/features/upload.js?v=20261004r"></script>
-<script src="js/features/create.js?v=20261004r"></script>
-<script src="js/features/backup.js?v=20261004r"></script>
-<script src="js/features/sign-in.js?v=20261004r"></script>
-<script src="js/features/keyboard.js?v=20261004r"></script>
-<script src="js/boot.js?v=20261004r"></script>
+<script src="js/data/util.js?v=20261004s"></script>
+<script src="js/data/tracks.js?v=20261004s"></script>
+<script src="js/data/covers.js?v=20261004s"></script>
+<script src="js/data/artwork.js?v=20261004s"></script>
+<script src="js/data/lyric-sync.js?v=20261004s"></script>
+<script src="js/data/metadata.js?v=20261004s"></script>
+<script src="js/data/waveform.js?v=20261004s"></script>
+<script src="js/data/routes.js?v=20261004s"></script>
+<script src="js/data/backup-format.js?v=20261004s"></script>
+<script src="js/data/create.js?v=20261004s"></script>
+<script src="js/features/vault.js?v=20261004s"></script>
+<script src="js/features/sync.js?v=20261004s"></script>
+<script src="js/features/shell.js?v=20261004s"></script>
+<script src="js/features/modals.js?v=20261004s"></script>
+<script src="js/features/routes.js?v=20261004s"></script>
+<script src="js/features/covers.js?v=20261004s"></script>
+<script src="js/features/artwork.js?v=20261004s"></script>
+<script src="js/features/lyric-sync.js?v=20261004s"></script>
+<script src="js/features/waveform.js?v=20261004s"></script>
+<script src="js/features/media-session.js?v=20261004s"></script>
+<script src="js/features/player.js?v=20261004s"></script>
+<script src="js/features/expanded-player.js?v=20261004s"></script>
+<script src="js/features/library.js?v=20261004s"></script>
+<script src="js/features/home.js?v=20261004s"></script>
+<script src="js/features/insights.js?v=20261004s"></script>
+<script src="js/features/playlists.js?v=20261004s"></script>
+<script src="js/features/share.js?v=20261004s"></script>
+<script src="js/features/edit-track.js?v=20261004s"></script>
+<script src="js/features/ai-metadata.js?v=20261004s"></script>
+<script src="js/features/upload.js?v=20261004s"></script>
+<script src="js/features/create.js?v=20261004s"></script>
+<script src="js/features/backup.js?v=20261004s"></script>
+<script src="js/features/sign-in.js?v=20261004s"></script>
+<script src="js/features/keyboard.js?v=20261004s"></script>
+<script src="js/boot.js?v=20261004s"></script>
 </body>
 </html>

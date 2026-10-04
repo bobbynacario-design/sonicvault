@@ -185,18 +185,15 @@ body.light .nav{background:linear-gradient(180deg, rgba(241,236,226,.88), rgba(2
 }
 .nav-left{display:flex;align-items:center;gap:1.4rem;min-width:0}
 .nav-brand-wrap{display:flex;align-items:center;gap:.9rem;min-width:0}
-/* An aurora orb rather than a lettered tile: it picks up the playing track's
-   accent, like the background blooms do. */
-.nav-mark{
+/* The logo (#i-logo in index.html): a keyhole with a waveform inside it,
+   on an aurora tile that picks up the playing track's accent, like the
+   background blooms do. */
+.brand-mark{
   flex:none;
+  display:block;
   width:34px;
   height:34px;
-  border-radius:11px;
-  background:
-    radial-gradient(circle at 30% 24%, rgba(255,255,255,.6), transparent 42%),
-    radial-gradient(circle at 80% 85%, var(--accent-dynamic), transparent 70%),
-    linear-gradient(140deg, var(--violet), var(--accent-dynamic));
-  box-shadow:0 10px 26px -10px var(--accent-dynamic);
+  filter:drop-shadow(0 8px 14px color-mix(in srgb, var(--accent-dynamic) 38%, transparent));
 }
 .nav-brand{display:flex;flex-direction:column;gap:.12rem;min-width:0}
 .nav-brand-title{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-.01em;line-height:1}
@@ -3121,7 +3118,7 @@ body.light .login-wrap::after{background:repeating-linear-gradient(90deg, rgba(0
 }
 .login-story{min-width:0}
 .login-brand{display:flex;align-items:center;gap:14px;margin-bottom:56px}
-.nav-mark.login-mark{width:52px;height:52px;border-radius:16px}
+.brand-mark.login-mark{width:52px;height:52px}
 .login-logo-text{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:-.01em;line-height:1}
 .login-tagline{margin-top:6px;font-size:13px;color:var(--muted)}
 .login-eyebrow{margin-bottom:14px;font-size:14px;font-weight:600;color:var(--accent-dynamic)}
@@ -3260,7 +3257,7 @@ body.light .btn-google{box-shadow:inset 0 0 0 1px #747775}
 @media (max-width:600px){
   .login-wrap{display:block;padding:26px 16px 34px}
   .login-brand{margin-bottom:22px}
-  .nav-mark.login-mark{width:44px;height:44px;border-radius:14px}
+  .brand-mark.login-mark{width:44px;height:44px}
   .login-logo-text{font-size:21px}
   .login-eyebrow{margin-top:40px}
   .login-card{max-width:none;padding:26px 22px}
