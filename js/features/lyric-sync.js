@@ -339,3 +339,35 @@ function renderSungCheck() {
     + '<div class="sung-note">From the transcription, which can mishear words under a loud mix. Tap a line to hear it.</div>'
     + '<div class="sung-lines">' + check.lines.map(function(line, i) { return sungLineHTML(line, i, times); }).join('') + '</div>';
 }
+
+// ── Synced lyrics as a file ─────────────────────────────────────────────────
+// The track menus' "Download synced lyrics": an LRC file (buildLRC in
+// js/data/lrc.js) to send to a lyric service or load into a player. Word by
+// word when the song has word timings and that's asked for.
+function downloadLyricsFile(id, words) {
+  var track = getVaultTrack(id);
+  if (!track || !hasUsableLyricTimes(track)) {
+    showToast('This song’s lyrics aren’t timed yet. Play it once with the AI worker connected.');
+    return;
+  }
+  var sync = getLyricSync(track);
+  var duration = Number(track.duration) || (_currentTrack && _currentTrack.id === id ? _audio.duration : 0) || 0;
+  var text = buildLRC({ title:track.title, artist:track.artist, duration:duration }, getTrackLyrics(track),
+    resolveLyricTimes(sync.lines, duration), sync.words, !!words);
+  var url = URL.createObjectURL(new Blob([text], { type:'text/plain;charset=utf-8' }));
+  var link = document.createElement('a');
+  link.href = url;
+  link.download = lrcFileName(track.title, words);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+}
+
+// The menu items for it, or nothing for a song whose lyrics aren't timed.
+function lyricsFileMenuItems(track) {
+  if (!hasUsableLyricTimes(track)) return '';
+  var stop = 'event.stopPropagation();closeAllCardMenus();';
+  return '<button role="menuitem" onclick="' + stop + 'downloadLyricsFile(' + jsq(track.id) + ', false)">Download synced lyrics</button>'
+    + (getLyricSync(track).words ? '<button role="menuitem" onclick="' + stop + 'downloadLyricsFile(' + jsq(track.id) + ', true)">Download word-by-word lyrics</button>' : '');
+}

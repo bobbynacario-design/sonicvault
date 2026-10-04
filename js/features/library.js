@@ -331,7 +331,7 @@ function buildTrackCard(track) {
                       ? '<button role="menuitem" class="is-shared" onclick="event.stopPropagation();closeAllCardMenus();unshareTrack(' + jsq(track.id) + ')">Revoke public link</button>'
                       : '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();shareTrack(' + jsq(track.id) + ')">Share&hellip;</button>')
     +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();openStoryClip(' + jsq(track.id) + ')">Make a story clip</button>'
-    +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();startRadio(' + jsq(track.id) + ')">Start radio</button>'
+    +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();startRadio(' + jsq(track.id) + ')">Start radio</button>' + lyricsFileMenuItems(track)
     +               '<button role="menuitem" class="is-danger" onclick="event.stopPropagation();closeAllCardMenus();deleteTrack(' + jsq(track.id) + ')">Delete track</button>'
     +             '</div>'
     +           '</div>'
@@ -476,7 +476,7 @@ function buildTrackRow(track, index) {
                 ? '<button role="menuitem" class="is-shared" onclick="event.stopPropagation();closeAllCardMenus();unshareTrack(' + jsq(track.id) + ')">Revoke public link</button>'
                 : '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();shareTrack(' + jsq(track.id) + ')">Share&hellip;</button>')
     +         '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();openStoryClip(' + jsq(track.id) + ')">Make a story clip</button>'
-    +         '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();startRadio(' + jsq(track.id) + ')">Start radio</button>'
+    +         '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();startRadio(' + jsq(track.id) + ')">Start radio</button>' + lyricsFileMenuItems(track)
     +         '<button role="menuitem" class="is-danger" onclick="event.stopPropagation();closeAllCardMenus();deleteTrack(' + jsq(track.id) + ')">Delete track</button>'
     +       '</div>'
     +     '</div>'
