@@ -185,15 +185,15 @@ body.light .nav{background:linear-gradient(180deg, rgba(241,236,226,.88), rgba(2
 }
 .nav-left{display:flex;align-items:center;gap:1.4rem;min-width:0}
 .nav-brand-wrap{display:flex;align-items:center;gap:.9rem;min-width:0}
-/* The logo (#i-logo in index.html): a keyhole with a waveform inside it,
-   on an aurora tile that picks up the playing track's accent, like the
+/* The logo (#i-logo in index.html): a keyhole on a midnight tile, with a
+   waveform inside it that picks up the playing track's accent, like the
    background blooms do. */
 .brand-mark{
   flex:none;
   display:block;
   width:34px;
   height:34px;
-  filter:drop-shadow(0 8px 14px color-mix(in srgb, var(--accent-dynamic) 38%, transparent));
+  filter:drop-shadow(0 8px 16px rgba(0,0,0,.35));
 }
 .nav-brand{display:flex;flex-direction:column;gap:.12rem;min-width:0}
 .nav-brand-title{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-.01em;line-height:1}
