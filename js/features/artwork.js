@@ -221,7 +221,36 @@ function fillLyricsFromTag(track, bytes) {
     _lyricsFilledThisSweep = true;
     if (_currentTrack && _currentTrack.id === privateTrack.id) updateExpandedPlayer();
   }
+  if (!privateTrack) rememberFileLyrics(track.id, text);
   return true;
+}
+
+// The lyric sheets of shared tracks a visitor opens, read from the song
+// file, for share records whose stored excerpt lost its line breaks (made
+// before 2026-10-04). Kept on this device; a handful at most.
+var FILE_LYRICS_KEY = 'sv_file_lyrics';
+var FILE_LYRICS_LIMIT = 40;
+var _fileLyrics = null;
+
+function getFileLyricsMap() {
+  if (_fileLyrics) return _fileLyrics;
+  try { _fileLyrics = JSON.parse(localStorage.getItem(FILE_LYRICS_KEY) || '{}') || {}; } catch (e) { _fileLyrics = {}; }
+  return _fileLyrics;
+}
+
+function getFileLyrics(trackId) {
+  return getFileLyricsMap()[trackId] || '';
+}
+
+function rememberFileLyrics(trackId, text) {
+  var map = getFileLyricsMap();
+  if (map[trackId] === text) return;
+  delete map[trackId];
+  map[trackId] = text;
+  var ids = Object.keys(map);
+  while (ids.length > FILE_LYRICS_LIMIT) delete map[ids.shift()];
+  try { localStorage.setItem(FILE_LYRICS_KEY, JSON.stringify(map)); } catch (e) {}
+  if (typeof _routeState !== 'undefined' && _routeState.mode === 'track' && _routeState.id === trackId) renderRouteAwareView(true);
 }
 
 // Look one track up. A network failure records nothing, so the next sweep
@@ -280,7 +309,10 @@ async function sweepArtwork() {
   // those once too.
   var todo = getArtCandidates().filter(function(track) {
     var entry = index[track.id];
-    return !entry || entry.src !== track.audioURL || !('lyrics' in entry);
+    if (!entry || entry.src !== track.audioURL || !('lyrics' in entry)) return true;
+    // A shared track whose excerpt lost its line breaks, read before its
+    // sheet was kept: read it once more for the sheet.
+    return entry.lyrics && isFlattenedLyrics(track.lyricsExcerpt) && !getFileLyrics(track.id);
   });
   if (!todo.length) return;
   _artSweepRunning = true;

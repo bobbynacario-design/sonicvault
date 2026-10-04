@@ -13,6 +13,24 @@ function isLyricSectionHeader(line) {
   return /^\((?:intro|verse|pre-?chorus|chorus|post-?chorus|hook|refrain|bridge|break(?:down)?|interlude|instrumental|solo|drop|build(?:-?up)?|outro|end|fade(?: out)?)\b[^)]*\)$/i.test(t);
 }
 
+// Share links made before 2026-10-04 stored their lyrics excerpt with every
+// line break collapsed into a space: one long run with the [Verse] tags
+// inline. A sheet of any length comes in lines, so a long single line is
+// one of those.
+function isFlattenedLyrics(text) {
+  var t = String(text || '').trim();
+  return t.length > 120 && t.indexOf('\n') === -1;
+}
+
+// Gives a flattened excerpt its sections back: each [tag] on its own line
+// after a gap. The lines inside a section cannot be recovered from the
+// text alone (the song file has them -- see js/features/artwork.js).
+function unflattenLyrics(text) {
+  var t = String(text || '').trim();
+  if (!isFlattenedLyrics(t)) return t;
+  return t.replace(/\s*(\[[^\]\n]{1,40}\])\s*/g, '\n\n$1\n').trim();
+}
+
 // The sheet as rows the player renders: section labels, blank gaps, and the
 // sung lines, numbered in order. Timings belong to sung lines only.
 function parseLyricSheet(lyrics) {

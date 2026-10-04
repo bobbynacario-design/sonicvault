@@ -117,7 +117,7 @@ function openShareLinkModal(title, subtitle, url) {
 
 // What a shared page shows of a lyric sheet: the opening lines, cut at a line
 // break, with line breaks kept. (Shares published before this carry a
-// one-line excerpt; publicLyricsHTML still renders those as a paragraph.)
+// one-line excerpt; renderPublicTrackPage reads those from the song file.)
 function trimLyricsPreview(lyrics, max) {
   var text = String(lyrics || '').replace(/\r\n?/g, '\n').trim();
   var limit = max || 900;
@@ -176,6 +176,12 @@ function renderPublicTrackPage(track) {
   var summary = getTrackSummary(track);
   var tags = sanitizeMetadataArray(track.aiTags || getTrackAITags(track), 6);
   var lyrics = String(track.lyricsExcerpt || trimLyricsPreview(getTrackLyrics(track), 900) || '').trim();
+  // Records shared before 2026-10-04 kept their excerpt as one long line.
+  // The song file's own sheet, once read, gives the lines back; until then
+  // the sections at least.
+  if (isFlattenedLyrics(lyrics)) {
+    lyrics = getFileLyrics(track.id) ? trimLyricsPreview(getFileLyrics(track.id), 900) : unflattenLyrics(lyrics);
+  }
   var palette = getCoverPalette(track);
   var plays = Number(track.plays || 0);
   var facts = [track.genre || track.aiGenre || 'Other', track.mood || track.aiMood || 'Mood', fmtTime(track.duration || 0)];

@@ -183,3 +183,14 @@ test("resolved start times never run backwards, whatever the spans", () => {
     for (let i = 1; i < r.length; i++) assert.ok(r[i][0] >= r[i - 1][0] - 1e-9, "case " + k + ": " + JSON.stringify(spans));
   }
 });
+
+test("a share excerpt that lost its line breaks gets its sections back", () => {
+  const flat = "[Intro] (Soft, rhythmic acoustic guitar picking, very calm) Breathe in. Run the numbers. [Verse 1] Looking at the board, counting up the outs Clearing up the mind, silencing the doubts [Chorus] Positive EV is the only guide";
+  assert.equal(g.isFlattenedLyrics(flat), true);
+  assert.equal(g.unflattenLyrics(flat),
+    "[Intro]\n(Soft, rhythmic acoustic guitar picking, very calm) Breathe in. Run the numbers.\n\n[Verse 1]\nLooking at the board, counting up the outs Clearing up the mind, silencing the doubts\n\n[Chorus]\nPositive EV is the only guide");
+  // Real sheets come in lines, and short lines are just short.
+  assert.equal(g.isFlattenedLyrics("[Verse]\nOne line\nTwo line"), false);
+  assert.equal(g.isFlattenedLyrics("Breathe in."), false);
+  assert.equal(g.unflattenLyrics("[Verse]\nOne line"), "[Verse]\nOne line");
+});
