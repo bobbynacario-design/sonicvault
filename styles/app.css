@@ -3120,6 +3120,28 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .version-switch:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 @media (max-width:640px){.version-list{margin-left:0}}
 
+/* What was sung against what was written (js/features/lyric-sync.js). */
+.player-copy-head{display:flex;align-items:center;justify-content:space-between;gap:.8rem}
+.player-check-btn{padding:.3rem .8rem;border:none;border-radius:999px;background:var(--surface-hover);color:var(--muted);font-family:var(--sans);font-size:12.5px;font-weight:600;cursor:pointer;transition:background .16s ease,color .16s ease}
+.player-check-btn:hover,.player-check-btn[aria-pressed="true"]{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+.player-check-btn[hidden],.sung-check[hidden],.player-lyrics[hidden]{display:none}
+.sung-check{display:grid;gap:.7rem}
+.sung-summary{display:flex;align-items:center;gap:.55rem;font-size:14px;color:var(--muted)}
+.sung-summary strong{color:var(--text);font-weight:600}
+.sung-note{font-size:12.5px;line-height:1.5;color:var(--muted2)}
+.sung-lines{display:grid;gap:.15rem;max-height:420px;overflow:auto;padding-right:.3rem}
+.sung-line{display:flex;flex-direction:column;gap:.15rem;padding:.4rem .55rem;border-radius:10px;font-size:14.5px;line-height:1.5;color:var(--muted)}
+.sung-line[role="button"]{cursor:pointer}
+.sung-line[role="button"]:hover{background:var(--surface-hover)}
+.sung-line.is-diff{color:var(--text);background:rgba(255,124,116,.06)}
+.sung-line.is-unheard{flex-direction:row;align-items:baseline;gap:.5rem;opacity:.65}
+.sung-changed,.sung-missing,.sung-extra{padding:0 .15rem;border-radius:4px;background:none;color:inherit;text-decoration:underline wavy;text-decoration-color:var(--danger);text-underline-offset:4px}
+.sung-missing{text-decoration-style:dotted}
+.sung-extra{text-decoration-color:var(--amber)}
+.sung-heard{font-size:13px;color:var(--muted)}
+.sung-heard-label{margin-right:.2rem;font-size:11.5px;font-weight:600;color:var(--muted2)}
+.sung-tag{font-size:11.5px;font-weight:600;color:var(--muted2)}
+
 /* ── Playlists ──────────────────────────────────────────────────────────
    Cards as album sleeves: the cover (four tracks' covers, or the first
    one's), the name and a line of facts, the play button rising over the

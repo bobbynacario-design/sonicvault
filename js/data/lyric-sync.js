@@ -110,7 +110,7 @@ function alignLyricsToWords(lyrics, heard) {
   });
   var n = sheet.length;
   var m = audio.length;
-  var result = { lines:lines.map(function() { return null; }), matched:0 };
+  var result = { lines:lines.map(function() { return null; }), matched:0, heard:lines.map(function() { return ''; }) };
   if (!n || !m) return result;
 
   var SKIP = -.6;
@@ -133,11 +133,13 @@ function alignLyricsToWords(lyrics, heard) {
   }
 
   var times = new Array(n);
+  var paired = new Array(n);   // the heard word each sheet word lined up with, matching or not
   i = n; j = m;
   while (i > 0 || j > 0) {
     var step = move[i * width + j];
     if (step === 1) {
       if (wordMatchScore(sheet[i - 1].w, audio[j - 1].w) > 0) times[i - 1] = audio[j - 1];
+      paired[i - 1] = j - 1;
       i--; j--;
     } else if (step === 2) {
       i--;
@@ -175,7 +177,129 @@ function alignLyricsToWords(lyrics, heard) {
     previousEnd = span[1];
   });
   result.matched = matched / n;
+  // What was heard on each line: every heard word from the first to the last
+  // one lined up with the line's words, so a sung substitution or an extra
+  // word inside the line is kept. '' for a line nothing lined up with.
+  var first = [];
+  var last = [];
+  sheet.forEach(function(entry, k) {
+    var at = paired[k];
+    if (at === undefined) return;
+    if (first[entry.line] === undefined || at < first[entry.line]) first[entry.line] = at;
+    if (last[entry.line] === undefined || at > last[entry.line]) last[entry.line] = at;
+  });
+  result.heard = lines.map(function(line, li) {
+    if (first[li] === undefined) return '';
+    return audio.slice(first[li], last[li] + 1).map(function(word) { return word.w; }).join(' ');
+  });
   return result;
+}
+
+// ── What was sung against what was written ──────────────────────────────────
+
+// Words that sound alike when sung, so neither counts as a change.
+var SUNG_ALIKE = [
+  ['to', 'too', 'two'], ['you', 'ya', 'yah'], ['gonna', 'going'], ['wanna', 'want'], ['gotta', 'got'],
+  ['cause', 'because', 'cuz', 'coz'], ['til', 'till', 'until'], ['oh', 'ooh', 'o'], ['yeah', 'yea'],
+  ['okay', 'ok'], ['alright', 'allright'], ['tonight', 'tonite'], ['thru', 'through'], ['nothin', 'nothing']
+];
+var SUNG_ALIKE_GROUP = (function() {
+  var map = {};
+  SUNG_ALIKE.forEach(function(group, gi) { group.forEach(function(word) { map[word] = gi; }); });
+  return map;
+})();
+
+// Stricter than wordMatchScore, which lets timing ride over bent words:
+// here "chips" and "ships" are different words. The same word, its plural,
+// a dropped g ("holdin"), a one-letter slip in a long word, or a sung-alike
+// pair count as sung as written.
+function sungWordMatch(a, b) {
+  if (a === b) return 2;
+  if (SUNG_ALIKE_GROUP[a] !== undefined && SUNG_ALIKE_GROUP[a] === SUNG_ALIKE_GROUP[b]) return 2;
+  if (a.replace(/s$/, '') === b.replace(/s$/, '')) return 1;
+  if (a.replace(/g$/, '') === b.replace(/g$/, '') && Math.min(a.length, b.length) >= 4) return 1;
+  if (Math.max(a.length, b.length) >= 7 && editDistance(a, b) <= 1) return 1;
+  return -1;
+}
+
+// One written line against what was heard on it, word by word: each written
+// word 'ok', 'changed' (another word was sung in its place) or 'missing';
+// each heard word 'ok', 'changed' or 'extra'. Written words keep their
+// punctuation for display. A line `differs` when a word of three letters or
+// more was changed or missing: the recogniser drops "a" and "I" under a mix
+// often enough that counting them would flag every line.
+function compareSungLine(written, heard) {
+  var tokens = String(written || '').split(/\s+/).filter(Boolean).map(function(text) {
+    return { text:text, words:lyricWordsOf(text), status:'ok', heard:[] };
+  });
+  var sheet = [];
+  tokens.forEach(function(token, ti) { token.words.forEach(function(w) { sheet.push({ w:w, token:ti, status:'ok' }); }); });
+  var audio = lyricWordsOf(heard).map(function(w) { return { w:w, status:'ok' }; });
+  if (!audio.length) {
+    return { tokens:tokens.map(function(t) { return { text:t.text, status:'unheard' }; }), heard:[], differs:false, unheard:true };
+  }
+  var n = sheet.length;
+  var m = audio.length;
+  var SKIP = -.6;
+  var score = [];
+  var move = [];
+  for (var i = 0; i <= n; i++) { score[i] = []; move[i] = []; }
+  for (i = 0; i <= n; i++) { score[i][0] = i * SKIP; move[i][0] = 2; }
+  for (var j = 0; j <= m; j++) { score[0][j] = j * SKIP; move[0][j] = 3; }
+  for (i = 1; i <= n; i++) {
+    for (j = 1; j <= m; j++) {
+      var diag = score[i - 1][j - 1] + sungWordMatch(sheet[i - 1].w, audio[j - 1].w);
+      var up = score[i - 1][j] + SKIP;
+      var left = score[i][j - 1] + SKIP;
+      if (diag >= up && diag >= left) { score[i][j] = diag; move[i][j] = 1; }
+      else if (up >= left) { score[i][j] = up; move[i][j] = 2; }
+      else { score[i][j] = left; move[i][j] = 3; }
+    }
+  }
+  i = n; j = m;
+  while (i > 0 || j > 0) {
+    var step = i > 0 && j > 0 ? move[i][j] : (i > 0 ? 2 : 3);
+    if (step === 1) {
+      if (sungWordMatch(sheet[i - 1].w, audio[j - 1].w) <= 0) {
+        sheet[i - 1].status = 'changed';
+        audio[j - 1].status = 'changed';
+        tokens[sheet[i - 1].token].heard.unshift(audio[j - 1].w);
+      }
+      i--; j--;
+    } else if (step === 2) {
+      sheet[i - 1].status = 'missing';
+      i--;
+    } else {
+      audio[j - 1].status = 'extra';
+      j--;
+    }
+  }
+  var differs = false;
+  sheet.forEach(function(entry) {
+    if (entry.status === 'ok') return;
+    var token = tokens[entry.token];
+    if (token.status !== 'changed') token.status = entry.status;
+    if (entry.w.length >= 3) differs = true;
+  });
+  return {
+    tokens:tokens.map(function(t) { return { text:t.text, status:t.status, heard:t.heard.join(' ') }; }),
+    heard:audio.map(function(a) { return { text:a.w, status:a.status }; }),
+    differs:differs,
+    unheard:false
+  };
+}
+
+// Every sung line of a sheet against the heard text stored with its timing:
+// how many were sung as written, how many differ, how many weren't heard.
+function checkSungLyrics(lyrics, heardLines) {
+  var lines = sungLyricLines(lyrics).map(function(line, i) {
+    var result = compareSungLine(line, heardLines ? heardLines[i] : '');
+    result.text = line;
+    return result;
+  });
+  var differ = lines.filter(function(line) { return line.differs; }).length;
+  var unheard = lines.filter(function(line) { return line.unheard; }).length;
+  return { lines:lines, total:lines.length, differ:differ, unheard:unheard, asWritten:lines.length - differ - unheard };
 }
 
 // Every sung line's [start, end], with starts that never run backwards.
@@ -267,7 +391,10 @@ function currentLyricIndex(times, t, lead) {
 //   { key, starts:[s|null...], ends:[e|null...], source, at }
 // (The first build stored lines:[[start, end]...]; every save of a timed
 // track failed. cloudSafeLyricSync converts those.)
-function packLyricSync(lyrics, lines, source, at) {
+// heard (optional): the text heard on each sung line, for checking what was
+// sung against what was written. A flat array of strings, which Firestore
+// accepts.
+function packLyricSync(lyrics, lines, source, at, heard) {
   var starts = [];
   var ends = [];
   (lines || []).forEach(function(span) {
@@ -275,7 +402,9 @@ function packLyricSync(lyrics, lines, source, at) {
     starts.push(ok ? Number(span[0]) : null);
     ends.push(ok ? Number(isFinite(span[1]) ? span[1] : span[0]) : null);
   });
-  return { key:lyricSyncKey(lyrics), starts:starts, ends:ends, source:source, at:at };
+  var packed = { key:lyricSyncKey(lyrics), starts:starts, ends:ends, source:source, at:at };
+  if (Array.isArray(heard)) packed.heard = heard.map(function(text) { return String(text || ''); });
+  return packed;
 }
 
 // The [start, end] | null per line a stored sync describes, from either shape.
@@ -302,13 +431,15 @@ function unpackLyricLines(sync) {
 function cloudSafeLyricSync(sync) {
   if (!sync || typeof sync !== 'object' || !Array.isArray(sync.lines)) return sync;
   var lines = unpackLyricLines(sync);
-  return {
+  var safe = {
     key:sync.key,
     starts:lines.map(function(span) { return span ? span[0] : null; }),
     ends:lines.map(function(span) { return span ? span[1] : null; }),
     source:sync.source,
     at:sync.at
   };
+  if (Array.isArray(sync.heard)) safe.heard = sync.heard.slice();
+  return safe;
 }
 
 // A hand correction: line index starts at t. Neighbours that would now be

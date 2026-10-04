@@ -194,3 +194,50 @@ test("a share excerpt that lost its line breaks gets its sections back", () => {
   assert.equal(g.isFlattenedLyrics("Breathe in."), false);
   assert.equal(g.unflattenLyrics("[Verse]\nOne line"), "[Verse]\nOne line");
 });
+
+test("what was heard on each line comes back with the timings", () => {
+  const sheet = "[Verse]\nCounted out the quiet years like chips across the felt\nSome I played too careful";
+  const heard = [
+    ["counted", 1, 1.4], ["out", 1.4, 1.6], ["the", 1.6, 1.7], ["quiet", 1.7, 2], ["years", 2, 2.3],
+    ["like", 2.3, 2.5], ["ships", 2.5, 2.8], ["across", 2.8, 3.1], ["the", 3.1, 3.2], ["felt", 3.2, 3.6],
+    ["la", 4, 4.2], ["la", 4.2, 4.4],
+    ["some", 5, 5.2], ["i", 5.2, 5.3], ["played", 5.3, 5.6], ["to", 5.6, 5.7], ["careful", 5.7, 6.2]
+  ];
+  const aligned = g.alignLyricsToWords(sheet, heard);
+  assert.deepEqual(aligned.heard, ["counted out the quiet years like ships across the felt", "some i played to careful"]);
+  // The "la la" between the lines belongs to neither.
+  const packed = g.packLyricSync(sheet, aligned.lines, "audio", "t", aligned.heard);
+  assert.deepEqual(packed.heard, aligned.heard);
+  assert.deepEqual(g.cloudSafeLyricSync(packed), packed);
+});
+
+test("a line sung differently is flagged word by word; small words and unheard lines are not", () => {
+  const changed = g.compareSungLine("Counted out the quiet years like chips across the felt", "counted out the quiet years like ships across the felt");
+  assert.equal(changed.differs, true);
+  const chips = changed.tokens.find((t) => t.text === "chips");
+  assert.deepEqual(chips, { text: "chips", status: "changed", heard: "ships" });
+  assert.ok(changed.tokens.filter((t) => t.status !== "ok").length === 1);
+
+  // "too" sung as "to" is close enough; a dropped "I" is too small to count.
+  const fine = g.compareSungLine("Some I played too careful", "some played to careful");
+  assert.equal(fine.differs, false);
+
+  const missing = g.compareSungLine("Forty-seven candles and I'm not done", "forty seven and i m not done");
+  assert.equal(missing.differs, true);
+  assert.equal(missing.tokens.find((t) => t.text === "candles").status, "missing");
+
+  const extra = g.compareSungLine("Deal me one more night", "deal me one more lonely night");
+  assert.equal(extra.differs, false, "an added word is shown, not counted against the sheet");
+  assert.equal(extra.heard.find((h) => h.text === "lonely").status, "extra");
+
+  const unheard = g.compareSungLine("Still in, still holding", "");
+  assert.equal(unheard.unheard, true);
+  assert.equal(unheard.differs, false);
+});
+
+test("a sheet's check counts lines sung as written, sung differently, and not heard", () => {
+  const sheet = "[Verse]\nCounted out the quiet years like chips across the felt\nSome I played too careful\n[Chorus]\nStill in, still holding";
+  const check = g.checkSungLyrics(sheet, ["counted out the quiet years like ships across the felt", "some i played to careful", ""]);
+  assert.deepEqual([check.total, check.asWritten, check.differ, check.unheard], [3, 1, 1, 1]);
+  assert.equal(check.lines[0].text, "Counted out the quiet years like chips across the felt");
+});

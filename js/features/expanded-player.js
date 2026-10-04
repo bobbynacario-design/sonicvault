@@ -232,6 +232,7 @@ function updateExpandedPlayer() {
     _lyricTimesCache = null;
   }
   renderLyricStatus();
+  renderSungCheck();
   renderAboutSong(getVaultTrack(_currentTrack.id) || _currentTrack);
   document.getElementById('xp-current').textContent = fmtTime(_audio.currentTime || 0);
   document.getElementById('xp-total').textContent = fmtTime(_audio.duration || _currentTrack.duration || 0);

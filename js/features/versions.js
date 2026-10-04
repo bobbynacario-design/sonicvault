@@ -110,7 +110,9 @@ function versionListHTML(track) {
       var name = versionLabel(take, group) + (take.title !== track.title ? ' · ' + take.title : '');
       return '<div class="version-row' + (isCurrent ? ' current' : '') + '" role="listitem">'
         + '<span class="version-name">' + (isCurrent ? eqBars() : '') + esc(name) + '</span>'
-        + '<span class="version-facts">' + fmtTime(take.duration || 0) + ' · ' + fmtCompactNumber(take.plays || 0) + (Number(take.plays) === 1 ? ' play' : ' plays') + '</span>'
+        + '<span class="version-facts">' + fmtTime(take.duration || 0) + ' · ' + fmtCompactNumber(take.plays || 0) + (Number(take.plays) === 1 ? ' play' : ' plays')
+        // Which take sang the sheet best, once they have been checked.
+        + (sungCheckSummary(take) ? ' · ' + sungCheckSummary(take) : '') + '</span>'
         + (isMain ? '<span class="version-main">Main</span>' : '<button type="button" class="sec-action" onclick="event.stopPropagation();setMainVersion(' + jsq(take.id) + ')">Make main</button>')
         + '<button type="button" class="sec-action" onclick="event.stopPropagation();playVersion(' + jsq(take.id) + ', ' + jsq(track.id) + ')">' + (isCurrent && _isPlaying ? 'Pause' : 'Play') + '</button>'
         + '</div>';
