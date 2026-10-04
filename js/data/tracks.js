@@ -49,3 +49,27 @@ function playlistTimestamp(pl) {
 function getCollectionDuration(list) {
   return list.reduce(function(sum, track) { return sum + Number(track.duration || 0); }, 0);
 }
+
+// ── Days played ─────────────────────────────────────────────────────────────
+// Each play is counted against the day it happened (track.playDays,
+// 'YYYY-MM-DD' -> plays, in the listener's own time zone), for a look back
+// at a year in songs. A map grows by one entry a day a song is played, so a
+// year of daily listening is a few KB on the track.
+
+function localDayKey(date) {
+  var d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return '';
+  var m = d.getMonth() + 1;
+  var day = d.getDate();
+  return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+}
+
+// A copy of the map with one more play on the day.
+function addPlayDay(playDays, date) {
+  var out = {};
+  var map = playDays && typeof playDays === 'object' && !Array.isArray(playDays) ? playDays : {};
+  Object.keys(map).forEach(function(key) { out[key] = Number(map[key]) || 0; });
+  var key = localDayKey(date);
+  if (key) out[key] = (out[key] || 0) + 1;
+  return out;
+}

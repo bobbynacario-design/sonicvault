@@ -391,6 +391,7 @@ function startPlayback(id, queueIds, queueLabel) {
   _isPlaying = true;
   if (privateTrack) {
     privateTrack.plays = Number(privateTrack.plays || 0) + 1;
+    privateTrack.playDays = addPlayDay(privateTrack.playDays, new Date());
     if (track !== privateTrack) track.plays = Number(track.plays || 0) + 1;
     persistTracks();
     rememberPlayback(privateTrack);
