@@ -70,10 +70,18 @@ function getVisualWaveform(track, count) {
   return bars;
 }
 
+// Also measures the song's loudness for Even volume (measureLoudness in
+// js/data/waveform.js) the first time, stamped on the track as lufs: the
+// same decode serves both.
 async function ensureWaveformForTrack(track, opts) {
   var src = track && (track.audioURL || track.audioData);
   if (!track || !src || _waveformExtractionJobs[track.id]) return false;
-  if (Array.isArray(getWaveformCache()[track.id]) && getWaveformCache()[track.id].length) return false;
+  var privateTrack = tracks.find(function(item) { return item.id === track.id; });
+  var hasLevels = function(list) { return Array.isArray(list) && list.length > 0; };
+  // Levels another device measured arrive on the track; no need to redo them.
+  var wantLevels = !hasLevels(getWaveformCache()[track.id]) && !hasLevels(track.loudness) && !(privateTrack && hasLevels(privateTrack.loudness));
+  var wantLoudness = !!privateTrack && !isMeasuredLoudness(privateTrack.lufs) && (wantLevels || shouldMeasureLoudness());
+  if (!wantLevels && !wantLoudness) return false;
   if (!(window.AudioContext || window.webkitAudioContext)) return false;
   var skipSave = !!(opts && opts.skipSave);
   // The sweep tags its downloads so sw.js serves a cached copy if it has one
@@ -91,20 +99,29 @@ async function ensureWaveformForTrack(track, opts) {
     var bufferData = await response.arrayBuffer();
     if (!_audioContext) _audioContext = new (window.AudioContext || window.webkitAudioContext)();
     var decoded = await _audioContext.decodeAudioData(bufferData.slice(0));
-    var levels = extractWaveformLevels(decoded, 72);
-    getWaveformCache()[track.id] = levels;
-    invalidateVisualWaveform(track.id);
-    // Stamp the levels onto the private track too, so other devices and share
-    // payloads carry them, and drop the superseded peaks.
-    var privateTrack = tracks.find(function(item) { return item.id === track.id; });
-    if (privateTrack) {
-      privateTrack.loudness = levels.slice();
-      delete privateTrack.peaks;
+    if (wantLevels) {
+      var levels = extractWaveformLevels(decoded, 72);
+      getWaveformCache()[track.id] = levels;
+      invalidateVisualWaveform(track.id);
+      // Stamp the levels onto the private track too, so other devices and share
+      // payloads carry them, and drop the superseded peaks.
+      if (privateTrack) {
+        privateTrack.loudness = levels.slice();
+        delete privateTrack.peaks;
+      }
+      saveWaveformCache();
     }
-    saveWaveformCache();
+    if (wantLoudness) {
+      // Silence can't be measured; -70 keeps it from being tried again.
+      var lufs = measureLoudness(decoded);
+      privateTrack.lufs = lufs === null ? -70 : lufs;
+      onTrackLoudnessMeasured(track.id);
+    }
     if (!skipSave && privateTrack) persistTracks();
-    renderTracks();
-    updateExpandedPlayer();
+    if (wantLevels) {
+      renderTracks();
+      updateExpandedPlayer();
+    }
     extracted = true;
   } catch (e) {
     console.warn('Waveform extraction skipped for', track.id, e);
@@ -129,9 +146,9 @@ async function sweepWaveformBackfill() {
   }
   var cache = getWaveformCache();
   var missing = tracks.filter(function(t) {
-    return (t.audioURL || t.audioData)
-      && !(Array.isArray(cache[t.id]) && cache[t.id].length)
-      && !(Array.isArray(t.loudness) && t.loudness.length);
+    if (!(t.audioURL || t.audioData)) return false;
+    var hasLevels = (Array.isArray(cache[t.id]) && cache[t.id].length) || (Array.isArray(t.loudness) && t.loudness.length);
+    return !hasLevels || (!isMeasuredLoudness(t.lufs) && shouldMeasureLoudness());
   });
   var unsaved = 0;
   for (var i = 0; i < missing.length; i++) {
@@ -144,6 +161,15 @@ async function sweepWaveformBackfill() {
     await new Promise(function(resolve) { setTimeout(resolve, 600); });
   }
   if (unsaved) persistTracks();
+}
+
+// Measuring loudness alone means downloading the whole song again: worth it
+// where Even volume works (not iPhone, which can't set volume), and not over
+// mobile data. A song decoded for its waveform anyway is always measured,
+// and the result syncs to every device.
+function shouldMeasureLoudness() {
+  var connection = navigator.connection;
+  return volumeControllable() && !(connection && (connection.saveData || connection.type === 'cellular'));
 }
 
 function updateWaveformProgress(trackId, pct) {

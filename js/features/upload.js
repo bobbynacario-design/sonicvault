@@ -152,6 +152,7 @@ async function decodeUploadPeaks(draft) {
     if (!_audioContext) _audioContext = new (window.AudioContext || window.webkitAudioContext)();
     var decoded = await _audioContext.decodeAudioData(bufferData);
     draft.loudness = extractWaveformLevels(decoded, 72);
+    draft.lufs = measureLoudness(decoded);
   } catch (e) {
     console.warn('Upload waveform decode skipped for', draft && draft.id, e);
   }
@@ -422,6 +423,7 @@ function trackFromUploadDraft(item, audioURL, offset) {
     duration: item.duration || 0,
     waveform: [],
     loudness: Array.isArray(item.loudness) && item.loudness.length ? item.loudness.slice() : [],
+    lufs: isMeasuredLoudness(item.lufs) ? item.lufs : null,
     created: new Date().toISOString().split('T')[0],
     plays: 0,
     shared: false,

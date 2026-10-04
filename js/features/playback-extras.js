@@ -1,10 +1,12 @@
-// A sleep timer and smooth transitions between songs, both in the expanded
-// player's sound row.
+// A sleep timer, smooth transitions between songs, and even volume, all in
+// the expanded player's sound row.
 //
-// Volume moves in ramps (rampVolume) and comes back to the listener's own
-// level (_userVolume in player.js) afterwards, so a fade never changes the
-// saved volume. iOS ignores a page setting audio volume, so on iPhone the
-// timer pauses without a fade and transitions only preload the next song.
+// Volume moves in ramps (rampVolume) and comes back to the song's level
+// (playbackVolume: the listener's own _userVolume from player.js, lowered
+// for a loud song when Even volume is on) afterwards, so a fade never
+// changes the saved volume. iOS ignores a page setting audio volume, so on
+// iPhone the timer pauses without a fade, transitions only preload the next
+// song, and Even volume is hidden.
 
 var SLEEP_STEPS = ['off', 15, 30, 45, 60, 'track'];
 var SLEEP_FADE_MS = 8000;
@@ -48,13 +50,91 @@ function rampVolume(to, ms, purpose, done) {
 _audio.addEventListener('playing', function() {
   if (_rampPurpose === 'sleep') return;
   _tailFading = false;
-  if (_audio.volume < _userVolume - 0.01) rampVolume(_userVolume, TRANSITION_FADE_IN_MS, 'in');
+  var level = playbackVolume();
+  if (_audio.volume < level - 0.01) rampVolume(level, TRANSITION_FADE_IN_MS, 'in');
+  else if (!_rampTimer && _audio.volume > level + 0.01) setElementVolume(level);
 });
 
-// A fade on the old song must not carry on into the next one.
+// A fade on the old song must not carry on into the next one, and each song
+// starts at its own level -- unless it is fading in after the last one
+// faded out, which 'playing' above takes care of.
 _audio.addEventListener('loadstart', function() {
+  var tail = _rampPurpose === 'tail' || _tailFading;
   if (_rampPurpose === 'tail') cancelVolumeRamp();
+  if (!tail && _rampPurpose !== 'sleep') setElementVolume(playbackVolume());
 });
+
+function setElementVolume(value) {
+  try { _audio.volume = Math.max(0, Math.min(1, value)); } catch (e) {}
+}
+
+// ─── Even volume ─────────────────────────────────────────────────────────────
+
+function evenVolumeOn() {
+  return _playerPrefs.level !== false && volumeControllable();
+}
+
+// iOS keeps an audio element at full volume whatever a page sets.
+var _volumeControllable = null;
+function volumeControllable() {
+  if (_volumeControllable === null) {
+    try {
+      var probe = new Audio();
+      probe.volume = .5;
+      _volumeControllable = Math.abs(probe.volume - .5) < .01;
+    } catch (e) {
+      _volumeControllable = false;
+    }
+  }
+  return _volumeControllable;
+}
+
+// How far the current song is turned down: its measured loudness against
+// the library's (levelTarget in js/data/waveform.js). A song not measured
+// yet is taken to be as loud as the library's typical song.
+function trackLevelGain(track) {
+  if (!track || !evenVolumeOn()) return 1;
+  var values = tracks.map(function(item) { return item.lufs; });
+  var target = levelTarget(values);
+  if (target === null) return 1;
+  var own = getVaultTrack(track.id) || track;
+  return levelGain(isMeasuredLoudness(own.lufs) && own.lufs > -60 ? own.lufs : typicalLoudness(values), target);
+}
+
+function playbackVolume() {
+  return _userVolume * trackLevelGain(_currentTrack);
+}
+
+function toggleEvenVolume() {
+  _playerPrefs.level = !(_playerPrefs.level !== false);
+  savePlayerPrefs();
+  updateLevelButton();
+  applyPlaybackLevel();
+  showToast(evenVolumeOn() ? 'Even volume on: loud songs play quieter to match the rest' : 'Even volume off');
+}
+
+// Brings a playing song to its level now, gently: after the switch, or
+// when its loudness has just been measured.
+function applyPlaybackLevel() {
+  if (_rampPurpose === 'sleep' || _rampPurpose === 'tail') return;
+  if (_isPlaying) rampVolume(playbackVolume(), 600, 'level');
+  else setElementVolume(playbackVolume());
+}
+
+// From ensureWaveformForTrack (js/features/waveform.js).
+function onTrackLoudnessMeasured(trackId) {
+  if (_currentTrack && _currentTrack.id === trackId) applyPlaybackLevel();
+}
+
+function updateLevelButton() {
+  var btn = document.getElementById('xp-level-btn');
+  if (!btn) return;
+  btn.hidden = !volumeControllable();
+  var on = evenVolumeOn();
+  btn.classList.toggle('mode-on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.title = on ? 'Even volume: on. Loud songs play quieter to match the rest.' : 'Even volume: off';
+}
 
 // ─── Sleep timer ─────────────────────────────────────────────────────────────
 
@@ -100,7 +180,7 @@ function fadeOutAndPause() {
   if (!_isPlaying) { updateSleepButton(); return; }
   rampVolume(0, SLEEP_FADE_MS, 'sleep', function() {
     if (_isPlaying) togglePlayback();
-    try { _audio.volume = _userVolume; } catch (e) {}
+    setElementVolume(playbackVolume());
     showToast('Sleep timer: paused');
   });
 }
@@ -182,4 +262,5 @@ function smoothTransitionTick() {
 function renderPlaybackExtras() {
   updateSleepButton();
   updateSmoothButton();
+  updateLevelButton();
 }

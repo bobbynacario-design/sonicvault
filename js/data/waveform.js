@@ -60,3 +60,107 @@ function extractWaveformLevels(buffer, count) {
     return Math.round(Math.max(.08, Math.min(.98, .1 + .88 * shaped)) * 1000) / 1000;
   });
 }
+
+// ── Even volume ─────────────────────────────────────────────────────────
+// Suno songs come out at different loudness. The player evens them out the
+// way streaming services do: each song's integrated loudness (LUFS, ITU-R
+// BS.1770-4) is measured once, and louder songs play turned down to match.
+
+// The K-weighting filter (a high shelf for how the ear hears treble, then a
+// high-pass below 38 Hz) for a sample rate, as the two biquads libebur128
+// uses.
+function kWeightingFilter(rate) {
+  var K = Math.tan(Math.PI * 1681.974450955533 / rate);
+  var Q = .7071752369554196;
+  var Vh = Math.pow(10, 3.999843853973347 / 20);
+  var Vb = Math.pow(Vh, .4996667741545416);
+  var a0 = 1 + K / Q + K * K;
+  var K2 = Math.tan(Math.PI * 38.13547087602444 / rate);
+  var Q2 = .5003270373238773;
+  var d0 = 1 + K2 / Q2 + K2 * K2;
+  return {
+    b0:(Vh + Vb * K / Q + K * K) / a0,
+    b1:2 * (K * K - Vh) / a0,
+    b2:(Vh - Vb * K / Q + K * K) / a0,
+    a1:2 * (K * K - 1) / a0,
+    a2:(1 - K / Q + K * K) / a0,
+    c1:2 * (K2 * K2 - 1) / d0,
+    c2:(1 - K2 / Q2 + K2 * K2) / d0
+  };
+}
+
+// Integrated loudness of an AudioBuffer (or anything with sampleRate,
+// length, numberOfChannels and getChannelData) in LUFS, to 0.1: K-weighted
+// power in 400ms blocks every 100ms, gated at -70 LUFS and then at 10 LU
+// below the loudness of what passed. null for silence, or under 0.4s.
+function measureLoudness(buffer) {
+  var rate = buffer && buffer.sampleRate;
+  var length = buffer ? buffer.length : 0;
+  if (!rate || length < rate * .4) return null;
+  var step = Math.round(rate * .1);
+  var segments = Math.floor(length / step);
+  var power = new Float64Array(segments);
+  var f = kWeightingFilter(rate);
+  for (var c = 0; c < buffer.numberOfChannels; c++) {
+    var x = buffer.getChannelData(c);
+    var s1 = 0, s2 = 0, t1 = 0, t2 = 0;
+    for (var seg = 0; seg < segments; seg++) {
+      var sum = 0;
+      var end = (seg + 1) * step;
+      for (var i = seg * step; i < end; i++) {
+        var v = x[i];
+        var y = f.b0 * v + s1;
+        s1 = f.b1 * v - f.a1 * y + s2;
+        s2 = f.b2 * v - f.a2 * y;
+        var w = y + t1;
+        t1 = -2 * y - f.c1 * w + t2;
+        t2 = y - f.c2 * w;
+        sum += w * w;
+      }
+      power[seg] += sum;
+    }
+  }
+  function lufs(z) { return -.691 + 10 * Math.log10(z); }
+  function mean(list) { return list.reduce(function(a, b) { return a + b; }, 0) / list.length; }
+  var blocks = [];
+  for (var b = 0; b + 4 <= segments; b++) blocks.push((power[b] + power[b + 1] + power[b + 2] + power[b + 3]) / (4 * step));
+  var heard = blocks.filter(function(z) { return z > 0 && lufs(z) > -70; });
+  if (!heard.length) return null;
+  var gate = lufs(mean(heard)) - 10;
+  var kept = heard.filter(function(z) { return lufs(z) > gate; });
+  return Math.round(lufs(mean(kept)) * 10) / 10;
+}
+
+function isMeasuredLoudness(value) {
+  return typeof value === 'number' && isFinite(value);
+}
+
+// The measured songs worth evening against: silence (stored as -70) aside.
+function audibleLoudness(values) {
+  return (values || []).filter(function(v) { return isMeasuredLoudness(v) && v > -60; }).sort(function(a, b) { return a - b; });
+}
+
+// The level songs are brought down to: the quieter end of the library (its
+// 10th percentile), so the loud ones meet the quiet ones -- but never under
+// -14 LUFS, the level Spotify and YouTube play at, so one very quiet song
+// can't hush the rest. null with nothing measured.
+function levelTarget(values) {
+  var list = audibleLoudness(values);
+  if (!list.length) return null;
+  return Math.max(-14, list[Math.floor((list.length - 1) * .1)]);
+}
+
+// The library's middle loudness: the stand-in for a song not measured yet,
+// so it doesn't play louder than everything around it.
+function typicalLoudness(values) {
+  var list = audibleLoudness(values);
+  return list.length ? list[Math.floor(list.length / 2)] : null;
+}
+
+// A volume factor from 0 to 1 that brings a song at `lufs` down to `target`.
+// A page can lower a song's volume but never raise it, so songs quieter
+// than the target play as they are.
+function levelGain(lufs, target) {
+  if (!isMeasuredLoudness(lufs) || !isMeasuredLoudness(target)) return 1;
+  return Math.min(1, Math.pow(10, (target - lufs) / 20));
+}

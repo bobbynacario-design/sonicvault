@@ -102,7 +102,8 @@ function savePlayerPrefs() {
     repeat: _repeatMode,
     volume: _userVolume,
     rate: _playbackRate,
-    smooth: _playerPrefs.smooth === true
+    smooth: _playerPrefs.smooth === true,
+    level: _playerPrefs.level !== false
   }));
 }
 
@@ -127,7 +128,7 @@ function setPlayerVolume(value) {
   var vol = Math.max(0, Math.min(1, Number(value) || 0));
   if (typeof cancelVolumeRamp === 'function') cancelVolumeRamp();
   _userVolume = vol;
-  _audio.volume = vol;
+  _audio.volume = typeof playbackVolume === 'function' ? playbackVolume() : vol;
   savePlayerPrefs();
   updatePlayerModeUI();
 }

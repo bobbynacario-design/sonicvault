@@ -3169,6 +3169,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .story-note.is-error{color:var(--danger)}
 #story-actions .sec-action{white-space:nowrap}
 .story-kept{display:flex;flex-direction:column;gap:.6rem}
+.player-pill[hidden]{display:none}
 .story-kept[hidden]{display:none}
 .story-kept-list{display:flex;flex-direction:column;gap:.15rem}
 .story-kept-row{display:flex;align-items:center;gap:.25rem;border-radius:14px;transition:background .16s ease}
