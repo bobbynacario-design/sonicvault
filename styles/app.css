@@ -3120,6 +3120,28 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .version-switch:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 @media (max-width:640px){.version-list{margin-left:0}}
 
+/* Search by meaning (js/features/meaning.js): a toggle inside the search
+   box, and a status line under it. */
+.search-mode{
+  flex:none;
+  margin-right:.35rem;
+  padding:.38rem .8rem;
+  border:none;
+  border-radius:999px;
+  background:var(--surface-hover);
+  color:var(--muted);
+  font-family:var(--sans);
+  font-size:12.5px;
+  font-weight:600;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:background .16s ease,color .16s ease;
+}
+.search-mode:hover{color:var(--text)}
+.search-mode.active{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+.search-mode[hidden],.meaning-status[hidden]{display:none}
+.meaning-status{margin:.6rem .2rem 0;font-size:13px;line-height:1.5;color:var(--muted)}
+
 /* What was sung against what was written (js/features/lyric-sync.js). */
 .player-copy-head{display:flex;align-items:center;justify-content:space-between;gap:.8rem}
 .player-check-btn{padding:.3rem .8rem;border:none;border-radius:999px;background:var(--surface-hover);color:var(--muted);font-family:var(--sans);font-size:12.5px;font-weight:600;cursor:pointer;transition:background .16s ease,color .16s ease}

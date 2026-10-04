@@ -103,6 +103,7 @@ export default {
     if (route === "/generate") return handleGenerate(request, env);
     if (route === "/lyrics") return handleLyrics(request, env);
     if (route === "/cover") return handleCover(request, env);
+    if (route === "/embed") return handleEmbed(request, env);
 
     let payload;
     try {
@@ -579,6 +580,44 @@ async function handleCover(request, env) {
     return jsonResponse({ error: "Cover generation returned no image." }, 502, request, env);
   }
   return jsonResponse({ model: IMAGE_MODEL, mime: "image/jpeg", image: image }, 200, request, env);
+}
+
+// ─── Search by meaning ───────────────────────────────────────────────────────
+
+// POST /embed { texts: [...] } -> { model, vectors: [[...1024 numbers], ...] }
+// BGE-M3 on Workers AI: multilingual (the vault holds Bikol and Tagalog
+// songs as well as English), one vector per text. The app sends a song's
+// words a few at a time, and a search query on its own; batches stay small
+// so turning the answer into JSON never costs the worker much CPU.
+const EMBED_MODEL = "@cf/baai/bge-m3";
+const MAX_EMBED_TEXTS = 16;
+const MAX_EMBED_CHARS = 4000;
+
+async function handleEmbed(request, env) {
+  if (!env.AI) {
+    return jsonResponse({ error: "Workers AI binding \"AI\" is not configured." }, 500, request, env);
+  }
+  const payload = await readJsonBody(request);
+  const texts = payload && Array.isArray(payload.texts)
+    ? payload.texts.map(function (text) { return cleanString(text).slice(0, MAX_EMBED_CHARS); })
+    : [];
+  if (!texts.length || texts.some(function (text) { return !text; })) {
+    return jsonResponse({ error: "Send { texts: [...] } with at least one non-empty text." }, 400, request, env);
+  }
+  if (texts.length > MAX_EMBED_TEXTS) {
+    return jsonResponse({ error: "Send at most " + MAX_EMBED_TEXTS + " texts at a time." }, 400, request, env);
+  }
+  let result;
+  try {
+    result = await env.AI.run(EMBED_MODEL, { text: texts });
+  } catch (err) {
+    return jsonResponse({ error: "Embedding failed.", details: cleanString(err && err.message) }, 502, request, env);
+  }
+  const vectors = result && Array.isArray(result.data) ? result.data : [];
+  if (vectors.length !== texts.length) {
+    return jsonResponse({ error: "Embedding returned " + vectors.length + " vectors for " + texts.length + " texts." }, 502, request, env);
+  }
+  return jsonResponse({ model: EMBED_MODEL, vectors: vectors }, 200, request, env);
 }
 
 // Overloaded (529), rate-limited (429) and server errors (5xx) are usually

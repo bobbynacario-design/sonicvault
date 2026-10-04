@@ -164,3 +164,20 @@ test("the Create routes need the token like every other", async () => {
   }), { ...BASE_ENV, GEMINI_API_KEY: "g" });
   assert.equal(res.status, 401);
 });
+
+test("/embed turns texts into vectors with BGE-M3, a few at a time", async () => {
+  let asked;
+  const ai = { run: async (model, input) => { asked = { model, input }; return { shape: [input.text.length, 3], data: input.text.map((_, i) => [i, 0.5, -1]) }; } };
+  const { res, text } = await call("/embed", { texts: ["the one about my brother", "rain"] }, { ai });
+  assert.equal(res.status, 200);
+  assert.deepEqual(JSON.parse(text), { model: "@cf/baai/bge-m3", vectors: [[0, 0.5, -1], [1, 0.5, -1]] });
+  assert.equal(asked.model, "@cf/baai/bge-m3");
+  assert.deepEqual(asked.input, { text: ["the one about my brother", "rain"] });
+
+  const tooMany = await call("/embed", { texts: new Array(17).fill("x") }, { ai });
+  assert.equal(tooMany.res.status, 400);
+  const empty = await call("/embed", { texts: ["ok", "  "] }, { ai });
+  assert.equal(empty.res.status, 400);
+  const short = await call("/embed", { texts: ["a"] }, { ai: { run: async () => ({ data: [] }) } });
+  assert.equal(short.res.status, 502);
+});

@@ -17,6 +17,7 @@ window.refreshAll = function() {
   updateAIConfigStatus();
   scheduleAutoDescribe();
   scheduleOfflineTopUp();
+  scheduleMeaningIndex();
   renderSyncBanner();
   renderBackupPanel();
   renderRouteAwareView(true);

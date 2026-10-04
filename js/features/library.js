@@ -184,9 +184,12 @@ function invalidateFilterCache() { _tracksVersion++; _filterCache.key = null; }
 
 function getFilteredTracks() {
   var searchVal = lower(document.getElementById('search-input') ? document.getElementById('search-input').value : '');
+  // Searching by meaning ranks songs by what they are about instead of
+  // matching words (js/features/meaning.js); null means search by words.
+  var meaningRank = getMeaningRank(searchVal);
   var cacheKey = [
     searchVal, _genreFilter, _moodFilter, _sourceFilter, _tagFilter || '',
-    _sortMode || '', tracks.length, _tracksVersion
+    _sortMode || '', tracks.length, _tracksVersion, getMeaningVersion(), meaningRank ? 'm' : 'w'
   ].join('|');
   if (_filterCache.key === cacheKey && _filterCache.result) {
     return _filterCache.result.slice();
@@ -210,7 +213,7 @@ function getFilteredTracks() {
       track.source,
       track.fileName
     ].join(' ').toLowerCase();
-    var matchSearch = !searchVal || haystack.indexOf(searchVal) !== -1;
+    var matchSearch = meaningRank ? meaningRank[track.id] !== undefined : (!searchVal || haystack.indexOf(searchVal) !== -1);
     var matchGenre = _genreFilter === 'All' || track.genre === _genreFilter;
     var matchMood = _moodFilter === 'All' || track.mood === _moodFilter;
     var matchSource = _sourceFilter === 'All' || track.source === _sourceFilter;
@@ -218,7 +221,9 @@ function getFilteredTracks() {
     return matchSearch && matchGenre && matchMood && matchSource && matchTag;
   });
 
-  if (_sortMode === 'most-played') {
+  if (meaningRank) {
+    filtered.sort(function(a, b) { return meaningRank[a.id] - meaningRank[b.id]; });
+  } else if (_sortMode === 'most-played') {
     filtered.sort(function(a, b) { return Number(b.plays || 0) - Number(a.plays || 0) || compareNewestFirst(a, b); });
   } else if (_sortMode === 'least-played') {
     filtered.sort(function(a, b) { return Number(a.plays || 0) - Number(b.plays || 0) || compareNewestFirst(a, b); });
@@ -365,6 +370,8 @@ function renderTrackList() {
   renderTagFilter();
   renderSortFilter();
   renderFilterBar();
+  renderMeaningToggle();
+  renderMeaningStatus();
 
   var filtered = getFilteredTracks();
   // Each song once, its other takes behind a "2 versions" chip.
