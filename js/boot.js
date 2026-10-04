@@ -7,6 +7,7 @@ window.refreshAll = function() {
   tracks = window.tracks;
   playlists = window.playlists;
   appSettings = window.appSettings || {};
+  syncAIConfigWithVault();
   _publicRoutePayload = window._publicShareData || _publicRoutePayload;
   renderTracks();
   renderPlaylists();

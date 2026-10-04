@@ -225,6 +225,9 @@ async function fbLoadAll() {
       if (k === 'settings') window.appSettings = val || {};
       localStorage.setItem('sv_' + k, JSON.stringify(val));
     }
+    // The vault's settings are known now (or this device's unsaved copy
+    // stands), so the AI worker settings can be compared against them.
+    window.svVaultSettingsLoaded = true;
     var tracksResult = await loadTracksFromServer();
     if (window.svApplyRemoteTracks) window.svApplyRemoteTracks(tracksResult.list);
     if (tracksResult.source === 'legacy') {

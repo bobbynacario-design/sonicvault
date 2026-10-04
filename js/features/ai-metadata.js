@@ -1,7 +1,12 @@
-// The AI metadata assist: the device-local endpoint config, the remote call,
-// and generating, accepting, or declining suggestions for queued uploads.
+// The AI metadata assist: the worker config, the remote call, and
+// generating, accepting, or declining suggestions for queued uploads.
+//
+// The worker's address and token follow the owner's sign-in (js/data/
+// ai-config.js): kept in the vault's private settings, with this browser's
+// copy in sv_ai_config for offline and signed-out use.
 
 var _aiConfig = loadLocalAIConfig();
+var _aiConfigPushTimer = null;
 
 function loadLocalAIConfig() {
   try {
@@ -9,26 +14,53 @@ function loadLocalAIConfig() {
     return {
       endpoint: String(saved.endpoint || '').trim(),
       token: String(saved.token || '').trim(),
-      model: String(saved.model || '').trim()
+      model: String(saved.model || '').trim(),
+      updatedAt: Number(saved.updatedAt) || 0
     };
   } catch (e) {
-    return { endpoint:'', token:'', model:'' };
+    return { endpoint:'', token:'', model:'', updatedAt:0 };
   }
 }
 
 function persistLocalAIConfig() {
-  localStorage.setItem('sv_ai_config', JSON.stringify({
-    endpoint: String(_aiConfig.endpoint || '').trim(),
-    token: String(_aiConfig.token || '').trim(),
-    model: String(_aiConfig.model || '').trim()
-  }));
+  try {
+    localStorage.setItem('sv_ai_config', JSON.stringify(aiWorkerRecord(_aiConfig, _aiConfig.updatedAt)));
+  } catch (e) {}
 }
 
 function updateAIConfigField(field, value) {
-  if (!_aiConfig) _aiConfig = { endpoint:'', token:'', model:'' };
+  if (!_aiConfig) _aiConfig = { endpoint:'', token:'', model:'', updatedAt:0 };
   _aiConfig[field] = String(value || '').trim();
+  _aiConfig.updatedAt = Date.now();
   persistLocalAIConfig();
   updateAIConfigStatus();
+  // Typing fires on every key; the vault hears once it settles.
+  clearTimeout(_aiConfigPushTimer);
+  _aiConfigPushTimer = setTimeout(syncAIConfigWithVault, 800);
+}
+
+// Called after every sync (refreshAll) and after an edit. Only for the
+// signed-in owner, and only once the vault's own settings have been read
+// this session: comparing against the cached copy could push an old token
+// over a newer one set on another device.
+function syncAIConfigWithVault() {
+  if (!window.fbOwnerUser || !window.svVaultSettingsLoaded) return;
+  if (typeof _coverDemoActive !== 'undefined' && _coverDemoActive) return;
+  var settings = window.appSettings || {};
+  var action = resolveAIWorkerSync(_aiConfig, settings.aiWorker);
+  if (action === 'adopt') {
+    var cloud = settings.aiWorker;
+    _aiConfig = aiWorkerRecord(cloud, cloud.updatedAt);
+    persistLocalAIConfig();
+    updateAIConfigStatus();
+  } else if (action === 'push') {
+    if (!_aiConfig.updatedAt) _aiConfig.updatedAt = Date.now();
+    persistLocalAIConfig();
+    settings.aiWorker = aiWorkerRecord(_aiConfig, _aiConfig.updatedAt);
+    window.appSettings = settings;
+    appSettings = settings;
+    save('settings', settings);
+  }
 }
 
 // The field being typed in is left alone: rewriting its value on every
@@ -47,8 +79,9 @@ function updateAIConfigStatus() {
   if (_aiConfig.endpoint) {
     var host = '';
     try { host = new URL(_aiConfig.endpoint).host; } catch (e) {}
+    var where = window.fbOwnerUser ? 'with your vault, so every browser you sign into uses it' : 'in this browser';
     el.innerHTML = '<strong>Worker set:</strong> ' + esc(host || _aiConfig.endpoint) + '. ' + (_aiConfig.token
-      ? 'Token saved in this browser (never synced). Use Test connection to check it.'
+      ? 'Token saved ' + where + '. Use Test connection to check it.'
       : 'No access token yet, so the worker will refuse requests.');
   } else {
     el.innerHTML = '<strong>No worker set.</strong> Tags come from local suggestions and lyric timing is estimated. Paste the worker URL and its access token to turn both on.';

@@ -28,6 +28,7 @@ var SHELL_ASSETS = [
   './js/data/routes.js',
   './js/data/backup-format.js',
   './js/data/create.js',
+  './js/data/ai-config.js',
   './js/features/vault.js',
   './js/features/sync.js',
   './js/features/shell.js',

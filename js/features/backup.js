@@ -8,7 +8,8 @@ function buildVaultBackup() {
     counts: { tracks: tracks.length, playlists: playlists.length },
     tracks: tracks,
     playlists: playlists,
-    settings: appSettings || {}
+    // No AI worker token in a file that may be copied anywhere.
+    settings: stripVaultSecrets(appSettings)
   };
 }
 
@@ -51,8 +52,10 @@ function exportVaultM3U() {
 function applyBackup(data) {
   window.tracks = data.tracks;
   window.playlists = data.playlists;
-  window.appSettings = (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings))
-    ? data.settings : {};
+  // A backup carries no worker settings; the vault keeps the ones it has.
+  var aiWorker = appSettings && appSettings.aiWorker;
+  window.appSettings = stripVaultSecrets(data.settings);
+  if (aiWorker) window.appSettings.aiWorker = aiWorker;
   tracks = window.tracks;
   playlists = window.playlists;
   appSettings = window.appSettings;
