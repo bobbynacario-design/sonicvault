@@ -147,15 +147,7 @@ export default {
 
     let anthropicResponse;
     try {
-      anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": env.ANTHROPIC_API_KEY,
-          "anthropic-version": ANTHROPIC_VERSION
-        },
-        body: JSON.stringify(anthropicBody)
-      });
+      anthropicResponse = await callAnthropic(env, anthropicBody);
     } catch (err) {
       return jsonResponse(
         {
@@ -170,11 +162,20 @@ export default {
 
     const rawText = await anthropicResponse.text();
     if (!anthropicResponse.ok) {
+      // The app shows only `error`, so Anthropic's own reason goes in it --
+      // "credit balance is too low", "invalid x-api-key", an unknown model --
+      // instead of a bare "request failed". It is logged for wrangler tail
+      // too. Anthropic's error text never contains the key.
+      const parsed = safeJsonParse(rawText);
+      const apiError = parsed && parsed.error ? parsed.error : {};
+      const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+      const kind = cleanString(apiError.type);
+      console.error("Anthropic request failed", anthropicResponse.status, kind, reason, "model:", model);
       return jsonResponse(
         {
-          error: "Anthropic API request failed.",
+          error: "Anthropic API request failed (" + anthropicResponse.status + (kind ? " " + kind : "") + "): " + reason,
           status: anthropicResponse.status,
-          details: safeJsonParse(rawText) || rawText
+          details: parsed || rawText
         },
         anthropicResponse.status === 429 ? 429 : 502,
         request,
@@ -309,6 +310,36 @@ async function handleTranscribe(request, env) {
     request,
     env
   );
+}
+
+// Overloaded (529), rate-limited (429) and server errors (5xx) are usually
+// gone a moment later, so they are retried twice -- honouring retry-after
+// when Anthropic sends one, capped so a request never hangs -- before the
+// app is told. Anything else (a bad key, no credit, an unknown model) is
+// returned at once.
+const RETRYABLE_STATUS = [429, 500, 502, 503, 504, 529];
+const RETRY_DELAYS_MS = [800, 2000];
+
+async function callAnthropic(env, body) {
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": env.ANTHROPIC_API_KEY,
+        "anthropic-version": ANTHROPIC_VERSION
+      },
+      body: JSON.stringify(body)
+    });
+    if (response.ok || attempt >= RETRY_DELAYS_MS.length || !RETRYABLE_STATUS.includes(response.status)) {
+      return response;
+    }
+    const retryAfter = Number(response.headers.get("retry-after"));
+    const wait = Math.min(isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : RETRY_DELAYS_MS[attempt], 5000);
+    console.warn("Anthropic " + response.status + ", retrying in " + wait + "ms");
+    await response.body?.cancel();
+    await new Promise(function (resolve) { setTimeout(resolve, wait); });
+  }
 }
 
 function handleOptions(request, env) {
