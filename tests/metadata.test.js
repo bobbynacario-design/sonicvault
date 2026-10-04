@@ -79,6 +79,19 @@ test("track tags are capped at eight and deduped across sources", () => {
   assert.deepEqual(g.sanitizeMetadataArray("a, b|c\nA"), ["a", "b", "c"]);
 });
 
+test("the AI's tags lead, and lyric words only fill the space left", () => {
+  const track = {
+    lyrics: "one hour take not because other one hour take not because other",
+    aiTags: ["introspective", "americana", "slow burn"],
+    aiTheme: "Nostalgia, Mindfulness, Regret",
+    genre: "Other", mood: "Reflective", source: "Suno",
+  };
+  const tags = g.getTrackTags(track);
+  assert.deepEqual(tags.slice(0, 6), ["introspective", "americana", "slow burn", "Nostalgia", "Mindfulness", "Regret"]);
+  assert.equal(tags.length, 8);
+  assert.ok(!tags.includes("Suno") && !tags.includes("Other"), JSON.stringify(tags));
+});
+
 test("the prompt excerpt falls back from prompt to summary to lyrics to a stock line", () => {
   assert.equal(g.getTrackPromptExcerpt({ prompt: "p", aiSummary: "s" }), "p");
   assert.equal(g.getTrackPromptExcerpt({ aiSummary: "s", lyrics: "l" }), "s");

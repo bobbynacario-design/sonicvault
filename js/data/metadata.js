@@ -413,22 +413,29 @@ function derivePromptTags(prompt) {
   return deriveTextTags(prompt, 5);
 }
 
+// Discovery tags, most meaningful first, capped at eight: the AI's own tags
+// and themes, words from the prompt, the genre/mood labels, and words pulled
+// from the lyrics only to fill what is left. Lyric words used to come first,
+// and common ones ("one", "take", "because") pushed the AI's tags past the
+// cap. The source ("Suno") and the "Other" genre say nothing, so they are
+// not tags.
 function getTrackTags(track) {
-  var tags = derivePromptTags(track && track.prompt)
-    .concat(deriveTextTags(getTrackLyrics(track), 6))
-    .concat(getTrackAITags(track))
-    .concat(getTrackAITheme(track));
-  [track && track.genre, track && track.mood, track && track.source, track && track.aiGenre, track && track.aiMood, track && track.aiEra].forEach(function(item) {
-    var value = String(item || '').trim();
-    if (value && tags.indexOf(lower(value)) === -1) tags.push(value);
-  });
+  var labels = [track && track.genre, track && track.mood, track && track.aiGenre, track && track.aiMood, track && track.aiEra]
+    .map(function(item) { return String(item || '').trim(); })
+    .filter(function(item) { return item && lower(item) !== 'other'; });
+  var tags = getTrackAITags(track)
+    .concat(sanitizeMetadataArray(getTrackAITheme(track), 4))
+    .concat(derivePromptTags(track && track.prompt))
+    .concat(labels)
+    .concat(deriveTextTags(getTrackLyrics(track), 6));
   return uniqueStrings(tags, 8);
 }
 
+// A neutral line for a track with no prompt, description or lyrics yet.
 function promptFallback(track) {
-  var mood = track && track.mood ? lower(track.mood) : 'late';
+  var mood = track && track.mood ? lower(track.mood) + ' ' : '';
   var source = track && track.source ? track.source : 'Suno';
-  return 'A ' + mood + ' record from ' + source + ', waiting for a fuller prompt note.';
+  return 'A ' + mood + 'track from ' + source + '.';
 }
 
 function getTrackPromptExcerpt(track, max) {

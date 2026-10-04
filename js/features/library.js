@@ -262,17 +262,17 @@ function renderBrowseSummary(filtered) {
 // Shared by the card grid and the row list so the notes panel cannot drift
 // between the two views.
 function buildTrackNotes(track) {
-  var prompt = '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Prompt</div><div class="expand-value">' + esc(track.prompt || promptFallback(track)) + '</div></div>';
+  var prompt = track.prompt ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Prompt</div><div class="expand-value">' + esc(track.prompt) + '</div></div>' : '';
   var lyrics = hasLyrics(track)
     ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Lyrics</div><div class="expand-value" style="white-space:pre-wrap">' + esc(getTrackLyrics(track)) + '</div></div>'
     : '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">Lyrics</div><div class="expand-value">No lyrics yet &mdash; use Edit details to paste a lyric sheet.</div></div>';
-  var summary = getTrackSummary(track) ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">AI summary</div><div class="expand-value">' + esc(getTrackSummary(track)) + '</div></div>' : '';
+  var summary = getTrackSummary(track) ? '<div class="expand-item" style="grid-column:1 / -1"><div class="expand-label">About this song</div><div class="expand-value">' + esc(getTrackSummary(track)) + '</div></div>' : '';
   var aiFacts = [track.aiTheme, track.aiEnergy, track.aiVocalStyle, track.aiEra].filter(Boolean).join(' / ');
   return '<div class="track-expand" id="notes-' + esc(track.id) + '"><div class="expand-grid">'
     + '<div class="expand-item"><div class="expand-label">Source</div><div class="expand-value">' + esc(track.source || 'Suno') + '</div></div>'
     + '<div class="expand-item"><div class="expand-label">Added</div><div class="expand-value">' + esc(track.created || 'Undated') + '</div></div>'
     + '<div class="expand-item"><div class="expand-label">File</div><div class="expand-value">' + esc(track.fileName || 'Manual upload') + (track.fileSize ? ' &middot; ' + (track.fileSize / 1024 / 1024).toFixed(1) + ' MB' : '') + '</div></div>'
-    + (aiFacts ? '<div class="expand-item"><div class="expand-label">AI metadata</div><div class="expand-value">' + esc(aiFacts) + '</div></div>' : '')
+    + (aiFacts ? '<div class="expand-item"><div class="expand-label">Details</div><div class="expand-value">' + esc(aiFacts) + '</div></div>' : '')
     + prompt + summary + lyrics
     + '</div></div>';
 }

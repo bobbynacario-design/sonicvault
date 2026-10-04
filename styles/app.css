@@ -2284,20 +2284,7 @@ body.light .player-modal .player-close{background:rgba(255,255,255,.5)}
   font-size:14px;
   line-height:1.7;
 }
-.player-prompt{
-  padding:1rem 1.05rem;
-  border-radius:20px;
-  background:rgba(255,255,255,.03);
-  color:var(--muted);
-  line-height:1.75;
-  font-size:14px;
-}
 .player-copy-stack{display:grid;gap:1rem}
-.player-copy-grid{
-  display:grid;
-  grid-template-columns:1.1fr .9fr;
-  gap:1rem;
-}
 .player-copy-card{
   padding:1rem 1.05rem;
   border-radius:20px;
@@ -2362,36 +2349,48 @@ body.light .player-modal .player-close{background:rgba(255,255,255,.5)}
   padding:.12rem .55rem;
   margin-left:-.55rem;
 }
+/* About this song: a description, then labelled details, then tags. */
+.player-about{gap:1rem}
 .player-ai-summary{
-  color:var(--muted);
-  font-size:14px;
-  line-height:1.75;
+  margin:0;
+  max-width:68ch;
+  color:var(--text);
+  font-size:15px;
+  line-height:1.7;
 }
-.player-ai-meta{
+.player-ai-summary.is-empty{color:var(--muted);font-size:14px}
+.player-about-action{
+  margin-left:.35rem;
+  padding:.15rem .65rem;
+  border-radius:999px;
+  background:var(--surface-hover);
+  color:var(--text);
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+}
+.player-about-action:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+.player-facts{
   display:grid;
-  gap:.5rem;
+  grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+  gap:.85rem 1.4rem;
+  margin:0;
 }
-.player-ai-meta-row{
-  display:flex;
-  gap:.45rem;
-  flex-wrap:wrap;
-}
-.player-ai-pill{
-  padding:0;
-  border:none;
-  background:none;
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.1em;
-  text-transform:uppercase;
+.player-facts[hidden],.player-tags[hidden]{display:none}
+.player-fact{min-width:0}
+.player-fact.is-wide{grid-column:1 / -1}
+.player-fact dt{font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:.2rem}
+.player-fact dd{margin:0;font-size:14px;line-height:1.55;color:var(--text);overflow-wrap:break-word}
+.player-fact.is-wide dd{color:var(--muted);max-width:80ch}
+.player-tags{display:flex;flex-wrap:wrap;gap:.4rem}
+@media (max-width:640px){.player-facts{grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem 1rem}}
+.player-tag{
+  padding:.3rem .75rem;
+  border-radius:999px;
+  background:var(--surface-hover);
   color:var(--muted);
-}
-.player-ai-pill{white-space:nowrap}
-.player-ai-pill:not(:last-child)::after{content:'\00B7';margin-left:.5rem;opacity:.7;color:var(--muted2)}
-.player-copy-card .player-prompt{
-  padding:0;
-  border:none;
-  background:none;
+  font-size:12.5px;
+  font-weight:500;
 }
 .player-seek{
   display:grid;
@@ -3048,7 +3047,6 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
      and tighter gaps bring the floor to ~215px. */
   .player-wave{height:92px;gap:1px}
   .player-wave .pbar{min-width:2px}
-  .player-copy-grid{grid-template-columns:1fr}
   .player-controls,.playlist-chip{grid-template-columns:1fr}
   .track-actions,.section-action-row,.modal-actions{width:100%}
   .track-actions .action-btn,.track-actions .icon-btn,.section-action-row .sec-action,.modal-actions .sec-action{flex:1;justify-content:center;text-align:center}

@@ -13,6 +13,48 @@ function formatLyricsHTML(rawLyrics) {
   }).join('');
 }
 
+// "About this song": the description, the details the AI inferred, the
+// prompt, and the tags, in one card. It replaces a "Prompt / notes" box that
+// was usually a filler sentence beside an "AI summary" whose tags were
+// mostly words lifted from the lyrics.
+function renderAboutSong(track) {
+  var summaryEl = document.getElementById('xp-ai-summary');
+  var factsEl = document.getElementById('xp-facts');
+  var tagsEl = document.getElementById('xp-tags');
+  if (!summaryEl || !factsEl || !tagsEl) return;
+  if (!track) {
+    summaryEl.className = 'player-ai-summary is-empty';
+    summaryEl.textContent = 'Play a track to see what it\u2019s about.';
+    factsEl.hidden = tagsEl.hidden = true;
+    return;
+  }
+  var summary = getTrackSummary(track);
+  var canEdit = !!getVaultTrack(track.id);
+  summaryEl.className = 'player-ai-summary' + (summary ? '' : ' is-empty');
+  summaryEl.innerHTML = summary
+    ? esc(summary)
+    : 'No description yet.' + (canEdit ? ' <button type="button" class="player-about-action" onclick="openEditTrack(' + jsq(track.id) + ')">Add one</button>' : '');
+
+  var facts = [
+    ['Themes', sanitizeMetadataArray(getTrackAITheme(track), 6).join(', ')],
+    ['Energy', track.aiEnergy],
+    ['Vocals', track.aiVocalStyle],
+    ['Era', track.aiEra],
+    ['Instruments', getTrackAIInstruments(track).join(', ')]
+  ].filter(function(fact) { return String(fact[1] || '').trim(); });
+  var prompt = String(track.prompt || '').trim();
+  factsEl.innerHTML = facts.map(function(fact) {
+    return '<div class="player-fact"><dt>' + fact[0] + '</dt><dd>' + esc(fact[1]) + '</dd></div>';
+  }).join('') + (prompt ? '<div class="player-fact is-wide"><dt>Prompt</dt><dd>' + esc(prompt) + '</dd></div>' : '');
+  factsEl.hidden = !facts.length && !prompt;
+
+  // The AI's own tags; a track never tagged shows words from its prompt.
+  var tags = getTrackAITags(track);
+  if (!tags.length) tags = derivePromptTags(prompt);
+  tagsEl.innerHTML = tags.slice(0, 8).map(function(tag) { return '<span class="player-tag">' + esc(tag) + '</span>'; }).join('');
+  tagsEl.hidden = !tags.length;
+}
+
 function openExpandedPlayer(event) {
   if (event && event.target && event.target.closest('.np-btn')) return;
   if (!_currentTrack) return;
@@ -149,14 +191,11 @@ function updateExpandedPlayer() {
     paintPlayerBackdrop();
     document.getElementById('xp-kicker').textContent = 'Listening room';
     document.getElementById('xp-meta').textContent = 'Genre / mood / source will appear here.';
-    document.getElementById('xp-prompt').textContent = 'Prompt and notes appear here once a track is active.';
     document.getElementById('xp-lyrics').innerHTML = 'Lyrics appear here once a track is active.';
     document.getElementById('xp-lyrics').className = 'player-lyrics empty';
     document.getElementById('xp-lyrics').removeAttribute('data-key');
     renderLyricStatus();
-    document.getElementById('xp-ai-summary').textContent = 'AI summary and curation tags will appear here after metadata generation.';
-    document.getElementById('xp-ai-tags').innerHTML = '';
-    document.getElementById('xp-ai-facts').innerHTML = '';
+    renderAboutSong(null);
     document.getElementById('xp-current').textContent = '0:00';
     document.getElementById('xp-total').textContent = '0:00';
     document.getElementById('xp-progress-fill').style.width = '0%';
@@ -175,7 +214,6 @@ function updateExpandedPlayer() {
   document.getElementById('xp-kicker').textContent = 'Playing from ' + (_playQueueLabel || 'your vault');
   document.getElementById('xp-title').textContent = _currentTrack.title;
   document.getElementById('xp-meta').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno') + ' / ' + fmtCompactNumber(_currentTrack.plays || 0) + (Number(_currentTrack.plays) === 1 ? ' play' : ' plays');
-  document.getElementById('xp-prompt').textContent = _currentTrack.prompt || promptFallback(_currentTrack);
   // Rebuilt only when the track or its lyrics change: this runs on every
   // play/pause, and rebuilding threw away the scroll position each time.
   // The vault's copy of the track, since lyrics can arrive after playback
@@ -192,13 +230,7 @@ function updateExpandedPlayer() {
     _lyricTimesCache = null;
   }
   renderLyricStatus();
-  document.getElementById('xp-ai-summary').textContent = getTrackSummary(_currentTrack) || 'No AI summary yet. Generate metadata from the upload flow to add a richer editorial read on this track.';
-  document.getElementById('xp-ai-tags').innerHTML = getTrackTags(_currentTrack).slice(0, 8).map(function(tag) {
-    return '<span class="player-ai-pill">' + esc(tag) + '</span>';
-  }).join('');
-  document.getElementById('xp-ai-facts').innerHTML = [getTrackAITheme(_currentTrack), _currentTrack.aiEnergy, _currentTrack.aiVocalStyle, _currentTrack.aiEra].filter(Boolean).map(function(item) {
-    return '<span class="player-ai-pill">' + esc(item) + '</span>';
-  }).join('') + (getTrackAIInstruments(_currentTrack).map(function(item) { return '<span class="player-ai-pill">' + esc(item) + '</span>'; }).join(''));
+  renderAboutSong(getVaultTrack(_currentTrack.id) || _currentTrack);
   document.getElementById('xp-current').textContent = fmtTime(_audio.currentTime || 0);
   document.getElementById('xp-total').textContent = fmtTime(_audio.duration || _currentTrack.duration || 0);
   var pct = _audio.duration ? (_audio.currentTime / _audio.duration) * 100 : 0;
