@@ -3277,6 +3277,25 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 }
 .karaoke-backdrop img{position:absolute;inset:-80px;width:calc(100% + 160px);height:calc(100% + 160px);object-fit:cover;filter:blur(70px) saturate(1.25);opacity:.75}
 .karaoke-backdrop img[hidden]{display:none}
+/* Moving colours and Music: three glows in the song's colours drifting
+   slowly; Music swells them with the song's loudness (--k-level) and holds
+   them still while paused. Dark has no backdrop at all. */
+.karaoke[data-bg="colours"] .karaoke-backdrop,.karaoke[data-bg="music"] .karaoke-backdrop{opacity:1;background:#05060c}
+.karaoke:not([data-bg="cover"]) .karaoke-backdrop img{display:none}
+.karaoke[data-bg="dark"] .karaoke-backdrop{display:none}
+.k-glows{display:none;position:absolute;inset:0;overflow:hidden}
+.karaoke[data-bg="colours"] .k-glows,.karaoke[data-bg="music"] .k-glows{display:block}
+.k-glow{position:absolute;width:78vmax;height:78vmax;border-radius:50%;opacity:.75;will-change:transform}
+.k-glow-a{left:-24vmax;top:-32vmax;background:radial-gradient(closest-side, var(--k-a, #4b4fd8), transparent);animation:k-drift-a 18s ease-in-out infinite alternate}
+.k-glow-b{right:-30vmax;bottom:-36vmax;background:radial-gradient(closest-side, var(--k-b, #8a3fd1), transparent);animation:k-drift-b 23s ease-in-out infinite alternate}
+.k-glow-c{left:12vmax;top:22vh;width:56vmax;height:56vmax;opacity:.45;background:radial-gradient(closest-side, var(--k-c, #f08b62), transparent);animation:k-drift-c 29s ease-in-out infinite alternate}
+@keyframes k-drift-a{0%{transform:translate(0,0) scale(1)}50%{transform:translate(22vmax,14vmax) scale(1.15)}100%{transform:translate(8vmax,30vmax) scale(.95)}}
+@keyframes k-drift-b{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-26vmax,-10vmax) scale(.9)}100%{transform:translate(-10vmax,-28vmax) scale(1.1)}}
+@keyframes k-drift-c{0%{transform:translate(0,0)}50%{transform:translate(-14vmax,18vmax)}100%{transform:translate(16vmax,-8vmax)}}
+.karaoke[data-bg="music"] .k-glow{opacity:calc(.25 + var(--k-level, .5) * .7);scale:calc(.78 + var(--k-level, .5) * .5);transition:opacity .45s linear, scale .45s linear}
+.karaoke[data-bg="music"] .k-glow-c{opacity:calc(.1 + var(--k-level, .5) * .6)}
+.karaoke[data-bg="music"].k-paused .k-glow{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){.k-glow{animation:none}}
 .karaoke-backdrop::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg, rgba(5,6,12,.25), rgba(5,6,12,.55) 60%, rgba(5,6,12,.85))}
 .karaoke-stage{
   position:relative;
@@ -3292,6 +3311,10 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .karaoke-song{min-width:0}
 .karaoke-title{font-family:var(--display);font-weight:700;font-size:22px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .karaoke-sub{margin-top:.3rem;font-size:13px;color:rgba(255,255,255,.62)}
+.karaoke-tools{flex:none;display:flex;align-items:center;gap:.5rem}
+.karaoke-bg-btn{display:inline-flex;align-items:center;gap:.45rem;height:44px;padding:0 1rem 0 .85rem;border:none;border-radius:999px;background:rgba(255,255,255,.1);color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer}
+.karaoke-bg-btn:hover{background:rgba(255,255,255,.18)}
+.karaoke-bg-btn .ic{width:16px;height:16px}
 .karaoke-close{flex:none;display:grid;place-items:center;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;cursor:pointer}
 .karaoke-close:hover{background:rgba(255,255,255,.18)}
 .karaoke-close .ic{width:18px;height:18px}

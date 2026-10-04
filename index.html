@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SonicVault">
 <meta name="theme-color" content="#090b12">
-<link rel="icon" type="image/svg+xml" href="assets/icons/sonicvault-mark.svg?v=20261004ak">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=20261004ak">
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png?v=20261004ak">
-<link rel="manifest" href="manifest.webmanifest?v=20261004ak">
+<link rel="icon" type="image/svg+xml" href="assets/icons/sonicvault-mark.svg?v=20261004al">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=20261004al">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png?v=20261004al">
+<link rel="manifest" href="manifest.webmanifest?v=20261004al">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="A private editorial vault for AI-generated music. Curate tracks, build mixtapes, and stream from anywhere.">
 <meta property="og:type" content="website">
@@ -21,8 +21,8 @@
 <meta name="twitter:description" content="Curate tracks, build mixtapes, and stream your AI-generated music from anywhere.">
 <title>SonicVault - Private AI Music Vault</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<script type="module" src="js/app.js?v=20261004ak"></script>
-<link rel="stylesheet" href="styles/app.css?v=20261004ak">
+<script type="module" src="js/app.js?v=20261004al"></script>
+<link rel="stylesheet" href="styles/app.css?v=20261004al">
 </head>
 <body>
 <!-- Icon sprite. Every glyph in the app is <svg class="ic"><use href="#i-NAME"/></svg>,
@@ -53,6 +53,7 @@
     <symbol id="i-import" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3.5"/><path d="m7 8.5 5-5 5 5"/><path d="M20.5 14.5v4a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-4"/></symbol>
     <symbol id="i-create" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/><path d="M3.5 4v4M1.5 6h4"/></symbol>
     <symbol id="i-fade" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6v12h11z"/><path d="M21 6v12H10z"/></symbol>
+    <symbol id="i-backdrop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5V15"/><path d="m7 10 5 5 5-5"/><path d="M20.5 14.5v4a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-4"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
@@ -123,7 +124,7 @@
     </div>
   </main>
 </div>
-<script src="js/first-paint.js?v=20261004ak"></script>
+<script src="js/first-paint.js?v=20261004al"></script>
 <!-- Unsynced writes are a data-loss state, so they get a persistent bar with
      an action rather than the 10px status pill, which the next operation
      overwrites within a second. -->
@@ -579,15 +580,21 @@
 </div>
 
 <!-- Karaoke (js/features/karaoke.js): the lyrics full screen, word by word. -->
-<div class="modal-overlay karaoke" id="modal-karaoke" role="dialog" aria-modal="true" aria-labelledby="karaoke-title">
-  <div class="karaoke-backdrop" id="karaoke-backdrop" aria-hidden="true"><img id="karaoke-art" alt="" hidden></div>
+<div class="modal-overlay karaoke" id="modal-karaoke" role="dialog" aria-modal="true" aria-labelledby="karaoke-title" data-bg="cover">
+  <div class="karaoke-backdrop" id="karaoke-backdrop" aria-hidden="true">
+    <img id="karaoke-art" alt="" hidden>
+    <div class="k-glows"><i class="k-glow k-glow-a"></i><i class="k-glow k-glow-b"></i><i class="k-glow k-glow-c"></i></div>
+  </div>
   <div class="karaoke-stage">
     <div class="karaoke-top">
       <div class="karaoke-song">
         <div class="karaoke-title" id="karaoke-title"></div>
         <div class="karaoke-sub" id="karaoke-sub"></div>
       </div>
-      <button type="button" class="karaoke-close" aria-label="Close karaoke" onclick="closeModal('modal-karaoke')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button>
+      <div class="karaoke-tools">
+        <button type="button" class="karaoke-bg-btn" id="karaoke-bg-btn" onclick="cycleKaraokeBackground()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-backdrop"/></svg><span id="karaoke-bg-label">Cover</span></button>
+        <button type="button" class="karaoke-close" aria-label="Close karaoke" onclick="closeModal('modal-karaoke')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button>
+      </div>
     </div>
     <div class="karaoke-lines" id="karaoke-lines"></div>
     <div class="karaoke-bottom">
@@ -854,54 +861,54 @@
      global scope, which is what lets the inline onclick handlers above reach
      feature functions. On deploy, bump the ?v= token on every local asset
      together; sw.js serves them cache-first. -->
-<script src="js/data/util.js?v=20261004ak"></script>
-<script src="js/data/tracks.js?v=20261004ak"></script>
-<script src="js/data/covers.js?v=20261004ak"></script>
-<script src="js/data/artwork.js?v=20261004ak"></script>
-<script src="js/data/lyric-sync.js?v=20261004ak"></script>
-<script src="js/data/metadata.js?v=20261004ak"></script>
-<script src="js/data/waveform.js?v=20261004ak"></script>
-<script src="js/data/routes.js?v=20261004ak"></script>
-<script src="js/data/backup-format.js?v=20261004ak"></script>
-<script src="js/data/create.js?v=20261004ak"></script>
-<script src="js/data/ai-config.js?v=20261004ak"></script>
-<script src="js/data/versions.js?v=20261004ak"></script>
-<script src="js/data/meaning.js?v=20261004ak"></script>
-<script src="js/data/story.js?v=20261004ak"></script>
-<script src="js/data/radio.js?v=20261004ak"></script>
-<script src="js/features/vault.js?v=20261004ak"></script>
-<script src="js/features/sync.js?v=20261004ak"></script>
-<script src="js/features/shell.js?v=20261004ak"></script>
-<script src="js/features/modals.js?v=20261004ak"></script>
-<script src="js/features/routes.js?v=20261004ak"></script>
-<script src="js/features/covers.js?v=20261004ak"></script>
-<script src="js/features/artwork.js?v=20261004ak"></script>
-<script src="js/features/lyric-sync.js?v=20261004ak"></script>
-<script src="js/features/waveform.js?v=20261004ak"></script>
-<script src="js/features/media-session.js?v=20261004ak"></script>
-<script src="js/features/player.js?v=20261004ak"></script>
-<script src="js/features/playback-extras.js?v=20261004ak"></script>
-<script src="js/features/expanded-player.js?v=20261004ak"></script>
-<script src="js/features/library.js?v=20261004ak"></script>
-<script src="js/features/versions.js?v=20261004ak"></script>
-<script src="js/features/meaning.js?v=20261004ak"></script>
-<script src="js/features/story.js?v=20261004ak"></script>
-<script src="js/features/karaoke.js?v=20261004ak"></script>
-<script src="js/features/translate.js?v=20261004ak"></script>
-<script src="js/features/radio.js?v=20261004ak"></script>
-<script src="js/features/home.js?v=20261004ak"></script>
-<script src="js/features/insights.js?v=20261004ak"></script>
-<script src="js/features/playlists.js?v=20261004ak"></script>
-<script src="js/features/offline.js?v=20261004ak"></script>
-<script src="js/features/share.js?v=20261004ak"></script>
-<script src="js/features/edit-track.js?v=20261004ak"></script>
-<script src="js/features/ai-metadata.js?v=20261004ak"></script>
-<script src="js/features/describe.js?v=20261004ak"></script>
-<script src="js/features/upload.js?v=20261004ak"></script>
-<script src="js/features/create.js?v=20261004ak"></script>
-<script src="js/features/backup.js?v=20261004ak"></script>
-<script src="js/features/sign-in.js?v=20261004ak"></script>
-<script src="js/features/keyboard.js?v=20261004ak"></script>
-<script src="js/boot.js?v=20261004ak"></script>
+<script src="js/data/util.js?v=20261004al"></script>
+<script src="js/data/tracks.js?v=20261004al"></script>
+<script src="js/data/covers.js?v=20261004al"></script>
+<script src="js/data/artwork.js?v=20261004al"></script>
+<script src="js/data/lyric-sync.js?v=20261004al"></script>
+<script src="js/data/metadata.js?v=20261004al"></script>
+<script src="js/data/waveform.js?v=20261004al"></script>
+<script src="js/data/routes.js?v=20261004al"></script>
+<script src="js/data/backup-format.js?v=20261004al"></script>
+<script src="js/data/create.js?v=20261004al"></script>
+<script src="js/data/ai-config.js?v=20261004al"></script>
+<script src="js/data/versions.js?v=20261004al"></script>
+<script src="js/data/meaning.js?v=20261004al"></script>
+<script src="js/data/story.js?v=20261004al"></script>
+<script src="js/data/radio.js?v=20261004al"></script>
+<script src="js/features/vault.js?v=20261004al"></script>
+<script src="js/features/sync.js?v=20261004al"></script>
+<script src="js/features/shell.js?v=20261004al"></script>
+<script src="js/features/modals.js?v=20261004al"></script>
+<script src="js/features/routes.js?v=20261004al"></script>
+<script src="js/features/covers.js?v=20261004al"></script>
+<script src="js/features/artwork.js?v=20261004al"></script>
+<script src="js/features/lyric-sync.js?v=20261004al"></script>
+<script src="js/features/waveform.js?v=20261004al"></script>
+<script src="js/features/media-session.js?v=20261004al"></script>
+<script src="js/features/player.js?v=20261004al"></script>
+<script src="js/features/playback-extras.js?v=20261004al"></script>
+<script src="js/features/expanded-player.js?v=20261004al"></script>
+<script src="js/features/library.js?v=20261004al"></script>
+<script src="js/features/versions.js?v=20261004al"></script>
+<script src="js/features/meaning.js?v=20261004al"></script>
+<script src="js/features/story.js?v=20261004al"></script>
+<script src="js/features/karaoke.js?v=20261004al"></script>
+<script src="js/features/translate.js?v=20261004al"></script>
+<script src="js/features/radio.js?v=20261004al"></script>
+<script src="js/features/home.js?v=20261004al"></script>
+<script src="js/features/insights.js?v=20261004al"></script>
+<script src="js/features/playlists.js?v=20261004al"></script>
+<script src="js/features/offline.js?v=20261004al"></script>
+<script src="js/features/share.js?v=20261004al"></script>
+<script src="js/features/edit-track.js?v=20261004al"></script>
+<script src="js/features/ai-metadata.js?v=20261004al"></script>
+<script src="js/features/describe.js?v=20261004al"></script>
+<script src="js/features/upload.js?v=20261004al"></script>
+<script src="js/features/create.js?v=20261004al"></script>
+<script src="js/features/backup.js?v=20261004al"></script>
+<script src="js/features/sign-in.js?v=20261004al"></script>
+<script src="js/features/keyboard.js?v=20261004al"></script>
+<script src="js/boot.js?v=20261004al"></script>
 </body>
 </html>

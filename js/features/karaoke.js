@@ -8,6 +8,14 @@
 // (js/features/keyboard.js).
 
 var KARAOKE_LEAD = .1;       // seconds: a word lights up just ahead of the voice
+// What sits behind the words, cycled by the button by the close button and
+// remembered (localStorage.sv_karaoke_bg).
+var KARAOKE_BACKGROUNDS = [
+  { id:'cover', label:'Cover', name:'the song’s cover, blurred' },
+  { id:'colours', label:'Colours', name:'moving colours' },
+  { id:'music', label:'Music', name:'colours that follow the music' },
+  { id:'dark', label:'Dark', name:'plain dark' }
+];
 var _karaoke = null;         // { trackId, key, index, words: { line: [...] }, playing, frame }
 
 function karaokeTrack() {
@@ -21,7 +29,8 @@ function karaokeAvailable(track) {
 function openKaraoke() {
   var track = karaokeTrack();
   if (!karaokeAvailable(track)) return;
-  _karaoke = { trackId:'', key:'', index:-2, words:{}, playing:null, frame:0 };
+  _karaoke = { trackId:'', key:'', index:-2, words:{}, playing:null, frame:0, level:-1 };
+  applyKaraokeBackground();
   openModal('modal-karaoke');
   karaokeFrame();
 }
@@ -59,6 +68,7 @@ function prepareKaraokeSong(track) {
   else artImg.removeAttribute('src');
   backdrop.style.setProperty('--k-a', palette.a);
   backdrop.style.setProperty('--k-b', palette.b);
+  backdrop.style.setProperty('--k-c', palette.accent || palette.a);
   document.getElementById('modal-karaoke').style.setProperty('--k-accent', palette.accent || palette.a);
   // Songs timed before word times were kept get them once.
   var sync = track && getLyricSync(track);
@@ -157,7 +167,9 @@ function karaokeFrame() {
   if (playing !== _karaoke.playing) {
     _karaoke.playing = playing;
     setPlayButton(document.getElementById('karaoke-play'), playing);
+    document.getElementById('modal-karaoke').classList.toggle('k-paused', !playing);
   }
+  if (karaokeBackground() === 'music') paintKaraokeLevel(usable || karaokeTrack(), t);
   var duration = _audio.duration || 0;
   document.getElementById('karaoke-fill').style.width = duration ? Math.min(100, t / duration * 100).toFixed(2) + '%' : '0%';
   document.getElementById('karaoke-time').textContent = fmtTime(t) + ' / ' + fmtTime(duration);
@@ -174,6 +186,50 @@ function karaokeSeek(event) {
   if (!_audio.duration || !rect.width) return;
   _audio.currentTime = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * _audio.duration;
   updateMediaSessionPosition();
+}
+
+function karaokeBackground() {
+  var saved = '';
+  try { saved = localStorage.getItem('sv_karaoke_bg') || ''; } catch (e) {}
+  return KARAOKE_BACKGROUNDS.some(function(bg) { return bg.id === saved; }) ? saved : 'cover';
+}
+
+function cycleKaraokeBackground() {
+  var ids = KARAOKE_BACKGROUNDS.map(function(bg) { return bg.id; });
+  var next = ids[(ids.indexOf(karaokeBackground()) + 1) % ids.length];
+  try { localStorage.setItem('sv_karaoke_bg', next); } catch (e) {}
+  applyKaraokeBackground();
+}
+
+function applyKaraokeBackground() {
+  var id = karaokeBackground();
+  var bg = KARAOKE_BACKGROUNDS.filter(function(item) { return item.id === id; })[0];
+  document.getElementById('modal-karaoke').setAttribute('data-bg', id);
+  document.getElementById('karaoke-bg-label').textContent = bg.label;
+  var btn = document.getElementById('karaoke-bg-btn');
+  btn.setAttribute('aria-label', 'Background: ' + bg.name + '. Change background');
+  btn.title = 'Background: ' + bg.name;
+  if (_karaoke) _karaoke.level = -1;
+}
+
+// "Music": how loud the song is at t, from its measured levels (72 across
+// the song, js/features/waveform.js), stretched over its own quiet-to-loud
+// range, as --k-level from 0 to 1. A song not measured yet sits at the middle.
+function paintKaraokeLevel(track, t) {
+  var levels = track ? getRealPeaksForTrack(track) : [];
+  var level = .5;
+  var duration = _audio.duration || (track && track.duration) || 0;
+  if (levels.length > 1 && duration) {
+    var at = Math.max(0, Math.min(1, t / duration)) * (levels.length - 1);
+    var i = Math.floor(at);
+    var raw = levels[i] + ((levels[Math.min(levels.length - 1, i + 1)] || levels[i]) - levels[i]) * (at - i);
+    var low = Math.min.apply(null, levels);
+    var high = Math.max.apply(null, levels);
+    level = high > low ? (raw - low) / (high - low) : .5;
+  }
+  if (Math.abs(level - _karaoke.level) < .01) return;
+  _karaoke.level = level;
+  document.getElementById('karaoke-backdrop').style.setProperty('--k-level', level.toFixed(3));
 }
 
 // The Karaoke button in the expanded player's lyrics card.
