@@ -48,7 +48,9 @@ function syncAIConfigWithVault() {
   if (typeof _coverDemoActive !== 'undefined' && _coverDemoActive) return;
   var settings = window.appSettings || {};
   var action = resolveAIWorkerSync(_aiConfig, settings.aiWorker);
-  if (action === 'adopt') {
+  // Never swap the settings out from under someone typing them.
+  var focused = document.activeElement && /^ai-(endpoint|token|model)$/.test(document.activeElement.id || '');
+  if (action === 'adopt' && !focused) {
     var cloud = settings.aiWorker;
     _aiConfig = aiWorkerRecord(cloud, cloud.updatedAt);
     persistLocalAIConfig();

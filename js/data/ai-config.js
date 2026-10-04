@@ -5,14 +5,25 @@
 // (sv_ai_config) for offline and signed-out use.
 // Pure: plain objects in, a decision or a copy out.
 
+// Settings that can reach a worker: an address, at least. Half-typed ones
+// (a token pasted before its address, a field cleared to retype it) stay in
+// the browser they were typed in: spread to the vault, they disconnected
+// every other browser.
+function isUsableAIWorker(config) {
+  return !!(config && String(config.endpoint || '').trim());
+}
+
 // What to do with this browser's copy and the vault's: 'adopt' the vault's,
-// 'push' this browser's, or 'none'. The newer change wins. A browser whose
-// copy predates syncing (no updatedAt) seeds an empty vault, and otherwise
-// gives way. An empty copy -- nothing set -- never seeds the vault.
+// 'push' this browser's, or 'none'. Only usable settings ever move. Between
+// two usable copies the newer change wins; a browser whose copy predates
+// syncing (no updatedAt) seeds a vault that has none, and otherwise gives
+// way.
 function resolveAIWorkerSync(local, cloud) {
-  var localAt = Number(local && local.updatedAt) || 0;
-  var hasLocal = !!(local && (local.endpoint || local.token));
-  if (!cloud || typeof cloud !== 'object') return hasLocal ? 'push' : 'none';
+  var localOK = isUsableAIWorker(local);
+  var cloudOK = !!cloud && typeof cloud === 'object' && isUsableAIWorker(cloud);
+  if (!cloudOK) return localOK ? 'push' : 'none';
+  if (!localOK) return 'adopt';
+  var localAt = Number(local.updatedAt) || 0;
   var cloudAt = Number(cloud.updatedAt) || 0;
   if (cloudAt > localAt) return 'adopt';
   if (localAt > cloudAt) return 'push';
