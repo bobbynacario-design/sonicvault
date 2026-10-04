@@ -227,9 +227,10 @@ function updateExpandedPlayer() {
   // started (the artwork sweep fills empty sheets from the file).
   var lyricTrack = getVaultTrack(_currentTrack.id) || _currentTrack;
   var lyricsEl = document.getElementById('xp-lyrics');
-  var translated = hasLyrics(lyricTrack) ? shownTranslationLines(lyricTrack) : null;
+  var shownTr = hasLyrics(lyricTrack) ? shownTranslation(lyricTrack) : null;
+  var translated = shownTr && !shownTr.same && Array.isArray(shownTr.lines) ? shownTr.lines : null;
   var lyricsKey = _currentTrack.id + '|' + (hasLyrics(lyricTrack) ? lyricSyncKey(getTrackLyrics(lyricTrack)) : 'none')
-    + '|' + (translated ? lyricTrack.translation.lang + lyricTrack.translation.at : '');
+    + '|' + (translated ? shownTr.lang + shownTr.at : '');
   if (lyricsEl.getAttribute('data-key') !== lyricsKey) {
     lyricsEl.setAttribute('data-key', lyricsKey);
     lyricsEl.innerHTML = hasLyrics(lyricTrack) ? formatLyricsHTML(getTrackLyrics(lyricTrack), translated) : 'Lyrics have not been added yet for this track.';

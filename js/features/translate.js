@@ -2,11 +2,12 @@
 // AI worker's /translate (Claude) for each sung line in another language --
 // shown under its original, so it stays timed to the music, in karaoke too
 // -- and what the song is about, with notes on idioms and local references.
-// Saved on the track as track.translation, so it is paid for once and
-// syncs; editing the lyrics retires it.
+// Saved on the track, one per language (track.translations, see
+// js/data/translations.js), so each language is paid for once, switching
+// back to one is free, and they sync; editing the lyrics retires them.
 //
-// track.translation = { key: lyricSyncKey(lyrics), lang, from, same,
-//                       lines: [one per sung line], about, notes: [{ line, note }], at }
+// track.translations = { English: { key: lyricSyncKey(lyrics), from, same,
+//   lines: [one per sung line], about, notes: [{ line, note }], at }, ... }
 
 var TRANSLATE_LANGUAGES = ['English', 'Filipino', 'Bikol', 'Cebuano', 'Spanish', 'Japanese', 'Korean', 'Chinese', 'French', 'German'];
 var _translateOpen = '';      // id of the track showing its translation
@@ -27,10 +28,14 @@ function translateEndpoint() {
 // The saved translation when it still belongs to these lyrics and this
 // language. A shared song's visitors get whichever language was saved.
 function getTranslation(track, lang) {
-  var tr = track && track.translation;
-  if (!tr || !hasLyrics(track) || tr.key !== lyricSyncKey(getTrackLyrics(track))) return null;
-  if (getVaultTrack(track.id) && tr.lang !== (lang || translateLanguage())) return null;
-  return tr;
+  if (!track || !hasLyrics(track)) return null;
+  var key = lyricSyncKey(getTrackLyrics(track));
+  if (!getVaultTrack(track.id)) {
+    var shared = track.translation;
+    return shared && shared.key === key ? shared : null;
+  }
+  var tr = savedTranslations(track)[lang || translateLanguage()];
+  return tr && tr.key === key ? tr : null;
 }
 
 // The translation the lyrics should show right now, or null.
@@ -81,9 +86,9 @@ async function requestTranslation(track, lang) {
     if (!response.ok) throw new Error(data.error || ('The worker answered ' + response.status + '.'));
     // The lyrics may have been edited while the request was out.
     if (getTrackLyrics(track) !== lyrics) return;
-    track.translation = {
-      key:lyricSyncKey(lyrics),
-      lang:lang,
+    var key = lyricSyncKey(lyrics);
+    track.translations = withTranslation(track, lang, {
+      key:key,
       from:String(data.from || ''),
       same:data.same === true,
       lines:Array.isArray(data.lines) ? data.lines.map(function(line) { return String(line || ''); }) : [],
@@ -92,7 +97,8 @@ async function requestTranslation(track, lang) {
         return { line:Number(item.line) || 0, note:String(item.note || '') };
       }),
       at:new Date().toISOString()
-    };
+    }, key);
+    delete track.translation;
     persistTracks();
   } catch (e) {
     _translateFailed[track.id] = (e && e.message) || 'The translation failed.';
@@ -115,7 +121,7 @@ function renderTranslateButton() {
   var btn = document.getElementById('xp-translate-btn');
   if (!btn) return;
   var track = translateTrack();
-  var can = !!(track && hasLyrics(track) && (track.translation || translateEndpoint()));
+  var can = !!(track && hasLyrics(track) && (Object.keys(savedTranslations(track)).length || translateEndpoint()));
   var open = can && _translateOpen === track.id;
   btn.hidden = !can;
   btn.textContent = open ? 'Hide translation' : 'Translate';
@@ -145,7 +151,9 @@ function renderTranslatePanel() {
   }
   var picker = '<label class="translate-lang"><span>Into</span><select onchange="setTranslateLanguage(this.value)" aria-label="Translate into">'
     + TRANSLATE_LANGUAGES.map(function(name) {
-        return '<option' + (name === lang ? ' selected' : '') + '>' + esc(name) + '</option>';
+        // A tick on the languages already saved: switching to those is free.
+        var saved = !!getTranslation(track, name);
+        return '<option value="' + attr(name) + '"' + (name === lang ? ' selected' : '') + '>' + esc(name) + (saved ? ' \u2713' : '') + '</option>';
       }).join('')
     + '</select></label>';
   var body;

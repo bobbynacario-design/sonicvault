@@ -20,19 +20,12 @@ function publicLyricSync(track) {
   return packLyricSync(getTrackLyrics(track), sync.lines, sync.source, sync.at || '', null, sync.words);
 }
 
+// One saved translation goes out with a share: English when there is one,
+// else the newest (publicTranslationOf, js/data/translations.js).
 function publicTranslation(track) {
-  var tr = track && track.translation;
-  if (!tr || !hasLyrics(track) || tr.key !== lyricSyncKey(getTrackLyrics(track))) return null;
-  return {
-    key:tr.key,
-    lang:String(tr.lang || ''),
-    from:String(tr.from || ''),
-    same:!!tr.same,
-    lines:(tr.lines || []).map(function(line) { return String(line || ''); }),
-    about:String(tr.about || ''),
-    notes:(tr.notes || []).map(function(item) { return { line:Number(item.line) || 0, note:String(item.note || '') }; }),
-    at:String(tr.at || '')
-  };
+  if (!track || !hasLyrics(track)) return null;
+  var tr = publicTranslationOf(track, lyricSyncKey(getTrackLyrics(track)));
+  return tr ? Object.assign(translationEntry(tr), { lang:tr.lang }) : null;
 }
 
 // full: the whole sheet with its timings and translation, for a song the
