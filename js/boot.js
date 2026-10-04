@@ -50,9 +50,14 @@ setTimeout(sweepWaveformBackfill, 4000);
 
 // Service worker: offline shell + cached fonts/SDK + recently played audio.
 // Guarded so opening index.html via file:// (local dev) stays error-free.
+// Registered by the app's base path, not relative to the address bar: by
+// 'load' a share link already reads /sonicvault/track/:id, and a relative
+// 'sw.js' would 404 under /track/. At the app root this is the same script
+// URL and scope as before, so existing registrations carry on.
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js').then(function(reg) {
+    var swBase = (getAppBasePath() || '').replace(/\/index\.html$/, '');
+    navigator.serviceWorker.register(swBase + '/sw.js', { scope: swBase + '/' }).then(function(reg) {
       reg.addEventListener('updatefound', function() {
         var sw = reg.installing;
         if (!sw) return;
