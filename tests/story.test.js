@@ -95,3 +95,27 @@ test("palette colours take an opacity for gradients", () => {
   assert.equal(g.hslWithAlpha("hsla(230, 14%, 70%, .1)", 0), "hsla(230, 14%, 70%, 0)");
   assert.equal(g.hslWithAlpha("#fff", 0.2), "rgba(255, 255, 255, 0.2)");
 });
+
+test("the device keeps the newest clips, and says which files to let go", () => {
+  const list = [1, 2, 3, 4, 5].map((n) => ({ id: "c" + n }));
+  const result = g.keepRecentClip(list, { id: "c9" }, 5);
+  assert.deepEqual(result.kept.map((c) => c.id), ["c9", "c1", "c2", "c3", "c4"]);
+  assert.deepEqual(result.dropped.map((c) => c.id), ["c5"]);
+  // Keeping one again moves it to the front instead of listing it twice.
+  assert.deepEqual(g.keepRecentClip(list, { id: "c3" }, 5).kept.map((c) => c.id), ["c3", "c1", "c2", "c4", "c5"]);
+  assert.deepEqual(g.keepRecentClip(null, { id: "a" }).kept.map((c) => c.id), ["a"]);
+  assert.deepEqual(g.keepRecentClip([null, { title: "no id" }], { id: "a" }).kept.map((c) => c.id), ["a"]);
+});
+
+test("a kept clip's age reads like speech", () => {
+  const now = Date.parse("2026-10-04T12:00:00Z");
+  const ago = (s) => new Date(now - s * 1000).toISOString();
+  assert.equal(g.storyClipAge(ago(20), now), "just now");
+  assert.equal(g.storyClipAge(ago(60), now), "1 minute ago");
+  assert.equal(g.storyClipAge(ago(3 * 3600 + 5), now), "3 hours ago");
+  assert.equal(g.storyClipAge(ago(30 * 3600), now), "yesterday");
+  assert.equal(g.storyClipAge(ago(3 * 86400), now), "3 days ago");
+  assert.equal(g.storyClipAge(ago(15 * 86400), now), "2 weeks ago");
+  assert.equal(g.storyClipAge(ago(60 * 86400), now), "over a month ago");
+  assert.equal(g.storyClipAge("not a date", now), "");
+});

@@ -139,3 +139,31 @@ function hslWithAlpha(color, alpha) {
   if (!m) return 'rgba(255, 255, 255, ' + alpha + ')';
   return 'hsla(' + m[1] + ', ' + m[2] + '%, ' + m[3] + '%, ' + alpha + ')';
 }
+
+// Clips kept on this device (js/features/story.js): the last few, newest
+// first. Returns { kept, dropped }; the caller deletes the dropped files.
+var STORY_KEEP = 5;
+
+function keepRecentClip(list, clip, max) {
+  var rest = (Array.isArray(list) ? list : []).filter(function(item) { return item && item.id && item.id !== clip.id; });
+  var all = [clip].concat(rest);
+  var limit = max || STORY_KEEP;
+  return { kept:all.slice(0, limit), dropped:all.slice(limit) };
+}
+
+// "just now", "5 minutes ago", "yesterday", "3 weeks ago".
+function storyClipAge(at, now) {
+  var secs = ((now || Date.now()) - new Date(at).getTime()) / 1000;
+  if (!isFinite(secs)) return '';
+  if (secs < 60) return 'just now';
+  var mins = Math.floor(secs / 60);
+  if (mins < 60) return mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+  var hours = Math.floor(mins / 60);
+  if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+  var days = Math.floor(hours / 24);
+  if (days === 1) return 'yesterday';
+  if (days < 7) return days + ' days ago';
+  var weeks = Math.floor(days / 7);
+  if (weeks < 5) return weeks + (weeks === 1 ? ' week ago' : ' weeks ago');
+  return 'over a month ago';
+}

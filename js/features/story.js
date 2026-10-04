@@ -4,6 +4,11 @@
 // MediaRecorder while the song plays silently into it, so a 15-second clip
 // takes 15 seconds to make. Which part of the song, text wrapping and the
 // recording format are worked out in js/data/story.js.
+//
+// Every finished clip is also kept on this device -- the last STORY_KEEP of
+// them, in Cache Storage (STORY_CLIP_CACHE, which sw.js leaves alone) with
+// a list in localStorage.sv_clips -- and listed in the dialog to open,
+// share, save or delete. Nothing goes to the vault or the cloud.
 
 var STORY_FONT_DISPLAY = 'Syne, sans-serif';
 var STORY_FONT_SANS = '"Space Grotesk", "DM Sans", sans-serif';
@@ -16,6 +21,9 @@ var _story = null;           // the open dialog: { trackId, length, start, best,
 var _storyScene = null;      // pictures and pre-painted layers for the open song
 var _storyBuffer = null;     // { id, buffer }: the open song, decoded once
 var _storyRun = null;        // the recording in progress: { cancel }
+var STORY_CLIP_CACHE = 'sv-clips-v1';
+var _storyClips = null;      // [{ id, trackId, title, start, length, ext, type, size, at }], newest first
+var _storyStills = {};       // clip id -> object URL of its still
 
 function storyClipsSupported() {
   var Ctx = window.AudioContext || window.webkitAudioContext;
@@ -46,10 +54,11 @@ function openStoryClip(id) {
   if (!track.audioURL && !track.audioData) { showToast('This song has no audio to make a clip from.'); return; }
   if (!storyClipsSupported()) { showToast('This browser can’t record video. Try Chrome or Safari.'); return; }
   resetStoryClip();
-  _story = { trackId:id, length:STORY_LENGTHS[0], start:0, best:null, phase:'setup', progress:0, url:'', file:null, error:'' };
+  _story = { trackId:id, length:STORY_LENGTHS[0], start:0, best:null, phase:'setup', timing:false, progress:0, url:'', file:null, error:'' };
   pickBestStoryStart();
   openModal('modal-story');
   renderStoryDialog();
+  syncKeptStoryClips();
   prepareStoryScene(track).then(drawStoryPreview);
   timeStoryLyrics(track);
 }
@@ -70,7 +79,7 @@ function onStoryClipClosed() {
 function resetStoryClip() {
   if (_storyRun) _storyRun.cancel();
   _storyRun = null;
-  if (_story && _story.url) URL.revokeObjectURL(_story.url);
+  releaseStoryResult();
   var video = document.getElementById('story-video');
   if (video && video.getAttribute('src')) {
     video.pause();
@@ -80,6 +89,20 @@ function resetStoryClip() {
   _story = null;
   _storyScene = null;
   _storyBuffer = null;
+}
+
+// Lets go of the clip on show: its video, and its still when this dialog
+// made it (a kept clip's still belongs to the list).
+function releaseStoryResult() {
+  if (!_story) return;
+  if (_story.url) URL.revokeObjectURL(_story.url);
+  if (_story.poster && _story.ownPoster) URL.revokeObjectURL(_story.poster);
+  _story.url = '';
+  _story.file = null;
+  _story.poster = '';
+  _story.ownPoster = false;
+  _story.clipId = '';
+  _story.viewing = null;
 }
 
 function pickBestStoryStart() {
@@ -103,7 +126,7 @@ function isBestStoryStart() {
 async function timeStoryLyrics(track) {
   if (!hasLyrics(track) || getLyricSync(track) || !lyricSyncEndpoint() || _lyricSyncFailed[track.id]) return;
   if (!/^https:\/\/res\.cloudinary\.com\//.test(track.audioURL || '') || navigator.onLine === false) return;
-  _story.phase = 'timing';
+  _story.timing = true;
   renderStoryDialog();
   if (!_lyricSyncJobs[track.id]) {
     await requestLyricSync(track);
@@ -112,8 +135,8 @@ async function timeStoryLyrics(track) {
       await new Promise(function(resolve) { setTimeout(resolve, 500); });
     }
   }
-  if (!_story || _story.trackId !== track.id || _story.phase !== 'timing') return;
-  _story.phase = 'setup';
+  if (!_story || _story.trackId !== track.id) return;
+  _story.timing = false;
   pickBestStoryStart();
   renderStoryDialog();
   await prepareStoryScene(track);
@@ -401,7 +424,7 @@ function storyStillLevels(n) {
 function drawStoryPreview() {
   var canvas = document.getElementById('story-canvas');
   var scene = _storyScene;
-  if (!canvas || !scene || !_story || scene.trackId !== _story.trackId || _story.phase === 'recording') return;
+  if (!canvas || !scene || !_story || scene.trackId !== _story.trackId || _story.phase === 'recording' || _story.phase === 'done') return;
   var t = Math.min(2, _story.length / 2);
   if (scene.times) {
     for (var i = 0; i < scene.times.length; i++) {
@@ -523,7 +546,7 @@ function recordStoryClip(buffer, scene, clipStart, length) {
 
 async function makeStoryClip() {
   var track = storyTrack();
-  if (!track || !storyEditable()) return;
+  if (!track || !storyEditable() || _story.timing) return;
   var Ctx = window.AudioContext || window.webkitAudioContext;
   if (!_audioContext) _audioContext = new Ctx();
   // First, while the tap still counts as a gesture: browsers keep audio
@@ -542,7 +565,8 @@ async function makeStoryClip() {
     // The preview still becomes the finished video's poster: its first
     // frame is the fade in from black.
     drawStoryPreview();
-    try { _story.poster = document.getElementById('story-canvas').toDataURL('image/jpeg', .85); } catch (e) { _story.poster = ''; }
+    var still = await storyStillBlob(document.getElementById('story-canvas'));
+    if (!_story || _story.trackId !== track.id) return;
     _story.phase = 'recording';
     _story.progress = 0;
     renderStoryDialog();
@@ -551,7 +575,15 @@ async function makeStoryClip() {
     if (!_story || _story.trackId !== track.id) return;
     _story.url = URL.createObjectURL(result.blob);
     _story.file = new File([result.blob], storyFileName(track.title, result.format.ext), { type:result.blob.type });
+    _story.poster = still ? URL.createObjectURL(still) : '';
+    _story.ownPoster = !!still;
     _story.phase = 'done';
+    renderStoryDialog();
+    var kept = await keepStoryClip(_story.file, still, {
+      trackId:track.id, title:track.title || 'Untitled', start:_story.start, length:_story.length,
+      ext:result.format.ext, type:_story.file.type, size:_story.file.size, at:new Date().toISOString()
+    });
+    if (_story && kept && _story.phase === 'done' && !_story.viewing) _story.clipId = kept.id;
   } catch (e) {
     _storyRun = null;
     if (!_story) return;
@@ -573,9 +605,7 @@ function cancelStoryClip() {
 
 function makeAnotherStoryClip() {
   if (!_story) return;
-  if (_story.url) URL.revokeObjectURL(_story.url);
-  _story.url = '';
-  _story.file = null;
+  releaseStoryResult();
   _story.phase = 'setup';
   renderStoryDialog();
   drawStoryPreview();
@@ -592,7 +622,8 @@ function canShareStoryClip() {
 function shareStoryClip() {
   if (!canShareStoryClip()) { saveStoryClip(); return; }
   var track = storyTrack();
-  navigator.share({ files:[_story.file], title:track ? track.title : 'SonicVault' }).catch(function(e) {
+  var title = _story.viewing ? _story.viewing.title : (track && track.title);
+  navigator.share({ files:[_story.file], title:title || 'SonicVault' }).catch(function(e) {
     if (e && e.name !== 'AbortError') showToast('Couldn’t share the clip. Save it instead.');
   });
 }
@@ -605,6 +636,176 @@ function saveStoryClip() {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+// ── Kept clips ────────────────────────────────────────────────────────
+
+function getStoryClips() {
+  if (_storyClips) return _storyClips;
+  try { _storyClips = JSON.parse(localStorage.getItem('sv_clips') || '[]'); } catch (e) { _storyClips = []; }
+  if (!Array.isArray(_storyClips)) _storyClips = [];
+  return _storyClips;
+}
+
+function saveStoryClipList() {
+  try { localStorage.setItem('sv_clips', JSON.stringify(getStoryClips())); } catch (e) {}
+}
+
+function storyClipVideoKey(id) {
+  return './__clips/video/' + encodeURIComponent(id);
+}
+
+function storyClipStillKey(id) {
+  return './__clips/still/' + encodeURIComponent(id);
+}
+
+// The preview at half size as a JPEG: the finished clip's poster and its
+// picture in the list. (A clip's first frame is the fade in from black.)
+function storyStillBlob(canvas) {
+  return new Promise(function(resolve) {
+    try {
+      var small = storyCanvas(STORY_WIDTH / 2, STORY_HEIGHT / 2);
+      small.getContext('2d').drawImage(canvas, 0, 0, small.width, small.height);
+      small.toBlob(function(blob) { resolve(blob || null); }, 'image/jpeg', .82);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+// Keeps a finished clip on this device and lets the oldest past STORY_KEEP
+// go. Returns its entry, or null when the browser wouldn't store it (a
+// private window, or the device is full): the clip on screen still works.
+async function keepStoryClip(file, still, meta) {
+  if (!('caches' in window)) return null;
+  var clip = Object.assign({ id:'clip-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }, meta);
+  try {
+    var cache = await caches.open(STORY_CLIP_CACHE);
+    await cache.put(storyClipVideoKey(clip.id), new Response(file, { headers:{ 'Content-Type':file.type } }));
+    if (still) await cache.put(storyClipStillKey(clip.id), new Response(still, { headers:{ 'Content-Type':'image/jpeg' } }));
+    var result = keepRecentClip(getStoryClips(), clip, STORY_KEEP);
+    _storyClips = result.kept;
+    saveStoryClipList();
+    await Promise.all(result.dropped.map(function(old) {
+      forgetStoryStill(old.id);
+      return Promise.all([cache.delete(storyClipVideoKey(old.id)), cache.delete(storyClipStillKey(old.id))]);
+    }));
+    // Ask the browser not to clear this site's storage when space runs low.
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function() {});
+    return clip;
+  } catch (e) {
+    console.warn('Couldn’t keep the clip on this device:', e);
+    return null;
+  }
+}
+
+function forgetStoryStill(id) {
+  if (_storyStills[id]) URL.revokeObjectURL(_storyStills[id]);
+  delete _storyStills[id];
+}
+
+async function storyStillURL(id) {
+  if (_storyStills[id]) return _storyStills[id];
+  try {
+    var response = await (await caches.open(STORY_CLIP_CACHE)).match(storyClipStillKey(id));
+    if (!response) return '';
+    _storyStills[id] = URL.createObjectURL(await response.blob());
+    return _storyStills[id];
+  } catch (e) {
+    return '';
+  }
+}
+
+// Drops list entries whose video the browser has since cleared.
+async function syncKeptStoryClips() {
+  if (!('caches' in window) || !getStoryClips().length) return;
+  try {
+    var cache = await caches.open(STORY_CLIP_CACHE);
+    var present = await Promise.all(getStoryClips().map(function(clip) { return cache.match(storyClipVideoKey(clip.id)); }));
+    var before = getStoryClips().length;
+    _storyClips = getStoryClips().filter(function(clip, i) { return !!present[i]; });
+    if (_storyClips.length !== before) {
+      saveStoryClipList();
+      renderKeptStoryClips();
+    }
+  } catch (e) {}
+}
+
+async function openKeptStoryClip(id) {
+  if (!_story || _story.phase === 'loading' || _story.phase === 'recording') return;
+  var clip = getStoryClips().find(function(item) { return item.id === id; });
+  if (!clip) return;
+  var response = null;
+  try { response = await (await caches.open(STORY_CLIP_CACHE)).match(storyClipVideoKey(id)); } catch (e) {}
+  if (!_story) return;
+  if (!response) {
+    _storyClips = getStoryClips().filter(function(item) { return item.id !== id; });
+    saveStoryClipList();
+    showToast('That clip is no longer on this device.');
+    renderKeptStoryClips();
+    return;
+  }
+  var blob = await response.blob();
+  var poster = await storyStillURL(id);
+  if (!_story || _story.phase === 'loading' || _story.phase === 'recording') return;
+  releaseStoryResult();
+  _story.url = URL.createObjectURL(blob);
+  _story.file = new File([blob], storyFileName(clip.title, clip.ext), { type:clip.type || blob.type || 'video/mp4' });
+  _story.poster = poster;
+  _story.clipId = id;
+  _story.viewing = clip;
+  _story.phase = 'done';
+  renderStoryDialog();
+}
+
+async function deleteKeptStoryClip(id) {
+  _storyClips = getStoryClips().filter(function(clip) { return clip.id !== id; });
+  saveStoryClipList();
+  var showing = _story && _story.phase === 'done' && _story.clipId === id;
+  if (showing && _story.viewing) {
+    makeAnotherStoryClip();
+  } else {
+    if (showing) _story.clipId = '';   // made just now: it stays on screen, no longer kept
+    renderStoryDialog();
+  }
+  forgetStoryStill(id);
+  try {
+    var cache = await caches.open(STORY_CLIP_CACHE);
+    await Promise.all([cache.delete(storyClipVideoKey(id)), cache.delete(storyClipStillKey(id))]);
+  } catch (e) {}
+}
+
+function renderKeptStoryClips() {
+  var box = document.getElementById('story-kept');
+  if (!box || !_story) return;
+  var clips = getStoryClips();
+  box.hidden = !clips.length;
+  if (!clips.length) { box.innerHTML = ''; return; }
+  var busy = _story.phase === 'loading' || _story.phase === 'recording';
+  var current = _story.phase === 'done' ? _story.clipId : '';
+  box.innerHTML = '<div class="story-label">Recent clips on this device</div>'
+    + '<div class="story-kept-list">' + clips.map(function(clip) {
+        var meta = 'From ' + fmtTime(clip.start) + ' · ' + clip.length + 's · ' + storyClipAge(clip.at);
+        var here = clip.id === current;
+        return '<div class="story-kept-row' + (here ? ' is-current' : '') + '">'
+          + '<button type="button" class="story-kept-open"' + (busy ? ' disabled' : '') + (here ? ' aria-current="true"' : '')
+          +   ' aria-label="' + attr('Open the clip of ' + clip.title + ', ' + meta) + '" onclick="openKeptStoryClip(' + jsq(clip.id) + ')">'
+          +   '<span class="story-kept-thumb"><img alt="" data-clip-still="' + attr(clip.id) + '" hidden></span>'
+          +   '<span class="story-kept-copy"><span class="story-kept-title">' + esc(clip.title) + '</span>'
+          +   '<span class="story-kept-meta">' + esc(meta) + '</span></span>'
+          + '</button>'
+          + '<button type="button" class="story-kept-del"' + (busy ? ' disabled' : '')
+          +   ' aria-label="' + attr('Delete the clip of ' + clip.title + ' from this device') + '" title="Delete from this device"'
+          +   ' onclick="deleteKeptStoryClip(' + jsq(clip.id) + ')">' + icon('x') + '</button>'
+          + '</div>';
+      }).join('') + '</div>';
+  box.querySelectorAll('img[data-clip-still]').forEach(function(img) {
+    storyStillURL(img.getAttribute('data-clip-still')).then(function(url) {
+      if (!url) return;
+      img.src = url;
+      img.hidden = false;
+    });
+  });
 }
 
 // ── The dialog ────────────────────────────────────────────────────────
@@ -664,12 +865,16 @@ function renderStoryProgress(t, total) {
 
 function storyNote(track) {
   var phase = _story.phase;
-  if (phase === 'timing') return 'Timing the lyrics first, so the words land when they’re sung. About half a minute.';
+  if (phase === 'setup' && _story.timing) return 'Timing the lyrics first, so the words land when they’re sung. About half a minute.';
   if (phase === 'loading') return 'Getting the song…';
   if (phase === 'error') return _story.error;
   if (phase === 'done') {
     var ext = _story.file.name.split('.').pop().toUpperCase();
-    var note = 'Ready: a ' + _story.length + '-second ' + ext + ', ' + formatFileSize(_story.file.size) + '.';
+    var shown = _story.viewing;
+    var what = 'a ' + (shown ? shown.length : _story.length) + '-second ' + ext + ', ' + formatFileSize(_story.file.size) + '.';
+    var note = shown
+      ? 'Made ' + storyClipAge(shown.at) + ', from ' + fmtTime(shown.start) + ' of the song: ' + what
+      : 'Ready: ' + what + (_story.clipId ? ' A copy stays on this device with your last ' + STORY_KEEP + ' clips.' : '');
     if (ext === 'WEBM') note += ' This browser can only record WebM, which iPhones and Instagram may not open; Safari or a recent Chrome makes MP4.';
     return note;
   }
@@ -687,7 +892,7 @@ function renderStoryDialog() {
   var track = storyTrack();
   if (!track) return;
   var phase = _story.phase;
-  var busy = phase === 'loading' || phase === 'recording' || phase === 'timing';
+  var busy = phase === 'loading' || phase === 'recording' || _story.timing;
   var done = phase === 'done';
   var canvas = document.getElementById('story-canvas');
   var video = document.getElementById('story-video');
@@ -706,10 +911,10 @@ function renderStoryDialog() {
   var progress = document.getElementById('story-progress');
   progress.hidden = phase !== 'recording';
   progress.querySelector('span').style.width = Math.round((_story.progress || 0) * 100) + '%';
-  document.getElementById('story-song').textContent = track.title || 'Untitled';
+  document.getElementById('story-song').textContent = (_story.viewing ? _story.viewing.title : track.title) || 'Untitled';
 
   var maxStart = Math.max(0, storyDuration(track) - _story.length);
-  var locked = !storyEditable();
+  var locked = !storyEditable() || _story.timing;
   document.getElementById('story-controls').innerHTML = done ? '' :
       '<div class="story-field">'
     +   '<div class="story-label" id="story-length-label">Length</div>'
@@ -738,7 +943,7 @@ function renderStoryDialog() {
   if (phase === 'loading' || phase === 'recording') {
     actions = '<button class="sec-action" onclick="cancelStoryClip()">Cancel</button>';
   } else if (done) {
-    actions = '<button class="sec-action" onclick="makeAnotherStoryClip()">Make another</button>'
+    actions = '<button class="sec-action" onclick="makeAnotherStoryClip()">' + (_story.viewing ? 'New clip' : 'Make another') + '</button>'
       + '<button class="sec-action' + (canShareStoryClip() ? '' : ' primary') + '" onclick="saveStoryClip()">Save video</button>'
       + (canShareStoryClip() ? '<button class="sec-action primary" onclick="shareStoryClip()">Share&hellip;</button>' : '');
   } else {
@@ -747,4 +952,5 @@ function renderStoryDialog() {
       + (phase === 'error' ? 'Try again' : 'Make the clip') + '</button>';
   }
   document.getElementById('story-actions').innerHTML = actions;
+  renderKeptStoryClips();
 }

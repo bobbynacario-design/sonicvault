@@ -13,6 +13,9 @@ var ART_CACHE = 'sv-art-v1';
 // Playlists kept offline (js/features/offline.js): written by the page,
 // served before the network, never trimmed.
 var OFFLINE_CACHE = 'sv-offline-v1';
+// Story clips kept on this device (js/features/story.js): written by the
+// page, never fetched through this worker.
+var CLIPS_CACHE = 'sv-clips-v1';
 
 var SHELL_ASSETS = [
   './',
@@ -87,7 +90,7 @@ self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.filter(function(key) {
-        return key.indexOf('sv-') === 0 && [SHELL_CACHE, STATIC_CACHE, AUDIO_CACHE, ART_CACHE, OFFLINE_CACHE].indexOf(key) === -1;
+        return key.indexOf('sv-') === 0 && [SHELL_CACHE, STATIC_CACHE, AUDIO_CACHE, ART_CACHE, OFFLINE_CACHE, CLIPS_CACHE].indexOf(key) === -1;
       }).map(function(key) { return caches.delete(key); }));
     }).then(function() { return self.clients.claim(); })
   );
