@@ -1805,17 +1805,20 @@ body.light .expand-item{background:none}
   gap:.45rem;
   flex-wrap:wrap;
 }
+/* Tags read as words, like the player's (.player-tag), not tracked-out
+   mono capitals. */
 .ai-chip{
-  padding:.34rem .6rem;
+  padding:.3rem .72rem;
   border-radius:999px;
-  border:1px solid var(--rim2);
-  background:rgba(255,255,255,.04);
-  font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.08em;
-  text-transform:uppercase;
+  background:var(--surface-hover);
+  font-family:var(--sans);
+  font-size:12.5px;
+  font-weight:500;
   color:var(--muted);
 }
+.edit-ai-facts{font-size:13.5px;font-weight:500;color:var(--text)}
+.edit-ai-facts[hidden],.edit-ai-note[hidden]{display:none}
+.edit-ai-note{font-size:12.5px;line-height:1.6;color:var(--muted)}
 .upload-progress-copy{
   margin:.65rem 0 .9rem;
   color:var(--muted);
@@ -3294,7 +3297,7 @@ body.light .btn-google{box-shadow:inset 0 0 0 1px #747775}
 .create-setup[hidden]{display:none}
 .create-setup strong{color:var(--text);font-weight:600}
 .create-setup code{font-family:var(--mono);font-size:12px;padding:.05rem .35rem;border-radius:6px;background:var(--surface-hover);color:var(--text);overflow-wrap:anywhere}
-.create-setup-link{
+.create-setup-link,.edit-ai-link{
   padding:0;
   border:none;
   background:none;

@@ -15,6 +15,33 @@ function buildEditSelectOptions(list, current) {
   return buildSelectOptions(options, current || options[0]);
 }
 
+// What the metadata panel says before anything is generated: the song's
+// description, and -- in a browser without the AI worker -- that suggestions
+// here come only from the song's own words.
+function renderEditMetadataPanel(track) {
+  var worker = !!_aiConfig.endpoint;
+  var summary = getTrackSummary(track);
+  document.getElementById('edit-ai-status').textContent = summary || (worker
+    ? 'No description yet. Claude can write one from the title, prompt and lyrics.'
+    : 'No description yet.');
+  document.getElementById('edit-ai-facts').hidden = true;
+  document.getElementById('edit-ai-chips').innerHTML = '';
+  // Claude's description is never replaced by basic suggestions, so with it
+  // in place and no worker here there is nothing useful to offer but the
+  // way to connect.
+  var keepsClaude = !worker && hasAIDescription(track);
+  var connect = ' <button type="button" class="edit-ai-link" onclick="closeModal(\'modal-edit-track\'); openAIWorkerSettings();">Connect the AI worker</button>';
+  var note = document.getElementById('edit-ai-note');
+  note.hidden = worker;
+  note.innerHTML = worker ? '' : keepsClaude
+    ? 'This browser isn\u2019t connected to the AI worker, so it can\u2019t describe the song again.' + connect
+    : 'This browser isn\u2019t connected to the AI worker, so suggestions come only from the song\u2019s own words, with no description.' + connect;
+  var btn = document.getElementById('edit-ai-btn');
+  btn.disabled = false;
+  btn.hidden = keepsClaude;
+  btn.textContent = worker ? (summary ? 'Describe again with Claude' : 'Describe with Claude') : 'Suggest from the lyrics';
+}
+
 function openEditTrack(id) {
   var track = getTrackById(id);
   if (!track) return;
@@ -27,11 +54,7 @@ function openEditTrack(id) {
   document.getElementById('edit-cover-style').innerHTML = buildCoverStyleOptions(getCoverStyle(track));
   document.getElementById('edit-prompt').value = track.prompt || '';
   document.getElementById('edit-lyrics').value = getTrackLyrics(track);
-  document.getElementById('edit-ai-chips').innerHTML = '';
-  document.getElementById('edit-ai-status').textContent = getTrackSummary(track) || 'Generate AI metadata from the current title, prompt, and lyrics. Uses your Claude worker when configured, otherwise local suggestions.';
-  var btn = document.getElementById('edit-ai-btn');
-  btn.disabled = false;
-  btn.textContent = getTrackSummary(track) ? 'Regenerate AI metadata' : 'Generate AI metadata';
+  renderEditMetadataPanel(track);
   openModal('modal-edit-track');
 }
 
@@ -52,25 +75,33 @@ async function regenerateTrackMetadata() {
   if (!input.title) { showToast('Add a title before generating metadata'); return; }
   var btn = document.getElementById('edit-ai-btn');
   var statusEl = document.getElementById('edit-ai-status');
+  var worker = !!_aiConfig.endpoint;
   btn.disabled = true;
-  statusEl.textContent = 'Generating metadata...';
+  statusEl.textContent = worker ? 'Claude is listening to the words\u2026' : 'Reading the words\u2026';
   try {
     var fallback = buildLocalMetadataSuggestion(input);
-    var metadata = _aiConfig.endpoint ? await requestRemoteAIMetadata(input, fallback) : fallback;
-    metadata.aiSource = _aiConfig.endpoint ? 'claude' : 'local';
+    var metadata = worker ? await requestRemoteAIMetadata(input, fallback) : fallback;
+    metadata.aiSource = worker ? 'claude' : 'local';
     _editTrackAI = metadata;
     var coverSelect = document.getElementById('edit-cover-style');
     if (coverSelect && metadata.coverStyle) coverSelect.value = normalizeCoverStyle(metadata.coverStyle, track);
-    statusEl.textContent = metadata.aiSummary || (_aiConfig.endpoint ? 'Claude metadata ready.' : 'Local suggestions ready.');
-    var chips = (metadata.aiTags || []).concat([metadata.aiMood, metadata.aiGenre, metadata.aiEnergy, getCoverStyleName(metadata.coverStyle)].filter(Boolean));
-    document.getElementById('edit-ai-chips').innerHTML = chips.map(function(c) { return '<span class="ai-chip">' + esc(c) + '</span>'; }).join('');
-    showToast(_aiConfig.endpoint ? 'Claude metadata generated' : 'Local metadata suggestions generated');
+    statusEl.textContent = metadata.aiSummary || (worker
+      ? 'Claude sent no description this time.'
+      : 'Suggestions from the song\u2019s words. Save to keep them.');
+    // The facts on one line, the tags as chips. The cover style is shown by
+    // its own picker, so it is not a tag.
+    var facts = [metadata.aiGenre, metadata.aiMood, metadata.aiEnergy ? metadata.aiEnergy + ' energy' : '', metadata.aiTheme].filter(Boolean);
+    var factsEl = document.getElementById('edit-ai-facts');
+    factsEl.textContent = facts.join(' \u00b7 ');
+    factsEl.hidden = !facts.length;
+    document.getElementById('edit-ai-chips').innerHTML = (metadata.aiTags || []).map(function(c) { return '<span class="ai-chip">' + esc(c) + '</span>'; }).join('');
+    showToast(worker ? 'Claude described the song. Save to keep it.' : 'Suggestions ready. Save to keep them.');
   } catch (e) {
-    statusEl.textContent = 'AI metadata failed: ' + (e && e.message ? e.message : 'unknown error');
-    showToast('AI metadata failed. Save still works.');
+    statusEl.textContent = 'Couldn\u2019t describe the song: ' + (e && e.message ? e.message : 'unknown error');
+    showToast('Describing the song failed. Save still works.');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Regenerate AI metadata';
+    btn.textContent = worker ? 'Describe again with Claude' : 'Suggest from the lyrics';
   }
 }
 

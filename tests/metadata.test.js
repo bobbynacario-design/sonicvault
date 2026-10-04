@@ -51,7 +51,76 @@ test("the local suggestion engine is deterministic and fills every field", () =>
   assert.equal(a.aiSource, "local");
   assert.ok(coverIds().includes(a.coverStyle));
   assert.ok(a.aiTags.length > 0 && a.aiTags.length <= 10);
-  assert.ok(a.aiSummary.includes("Neon Highway"));
+  // A template cannot describe a song, so the local engine does not try.
+  assert.equal(a.aiSummary, "");
+});
+
+// The opening of "Still In": a reflective song about turning 47, in poker
+// terms. The local tagger once called it "energetic synthwave" (from "run"
+// inside "turn") with "low energy" (from "still"), themed "coastal reset and
+// night-drive escape", and wrote a review saying so.
+const STILL_IN = {
+  title: "Still In (1)",
+  genre: "Country",
+  mood: "Warm",
+  lyrics: [
+    "[Verse 1]",
+    "Woke up September, one more turn around the sun",
+    "Forty-seven candles and I'm not done, not done",
+    "Counted out the quiet years like chips across the felt",
+    "Some I played too careful, some I never even dealt",
+    "[Chorus]",
+    "Still in, still holding, deal me one more night",
+    "Still in, still holding, deal me one more night",
+    "Still in, still holding, deal me one more night"
+  ].join("\n")
+};
+
+test("keywords count only as whole words, and 'still' is not a tempo", () => {
+  const out = g.buildLocalMetadataSuggestion(STILL_IN);
+  assert.equal(out.aiMood, "Warm", "'run' inside 'turn' is not a mood");
+  assert.equal(out.aiGenre, "Country", "nothing in the words overrides the chosen genre");
+  assert.equal(out.aiEnergy, "Medium", "'still' says nothing about energy");
+  assert.equal(out.aiTheme, "", "one 'sun' does not make a song coastal");
+  assert.equal(out.aiSummary, "");
+  assert.equal(out.aiEra, "");
+  assert.equal(out.aiVocalStyle, "Lead vocal");
+  assert.equal(g.hasKeyword("one more turn around the sun", "run"), false);
+  assert.equal(g.hasKeyword("we run", "run"), true);
+  assert.equal(g.hasKeyword("a slow jam tonight", "slow jam"), true);
+  assert.equal(g.hasKeyword("r&b soul", "r&b"), true);
+});
+
+test("local tags are words the song repeats, not one-off words or lines", () => {
+  const out = g.buildLocalMetadataSuggestion(STILL_IN);
+  assert.deepEqual(out.aiTags, ["holding", "night", "deal"]);
+  assert.equal(g.buildLocalMetadataSuggestion({ title: "X", lyrics: "one two three" }).aiTags.length, 0);
+});
+
+test("basic suggestions never overwrite a description Claude wrote", () => {
+  const track = { title: "Still In", genre: "Country", aiSource: "claude", aiSummary: "A gambler's birthday toast.", aiTags: ["poker", "birthday"], aiTheme: "Aging" };
+  g.applyAIMetadataToDraft(track, g.buildLocalMetadataSuggestion(STILL_IN), false);
+  assert.equal(track.aiSummary, "A gambler's birthday toast.");
+  assert.deepEqual(track.aiTags, ["poker", "birthday"]);
+  assert.equal(track.aiSource, "claude");
+  // A song with no AI description takes them.
+  const bare = { title: "Still In", genre: "Country" };
+  g.applyAIMetadataToDraft(bare, g.buildLocalMetadataSuggestion(STILL_IN), false);
+  assert.equal(bare.aiSource, "local");
+  assert.deepEqual(bare.aiTags, ["holding", "night", "deal"]);
+});
+
+test("reviews the local tagger wrote are dropped when read; real ones are kept", () => {
+  const old = {
+    aiSource: "local",
+    aiSummary: "“Still In (1)” leans into coastal reset and night-drive escape as a energetic synthwave release, framing the hook around still in 1. The lyric sheet points to a low-energy arrangement with focused production detail and a anthemic lead delivery."
+  };
+  assert.equal(g.getTrackSummary(old), "");
+  assert.equal(g.getTrackSummary({ aiSource: "local", aiSummary: '"X" lands as an uplifting pop cut built around hope.' }), "");
+  assert.equal(g.getTrackSummary({ aiSummary: "A curated SonicVault release shaped from the track title, prompt, and lyrics." }), "");
+  // Claude's summaries, and anything a person wrote, stay.
+  assert.equal(g.getTrackSummary({ aiSource: "claude", aiSummary: '"X" leans into something real.' }), '"X" leans into something real.');
+  assert.equal(g.getTrackSummary({ aiSource: "local", aiSummary: "My own words." }), "My own words.");
 });
 
 test("AI suggestions never overwrite a genre or mood the user picked, unless forced", () => {
