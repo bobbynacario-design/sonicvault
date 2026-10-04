@@ -86,3 +86,38 @@ function collapseVersions(list, allTracks, keyOf) {
   });
   return { list: out, versions: versions };
 }
+
+// ── Comparing takes ─────────────────────────────────────────────────────────
+// Where to land in another take so it is the same place in the song, not
+// just the same second: two takes sing the sheet at different speeds and
+// with different intros. With both timed (lines: [start, end] per sung
+// line, the same sheet), the same line, as far through it; before the
+// first line, as far through the intro; past the last, as long after it.
+// Untimed, the same second. Clamped to the other take's length.
+function mapTakeTime(fromTimes, toTimes, t, toDuration) {
+  var time = Math.max(0, Number(t) || 0);
+  var limit = Number(toDuration) > 0 ? Number(toDuration) : Infinity;
+  var clamp = function(v) { return Math.max(0, Math.min(limit, v)); };
+  if (!fromTimes || !toTimes || !fromTimes.length || fromTimes.length !== toTimes.length) return clamp(time);
+  var n = fromTimes.length;
+  if (time < fromTimes[0][0]) {
+    return clamp(fromTimes[0][0] > 0 ? time / fromTimes[0][0] * toTimes[0][0] : toTimes[0][0]);
+  }
+  var i = n - 1;
+  while (i > 0 && fromTimes[i][0] > time) i--;
+  if (i === n - 1) return clamp(toTimes[i][0] + (time - fromTimes[i][0]));
+  var span = fromTimes[i + 1][0] - fromTimes[i][0];
+  var through = span > 0 ? (time - fromTimes[i][0]) / span : 0;
+  return clamp(toTimes[i][0] + through * (toTimes[i + 1][0] - toTimes[i][0]));
+}
+
+// Volume factors that play takes equally loud: the louder ones turned down
+// to the quietest measured one. A take not measured plays as it is.
+function matchTakeLoudness(lufsList) {
+  var measured = lufsList.filter(function(v) { return typeof v === 'number' && isFinite(v) && v > -60; });
+  if (!measured.length) return lufsList.map(function() { return 1; });
+  var quietest = Math.min.apply(null, measured);
+  return lufsList.map(function(v) {
+    return typeof v === 'number' && isFinite(v) && v > -60 ? Math.min(1, Math.pow(10, (quietest - v) / 20)) : 1;
+  });
+}

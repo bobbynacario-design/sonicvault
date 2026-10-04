@@ -166,7 +166,8 @@ function renderPlayerVersions(track) {
   el.innerHTML = '<span>' + versionLabel(track, group) + ' of ' + group.length + '</span>'
     + group.filter(function(take) { return take !== track; }).map(function(take) {
       return '<button type="button" class="version-switch" onclick="switchToVersion(' + jsq(take.id) + ')">Switch to ' + versionLabel(take, group).toLowerCase() + '</button>';
-    }).join('');
+    }).join('')
+    + '<button type="button" class="version-switch is-compare" onclick="compareCurrentTrack()">Compare takes</button>';
 }
 
 function switchToVersion(id) {

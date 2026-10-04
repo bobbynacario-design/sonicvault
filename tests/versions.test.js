@@ -50,3 +50,24 @@ test("a list shows each song once, in the place of its first version", () => {
   // Songs with no twin are untouched.
   assert.deepEqual(g.collapseVersions([solo], all).list, [solo]);
 });
+
+test("switching takes lands at the same line, as far through it", () => {
+  // Take A sings lines at 10, 20, 30; take B, with a longer intro and slower, at 15, 27, 39.
+  const a = [[10, 18], [20, 28], [30, 38]];
+  const b = [[15, 25], [27, 37], [39, 49]];
+  assert.equal(g.mapTakeTime(a, b, 25, 60), 33);    // halfway through line 2 in both
+  assert.equal(g.mapTakeTime(a, b, 5, 60), 7.5);    // halfway through the intro
+  assert.equal(g.mapTakeTime(a, b, 34, 60), 43);    // 4s into the last line
+  assert.equal(g.mapTakeTime(a, b, 80, 60), 60);    // never past the end
+  // Untimed, or different sheets: the same second.
+  assert.equal(g.mapTakeTime(null, b, 25, 60), 25);
+  assert.equal(g.mapTakeTime(a, b.slice(0, 2), 25, 60), 25);
+});
+
+test("takes play equally loud: the louder turned down to the quietest", () => {
+  const gains = g.matchTakeLoudness([-8, -14, null]);
+  assert.ok(Math.abs(gains[0] - 0.501) < 0.001);
+  assert.equal(gains[1], 1);
+  assert.equal(gains[2], 1);
+  assert.deepEqual(g.matchTakeLoudness([null, undefined]), [1, 1]);
+});

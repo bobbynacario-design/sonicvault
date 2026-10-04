@@ -3241,6 +3241,35 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   #story-actions .sec-action{flex:1 0 auto}
 }
 
+/* Compare takes (js/features/compare.js). */
+.compare-modal{max-width:760px}
+.compare-takes{display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:.7rem;margin-top:1.1rem}
+.compare-take{display:grid;gap:.5rem;justify-items:start;padding:.5rem;border-radius:18px;background:var(--surface);transition:background .16s ease, box-shadow .16s ease}
+.compare-take.active{background:var(--accent-dynamic-soft);box-shadow:inset 0 0 0 2px var(--accent-dynamic)}
+.compare-pick{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:.75rem;row-gap:.15rem;align-items:center;width:100%;padding:.45rem;border:none;border-radius:14px;background:none;color:var(--text);text-align:left;font-family:var(--sans);cursor:pointer}
+.compare-pick .cover-art{grid-row:span 3}
+.compare-name{font-size:15px;font-weight:700}
+.compare-now{margin-left:.35rem;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-dynamic)}
+.compare-facts,.compare-check{font-size:12.5px;color:var(--muted)}
+.compare-check{color:var(--muted2)}
+.compare-take .version-main,.compare-main{margin:0 .45rem .3rem}
+.compare-line{min-height:1.6em;margin-top:1rem;font-size:17px;font-weight:600;line-height:1.5;color:var(--text)}
+.compare-transport{display:flex;align-items:center;gap:1rem;margin-top:.6rem}
+.compare-play{width:52px;height:52px;background:var(--text);color:var(--bg)}
+.compare-bar{background:linear-gradient(var(--rim2), var(--rim2)) center / 100% 4px no-repeat}
+.compare-bar span{background:var(--accent-dynamic)}
+.compare-time{flex:none;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.compare-note{margin:.8rem 0 0;font-size:13px;line-height:1.5;color:var(--muted2)}
+.version-switch.is-compare{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+@media (max-width:640px){
+  .compare-takes{grid-template-columns:repeat(2, minmax(0, 1fr));gap:.5rem}
+  .compare-take{padding:.35rem;gap:.35rem}
+  .compare-pick{grid-template-columns:minmax(0,1fr);padding:.35rem}
+  .compare-pick .cover-art{grid-row:auto;margin-bottom:.3rem}
+  .compare-check{display:none}
+  .compare-take .version-main,.compare-main{margin:0 .35rem .25rem}
+}
+
 /* A playlist from a sentence (js/features/meaning.js). */
 .pl-sentence{display:grid;gap:.55rem;margin:.2rem 0 1.4rem;padding:1rem 1.1rem;border-radius:18px;background:var(--surface)}
 .pl-sentence[hidden],.pl-sentence-status[hidden]{display:none}

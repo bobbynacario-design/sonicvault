@@ -63,6 +63,7 @@ function closeModal(id) {
   // A clip being recorded stops when its dialog closes, however it closes.
   if (id === 'modal-story') onStoryClipClosed();
   if (id === 'modal-karaoke') onKaraokeClosed();
+  if (id === 'modal-compare') onCompareClosed();
   var returnTo = _modalReturnFocus[id];
   delete _modalReturnFocus[id];
   if (returnTo && returnTo.focus && document.contains(returnTo)) {
