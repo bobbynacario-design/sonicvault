@@ -69,8 +69,9 @@ document.addEventListener('keydown', function(e) {
   if (typing) return;
 
   // While a dialog is open, swallow everything else so shortcuts don't fire
-  // behind it.
-  if (getOpenOverlay()) return;
+  // behind it -- except karaoke, which is the player full screen.
+  var overlay = getOpenOverlay();
+  if (overlay && overlay.id !== 'modal-karaoke') return;
 
   // Let buttons/links/card-buttons handle their own activation keys.
   if ((tag === 'BUTTON' || tag === 'A' || target.getAttribute && target.getAttribute('role') === 'button')

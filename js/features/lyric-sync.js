@@ -7,13 +7,15 @@
 // A line that came out wrong is fixed by tapping it while it is being sung;
 // with no worker configured, the same taps time a song by hand.
 //
-// track.lyricSync = { key, starts: [s | null...], ends: [e | null...], source, at, heard? }
+// track.lyricSync = { key, starts: [s | null...], ends: [e | null...], source, at, heard?, words? }
 //   (two flat arrays: Firestore rejects an array inside an array -- see
 //   packLyricSync in js/data/lyric-sync.js)
 //   key     lyricSyncKey(lyrics) -- editing the lyrics retires the timings
 //   source  'audio' | 'audio+fixed' | 'manual' | 'unmatched'
 //   heard   what the transcription heard on each sung line, for checking
 //           what was sung against what was written (checkSungLyrics)
+//   words   when each sheet word was heard, flat, for karaoke
+//           (karaokeWords; js/features/karaoke.js)
 
 var LYRIC_SYNC_MIN_MATCH = .3;   // below this share of words matched, timings are not trusted
 var LYRIC_SYNC_TIMEOUT_MS = 120000;
@@ -38,7 +40,8 @@ function getLyricSync(track) {
   if (sync.key !== lyricSyncKey(getTrackLyrics(track))) return null;
   if (sync.source !== 'unmatched' && lines.length !== sungLyricLines(getTrackLyrics(track)).length) return null;
   var heard = Array.isArray(sync.heard) && sync.heard.length === lines.length ? sync.heard : null;
-  return { key:sync.key, lines:lines, source:sync.source, at:sync.at, heard:heard };
+  var words = Array.isArray(sync.words) && sync.words.length === lyricWordOffsets(getTrackLyrics(track)).total ? sync.words : null;
+  return { key:sync.key, lines:lines, source:sync.source, at:sync.at, heard:heard, words:words };
 }
 
 function hasUsableLyricTimes(track) {
@@ -97,7 +100,7 @@ async function requestLyricSync(track) {
     if (getLyricSync(track) || !hasLyrics(track)) return;
     var aligned = alignLyricsToWords(lyrics, words);
     var trusted = aligned.matched >= LYRIC_SYNC_MIN_MATCH;
-    track.lyricSync = packLyricSync(lyrics, trusted ? aligned.lines : [], trusted ? 'audio' : 'unmatched', new Date().toISOString(), aligned.heard);
+    track.lyricSync = packLyricSync(lyrics, trusted ? aligned.lines : [], trusted ? 'audio' : 'unmatched', new Date().toISOString(), aligned.heard, aligned.words);
     persistTracks();
   } catch (e) {
     _lyricSyncFailed[track.id] = e && e.name === 'AbortError' ? 'timeout' : 'error';
@@ -158,7 +161,8 @@ function onLyricLineTap(index) {
     time:_audio.currentTime,
     at:Date.now()
   };
-  track.lyricSync = packLyricSync(lyrics, fixLyricLine(base, index, _audio.currentTime), source, new Date().toISOString());
+  track.lyricSync = packLyricSync(lyrics, fixLyricLine(base, index, _audio.currentTime), source, new Date().toISOString(),
+    sync ? sync.heard : null, sync ? sync.words : null);
   _lyricTimesCache = null;
   persistTracks();
   renderLyricStatus();
@@ -180,6 +184,7 @@ function undoLyricFix() {
 }
 
 function renderLyricStatus() {
+  if (typeof renderKaraokeButton === 'function') renderKaraokeButton();
   var el = document.getElementById('xp-lyrics-status');
   if (!el) return;
   var track = _currentTrack && (getVaultTrack(_currentTrack.id) || _currentTrack);
@@ -247,10 +252,10 @@ async function requestSungCheck(track) {
     var aligned = alignLyricsToWords(lyrics, words);
     var existing = getLyricSync(track);
     if (existing && (existing.source === 'audio+fixed' || existing.source === 'manual')) {
-      track.lyricSync = packLyricSync(lyrics, existing.lines, existing.source, existing.at, aligned.heard);
+      track.lyricSync = packLyricSync(lyrics, existing.lines, existing.source, existing.at, aligned.heard, aligned.words);
     } else {
       var trusted = aligned.matched >= LYRIC_SYNC_MIN_MATCH;
-      track.lyricSync = packLyricSync(lyrics, trusted ? aligned.lines : [], trusted ? 'audio' : 'unmatched', new Date().toISOString(), aligned.heard);
+      track.lyricSync = packLyricSync(lyrics, trusted ? aligned.lines : [], trusted ? 'audio' : 'unmatched', new Date().toISOString(), aligned.heard, aligned.words);
     }
     persistTracks();
   } catch (e) {

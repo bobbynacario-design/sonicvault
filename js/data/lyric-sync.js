@@ -93,7 +93,10 @@ function wordMatchScore(a, b) {
 // under a loud mix and invents a few words in instrumental passages -- so the
 // match follows the order of the song and repeated choruses land on their
 // own repeats. Returns one [start, end] per sung line (null where nothing on
-// the line was heard), and the share of sheet words that were matched.
+// the line was heard), the share of sheet words that were matched, what was
+// heard on each line, and when each sheet word was heard (words: one start
+// per lyricWordsOf word, line after line, null where none lined up -- the
+// karaoke timings).
 // heard: [[word, start, end], ...] as the worker sends it.
 function alignLyricsToWords(lyrics, heard) {
   var lines = sungLyricLines(lyrics);
@@ -110,7 +113,12 @@ function alignLyricsToWords(lyrics, heard) {
   });
   var n = sheet.length;
   var m = audio.length;
-  var result = { lines:lines.map(function() { return null; }), matched:0, heard:lines.map(function() { return ''; }) };
+  var result = {
+    lines:lines.map(function() { return null; }),
+    matched:0,
+    heard:lines.map(function() { return ''; }),
+    words:sheet.map(function() { return null; })
+  };
   if (!n || !m) return result;
 
   var SKIP = -.6;
@@ -177,6 +185,7 @@ function alignLyricsToWords(lyrics, heard) {
     previousEnd = span[1];
   });
   result.matched = matched / n;
+  result.words = sheet.map(function(entry, k) { return times[k] ? Math.round(times[k].start * 100) / 100 : null; });
   // What was heard on each line: every heard word from the first to the last
   // one lined up with the line's words, so a sung substitution or an extra
   // word inside the line is kept. '' for a line nothing lined up with.
@@ -394,7 +403,9 @@ function currentLyricIndex(times, t, lead) {
 // heard (optional): the text heard on each sung line, for checking what was
 // sung against what was written. A flat array of strings, which Firestore
 // accepts.
-function packLyricSync(lyrics, lines, source, at, heard) {
+// words (optional): when each sheet word was heard (alignLyricsToWords'
+// words), for karaoke. A flat array of numbers and nulls.
+function packLyricSync(lyrics, lines, source, at, heard, words) {
   var starts = [];
   var ends = [];
   (lines || []).forEach(function(span) {
@@ -404,6 +415,9 @@ function packLyricSync(lyrics, lines, source, at, heard) {
   });
   var packed = { key:lyricSyncKey(lyrics), starts:starts, ends:ends, source:source, at:at };
   if (Array.isArray(heard)) packed.heard = heard.map(function(text) { return String(text || ''); });
+  if (Array.isArray(words)) {
+    packed.words = words.map(function(t) { return typeof t === 'number' && isFinite(t) ? Math.round(t * 100) / 100 : null; });
+  }
   return packed;
 }
 
@@ -439,6 +453,7 @@ function cloudSafeLyricSync(sync) {
     at:sync.at
   };
   if (Array.isArray(sync.heard)) safe.heard = sync.heard.slice();
+  if (Array.isArray(sync.words)) safe.words = sync.words.slice();
   return safe;
 }
 
@@ -458,4 +473,94 @@ function fixLyricLine(spans, index, t) {
     if (out[i] && out[i][0] <= time) out[i] = null;
   }
   return out;
+}
+
+// ── Karaoke: word by word ───────────────────────────────────────────────────
+
+// Where each sung line's words begin in a sheet's flat word list
+// (alignLyricsToWords' words, lyricSync.words), and how many there are.
+function lyricWordOffsets(lyrics) {
+  var offsets = [];
+  var total = 0;
+  sungLyricLines(lyrics).forEach(function(line) {
+    offsets.push(total);
+    total += lyricWordsOf(line).length;
+  });
+  return { offsets:offsets, total:total };
+}
+
+// A sung line as the words to light up in turn, each with when it starts
+// and ends. span: the line's [start, end]. starts: when each of its sheet
+// words (lyricWordsOf order) was heard, null where it wasn't, or nothing at
+// all. Heard times outside the line -- a line re-timed by hand since -- or
+// out of order are dropped, and the words without a time are spread between
+// the known ones by their length, so the words always run through the line
+// in order. Returns [{ text, space, start, end }]: each word as written with
+// the space after it; a bit with no letters ("—") rides with the word before.
+function karaokeWords(line, span, starts) {
+  var chunks = String(line || '').split(/(\s+)/);
+  var words = [];
+  for (var i = 0; i < chunks.length; i += 2) {
+    var text = chunks[i];
+    var space = chunks[i + 1] || '';
+    if (!text) continue;
+    var tokens = lyricWordsOf(text).length;
+    if (!tokens && words.length) {
+      var prev = words[words.length - 1];
+      prev.text += prev.space + text;
+      prev.space = space;
+      continue;
+    }
+    words.push({ text:text, space:space, tokens:tokens });
+  }
+  var lineStart = span && isFinite(span[0]) ? Number(span[0]) : 0;
+  var lineEnd = span && isFinite(span[1]) ? Math.max(lineStart, Number(span[1])) : lineStart;
+  var tokenList = lyricWordsOf(line);
+  var count = tokenList.length;
+  var weight = tokenList.map(function(token) { return token.length + 1; });
+  var times = new Array(count);
+  var last = -Infinity;
+  for (var k = 0; k < count; k++) {
+    var t = starts ? starts[k] : null;
+    if (typeof t === 'number' && isFinite(t) && t >= lineStart - .3 && t <= lineEnd + .3 && t > last) {
+      times[k] = Math.max(lineStart, Math.min(lineEnd, t));
+      last = times[k];
+    } else {
+      times[k] = null;
+    }
+  }
+  // Fill each run of untimed words between two known moments.
+  var a = -1;
+  while (a < count) {
+    var b = a + 1;
+    while (b < count && times[b] === null) b++;
+    if (b > a + 1) {
+      var from = a >= 0 ? a : 0;
+      var base = a >= 0 ? times[a] : lineStart;
+      var until = b < count ? times[b] : lineEnd;
+      var total = 0;
+      for (k = from; k < b; k++) total += weight[k];
+      var run = 0;
+      for (k = from; k < b; k++) {
+        if (k > a) times[k] = base + Math.max(0, until - base) * (total ? run / total : 0);
+        run += weight[k];
+      }
+    }
+    a = b;
+  }
+  var at = 0;
+  words.forEach(function(word) {
+    word.start = at < count ? times[at] : lineEnd;
+    at += word.tokens;
+  });
+  return words.map(function(word, w) {
+    var next = words[w + 1];
+    var end = next ? next.start : lineEnd;
+    return {
+      text:word.text,
+      space:word.space,
+      start:Math.round(word.start * 100) / 100,
+      end:Math.round(Math.max(word.start, end) * 100) / 100
+    };
+  });
 }

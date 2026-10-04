@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SonicVault">
 <meta name="theme-color" content="#090b12">
-<link rel="icon" type="image/svg+xml" href="assets/icons/sonicvault-mark.svg?v=20261004ah">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=20261004ah">
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png?v=20261004ah">
-<link rel="manifest" href="manifest.webmanifest?v=20261004ah">
+<link rel="icon" type="image/svg+xml" href="assets/icons/sonicvault-mark.svg?v=20261004ai">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=20261004ai">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png?v=20261004ai">
+<link rel="manifest" href="manifest.webmanifest?v=20261004ai">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="A private editorial vault for AI-generated music. Curate tracks, build mixtapes, and stream from anywhere.">
 <meta property="og:type" content="website">
@@ -21,8 +21,8 @@
 <meta name="twitter:description" content="Curate tracks, build mixtapes, and stream your AI-generated music from anywhere.">
 <title>SonicVault - Private AI Music Vault</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<script type="module" src="js/app.js?v=20261004ah"></script>
-<link rel="stylesheet" href="styles/app.css?v=20261004ah">
+<script type="module" src="js/app.js?v=20261004ai"></script>
+<link rel="stylesheet" href="styles/app.css?v=20261004ai">
 </head>
 <body>
 <!-- Icon sprite. Every glyph in the app is <svg class="ic"><use href="#i-NAME"/></svg>,
@@ -123,7 +123,7 @@
     </div>
   </main>
 </div>
-<script src="js/first-paint.js?v=20261004ah"></script>
+<script src="js/first-paint.js?v=20261004ai"></script>
 <!-- Unsynced writes are a data-loss state, so they get a persistent bar with
      an action rather than the 10px status pill, which the next operation
      overwrites within a second. -->
@@ -578,6 +578,27 @@
   </div>
 </div>
 
+<!-- Karaoke (js/features/karaoke.js): the lyrics full screen, word by word. -->
+<div class="modal-overlay karaoke" id="modal-karaoke" role="dialog" aria-modal="true" aria-labelledby="karaoke-title">
+  <div class="karaoke-backdrop" id="karaoke-backdrop" aria-hidden="true"><img id="karaoke-art" alt="" hidden></div>
+  <div class="karaoke-stage">
+    <div class="karaoke-top">
+      <div class="karaoke-song">
+        <div class="karaoke-title" id="karaoke-title"></div>
+        <div class="karaoke-sub" id="karaoke-sub"></div>
+      </div>
+      <button type="button" class="karaoke-close" aria-label="Close karaoke" onclick="closeModal('modal-karaoke')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="karaoke-lines" id="karaoke-lines"></div>
+    <div class="karaoke-bottom">
+      <button type="button" class="karaoke-play" id="karaoke-play" aria-label="Play" onclick="togglePlayback()"></button>
+      <div class="karaoke-bar" onclick="karaokeSeek(event)"><span id="karaoke-fill"></span></div>
+      <div class="karaoke-time" id="karaoke-time"></div>
+    </div>
+    <div class="karaoke-status" id="karaoke-status" aria-live="polite"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-playlist-detail" role="dialog" aria-modal="true" aria-label="Playlist detail">
   <div class="modal" style="max-width:860px">
     <div id="pld-body"></div>
@@ -741,7 +762,10 @@
             <div class="player-copy-card">
               <div class="player-copy-head">
                 <div class="player-copy-kicker">Lyrics</div>
-                <button type="button" class="player-check-btn" id="xp-check-btn" aria-pressed="false" aria-controls="xp-sung-check" hidden onclick="toggleSungCheck()">Check what was sung</button>
+                <div class="player-copy-actions">
+                  <button type="button" class="player-check-btn" id="xp-karaoke-btn" hidden onclick="openKaraoke()">Karaoke</button>
+                  <button type="button" class="player-check-btn" id="xp-check-btn" aria-pressed="false" aria-controls="xp-sung-check" hidden onclick="toggleSungCheck()">Check what was sung</button>
+                </div>
               </div>
               <div class="player-lyrics-status" id="xp-lyrics-status" aria-live="polite"></div>
               <div class="player-lyrics empty" id="xp-lyrics">Lyrics appear here once a track is active.</div>
@@ -827,50 +851,51 @@
      global scope, which is what lets the inline onclick handlers above reach
      feature functions. On deploy, bump the ?v= token on every local asset
      together; sw.js serves them cache-first. -->
-<script src="js/data/util.js?v=20261004ah"></script>
-<script src="js/data/tracks.js?v=20261004ah"></script>
-<script src="js/data/covers.js?v=20261004ah"></script>
-<script src="js/data/artwork.js?v=20261004ah"></script>
-<script src="js/data/lyric-sync.js?v=20261004ah"></script>
-<script src="js/data/metadata.js?v=20261004ah"></script>
-<script src="js/data/waveform.js?v=20261004ah"></script>
-<script src="js/data/routes.js?v=20261004ah"></script>
-<script src="js/data/backup-format.js?v=20261004ah"></script>
-<script src="js/data/create.js?v=20261004ah"></script>
-<script src="js/data/ai-config.js?v=20261004ah"></script>
-<script src="js/data/versions.js?v=20261004ah"></script>
-<script src="js/data/meaning.js?v=20261004ah"></script>
-<script src="js/data/story.js?v=20261004ah"></script>
-<script src="js/features/vault.js?v=20261004ah"></script>
-<script src="js/features/sync.js?v=20261004ah"></script>
-<script src="js/features/shell.js?v=20261004ah"></script>
-<script src="js/features/modals.js?v=20261004ah"></script>
-<script src="js/features/routes.js?v=20261004ah"></script>
-<script src="js/features/covers.js?v=20261004ah"></script>
-<script src="js/features/artwork.js?v=20261004ah"></script>
-<script src="js/features/lyric-sync.js?v=20261004ah"></script>
-<script src="js/features/waveform.js?v=20261004ah"></script>
-<script src="js/features/media-session.js?v=20261004ah"></script>
-<script src="js/features/player.js?v=20261004ah"></script>
-<script src="js/features/playback-extras.js?v=20261004ah"></script>
-<script src="js/features/expanded-player.js?v=20261004ah"></script>
-<script src="js/features/library.js?v=20261004ah"></script>
-<script src="js/features/versions.js?v=20261004ah"></script>
-<script src="js/features/meaning.js?v=20261004ah"></script>
-<script src="js/features/story.js?v=20261004ah"></script>
-<script src="js/features/home.js?v=20261004ah"></script>
-<script src="js/features/insights.js?v=20261004ah"></script>
-<script src="js/features/playlists.js?v=20261004ah"></script>
-<script src="js/features/offline.js?v=20261004ah"></script>
-<script src="js/features/share.js?v=20261004ah"></script>
-<script src="js/features/edit-track.js?v=20261004ah"></script>
-<script src="js/features/ai-metadata.js?v=20261004ah"></script>
-<script src="js/features/describe.js?v=20261004ah"></script>
-<script src="js/features/upload.js?v=20261004ah"></script>
-<script src="js/features/create.js?v=20261004ah"></script>
-<script src="js/features/backup.js?v=20261004ah"></script>
-<script src="js/features/sign-in.js?v=20261004ah"></script>
-<script src="js/features/keyboard.js?v=20261004ah"></script>
-<script src="js/boot.js?v=20261004ah"></script>
+<script src="js/data/util.js?v=20261004ai"></script>
+<script src="js/data/tracks.js?v=20261004ai"></script>
+<script src="js/data/covers.js?v=20261004ai"></script>
+<script src="js/data/artwork.js?v=20261004ai"></script>
+<script src="js/data/lyric-sync.js?v=20261004ai"></script>
+<script src="js/data/metadata.js?v=20261004ai"></script>
+<script src="js/data/waveform.js?v=20261004ai"></script>
+<script src="js/data/routes.js?v=20261004ai"></script>
+<script src="js/data/backup-format.js?v=20261004ai"></script>
+<script src="js/data/create.js?v=20261004ai"></script>
+<script src="js/data/ai-config.js?v=20261004ai"></script>
+<script src="js/data/versions.js?v=20261004ai"></script>
+<script src="js/data/meaning.js?v=20261004ai"></script>
+<script src="js/data/story.js?v=20261004ai"></script>
+<script src="js/features/vault.js?v=20261004ai"></script>
+<script src="js/features/sync.js?v=20261004ai"></script>
+<script src="js/features/shell.js?v=20261004ai"></script>
+<script src="js/features/modals.js?v=20261004ai"></script>
+<script src="js/features/routes.js?v=20261004ai"></script>
+<script src="js/features/covers.js?v=20261004ai"></script>
+<script src="js/features/artwork.js?v=20261004ai"></script>
+<script src="js/features/lyric-sync.js?v=20261004ai"></script>
+<script src="js/features/waveform.js?v=20261004ai"></script>
+<script src="js/features/media-session.js?v=20261004ai"></script>
+<script src="js/features/player.js?v=20261004ai"></script>
+<script src="js/features/playback-extras.js?v=20261004ai"></script>
+<script src="js/features/expanded-player.js?v=20261004ai"></script>
+<script src="js/features/library.js?v=20261004ai"></script>
+<script src="js/features/versions.js?v=20261004ai"></script>
+<script src="js/features/meaning.js?v=20261004ai"></script>
+<script src="js/features/story.js?v=20261004ai"></script>
+<script src="js/features/karaoke.js?v=20261004ai"></script>
+<script src="js/features/home.js?v=20261004ai"></script>
+<script src="js/features/insights.js?v=20261004ai"></script>
+<script src="js/features/playlists.js?v=20261004ai"></script>
+<script src="js/features/offline.js?v=20261004ai"></script>
+<script src="js/features/share.js?v=20261004ai"></script>
+<script src="js/features/edit-track.js?v=20261004ai"></script>
+<script src="js/features/ai-metadata.js?v=20261004ai"></script>
+<script src="js/features/describe.js?v=20261004ai"></script>
+<script src="js/features/upload.js?v=20261004ai"></script>
+<script src="js/features/create.js?v=20261004ai"></script>
+<script src="js/features/backup.js?v=20261004ai"></script>
+<script src="js/features/sign-in.js?v=20261004ai"></script>
+<script src="js/features/keyboard.js?v=20261004ai"></script>
+<script src="js/boot.js?v=20261004ai"></script>
 </body>
 </html>
