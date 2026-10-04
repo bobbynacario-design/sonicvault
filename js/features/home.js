@@ -1,22 +1,24 @@
 // The library home above the shelf: the resume strip and the rails, plus
 // the track pickers they and the player draw from.
 
+// Rails show each song once: Suno's two takes of a song would otherwise sit
+// side by side in "Recently added" (dedupeVersions, js/features/versions.js).
 function getMostPlayedTracks(limit) {
-  return tracks.slice().sort(function(a, b) {
+  return dedupeVersions(tracks.slice().sort(function(a, b) {
     return Number(b.plays || 0) - Number(a.plays || 0) || compareNewestFirst(a, b);
-  }).slice(0, limit || 4);
+  })).slice(0, limit || 4);
 }
 
 function getLeastPlayedTracks(limit) {
-  return tracks.slice().sort(function(a, b) {
+  return dedupeVersions(tracks.slice().sort(function(a, b) {
     return Number(a.plays || 0) - Number(b.plays || 0) || compareNewestFirst(a, b);
-  }).slice(0, limit || 4);
+  })).slice(0, limit || 4);
 }
 
 function getNewestTracks(limit) {
-  return tracks.slice().sort(function(a, b) {
+  return dedupeVersions(tracks.slice().sort(function(a, b) {
     return compareNewestFirst(a, b);
-  }).slice(0, limit || 4);
+  })).slice(0, limit || 4);
 }
 
 function getContinueTrack() {

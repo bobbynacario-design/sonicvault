@@ -233,7 +233,7 @@ function getFilteredTracks() {
   return filtered.slice();
 }
 
-function renderBrowseSummary(filtered) {
+function renderBrowseSummary(filtered, withVersions) {
   var el = document.getElementById('browse-summary');
   if (!el) return;
   var filters = [];
@@ -249,7 +249,9 @@ function renderBrowseSummary(filtered) {
     : '';
   el.classList.toggle('has-filters', filters.length > 0);
   el.innerHTML = ''
-    + '<div><strong>' + filtered.length + '</strong> track' + (filtered.length !== 1 ? 's' : '') + ' in view.</div>'
+    + '<div><strong>' + filtered.length + '</strong> ' + (withVersions > filtered.length
+        ? 'song' + (filtered.length !== 1 ? 's' : '') + ' in view \u00b7 ' + withVersions + ' tracks counting versions.'
+        : 'track' + (filtered.length !== 1 ? 's' : '') + ' in view.') + '</div>'
     + '<div>' + (filters.length ? 'Active filters: ' + esc(filters.join(' / ')) : 'Showing the full collection in listening-first order.') + '</div>'
     + clearBtn;
 }
@@ -298,6 +300,7 @@ function buildTrackCard(track) {
     +         (!hasLyrics(track) ? '<span class="meta-pill warn">Lyrics missing</span>' : '')
     +         (track.shared ? '<span class="meta-pill shared">Public link live</span>' : '')
     +         (track.autoImported ? '<span class="meta-pill">Watcher import</span>' : '')
+    +         versionChipHTML(track)
     +       '</div>'
     +       '<div class="track-tag-row">' + tags.slice(0, 6).map(function(tag) { return '<span class="track-tag">' + esc(tag) + '</span>'; }).join('') + '</div>'
     +       '<div class="track-meta-strip">'
@@ -332,6 +335,7 @@ function buildTrackCard(track) {
     +   '<div class="track-footer">'
     +     renderWaveformHTML(track.id, waveform)
     +     buildTrackNotes(track)
+    +     versionListHTML(track)
     +   '</div>'
     + '</div>';
 }
@@ -363,7 +367,11 @@ function renderTrackList() {
   renderFilterBar();
 
   var filtered = getFilteredTracks();
-  renderBrowseSummary(filtered);
+  // Each song once, its other takes behind a "2 versions" chip.
+  var shelf = shelfCollapse(filtered);
+  _shelfVersions = shelf.versions;
+  renderGroupVersionsToggle();
+  renderBrowseSummary(shelf.list, filtered.length);
 
   var el = document.getElementById('track-list');
   if (!el) return;
@@ -383,7 +391,7 @@ function renderTrackList() {
     return;
   }
 
-  _shelfTracks = filtered;
+  _shelfTracks = shelf.list;
   _shelfRendered = 0;
   el.className = _shelfView === 'list' ? 'track-list-view' : 'track-grid';
   el.innerHTML = '';
@@ -427,7 +435,7 @@ function buildTrackRow(track, index) {
   var isCurrent = _currentTrack && _currentTrack.id === track.id;
   var expanded = _expandedTrackId === track.id;
   return ''
-    + '<div class="track-row-wrap' + (expanded ? ' expanded' : '') + '" id="card-' + esc(track.id) + '">'
+    + '<div class="track-row-wrap' + (expanded ? ' expanded' : '') + '" id="card-' + esc(track.id) + '" data-index="' + index + '">'
     + '<div class="track-row' + (isCurrent ? ' current' : '') + '"'
     +   (isCurrent ? ' aria-current="true"' : '')
     +   ' role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track')) + '"'
@@ -435,7 +443,7 @@ function buildTrackRow(track, index) {
     +   '<div class="row-index" aria-hidden="true">' + (isCurrent ? eqBars() : (index + 1)) + '</div>'
     +   buildCoverArt(track, 'xs', false)
     +   '<div class="row-main">'
-    +     '<div class="row-title">' + esc(track.title) + '</div>'
+    +     '<div class="row-title">' + esc(track.title) + versionChipHTML(track) + '</div>'
     +     '<div class="row-sub">' + esc(track.genre || 'Other') + ' &middot; ' + esc(track.mood || 'Mood')
     +       (track.shared ? ' &middot; <span class="row-shared">Public link</span>' : '')
     +       (!hasLyrics(track) ? ' &middot; <span class="row-warn">No lyrics</span>' : '')
@@ -464,6 +472,7 @@ function buildTrackRow(track, index) {
     +   '</div>'
     + '</div>'
     + buildTrackNotes(track)
+    + versionListHTML(track)
     + '</div>';
 }
 

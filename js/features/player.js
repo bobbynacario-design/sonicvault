@@ -354,7 +354,8 @@ function startPlayback(id, queueIds, queueLabel) {
   if (queueIds && queueIds.length) {
     setPlaybackQueue(queueIds, queueLabel);
   } else {
-    var filtered = getFilteredTracks().map(function(item) { return item.id; });
+    var filtered = getShelfQueueTracks().map(function(item) { return item.id; });
+    if (filtered.length && filtered.indexOf(id) === -1) filtered = queueWithVersion(filtered, track);
     setPlaybackQueue(filtered.length ? filtered : tracks.map(function(item) { return item.id; }), 'Filtered shelf');
   }
 

@@ -24,7 +24,9 @@ function makeCoverDemoTracks() {
     return Object.assign({
       id:'demo-cover-' + index,
       source:'Suno',
-      lyrics:'[Verse]\nThis is a local SonicVault cover demo.\n[Chorus]\nNo audio is saved, no vault data is changed.',
+      // Each demo song its own sheet: identical sheets would group all eight
+      // as versions of one song (js/data/versions.js).
+      lyrics:'[Verse]\n' + item.title + ' is a local SonicVault cover demo.\n[Chorus]\nNo audio is saved, no vault data is changed.',
       audioURL:'',
       duration:180 + (index * 9),
       created:new Date().toISOString().split('T')[0],

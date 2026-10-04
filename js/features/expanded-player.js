@@ -191,6 +191,7 @@ function updateExpandedPlayer() {
     paintPlayerBackdrop();
     document.getElementById('xp-kicker').textContent = 'Listening room';
     document.getElementById('xp-meta').textContent = 'Genre / mood / source will appear here.';
+    renderPlayerVersions(null);
     document.getElementById('xp-lyrics').innerHTML = 'Lyrics appear here once a track is active.';
     document.getElementById('xp-lyrics').className = 'player-lyrics empty';
     document.getElementById('xp-lyrics').removeAttribute('data-key');
@@ -214,6 +215,7 @@ function updateExpandedPlayer() {
   document.getElementById('xp-kicker').textContent = 'Playing from ' + (_playQueueLabel || 'your vault');
   document.getElementById('xp-title').textContent = _currentTrack.title;
   document.getElementById('xp-meta').textContent = (_currentTrack.genre || 'Other') + ' / ' + (_currentTrack.mood || 'Mood') + ' / ' + (_currentTrack.source || 'Suno') + ' / ' + fmtCompactNumber(_currentTrack.plays || 0) + (Number(_currentTrack.plays) === 1 ? ' play' : ' plays');
+  renderPlayerVersions(getVaultTrack(_currentTrack.id));
   // Rebuilt only when the track or its lyrics change: this runs on every
   // play/pause, and rebuilding threw away the scroll position each time.
   // The vault's copy of the track, since lyrics can arrive after playback
