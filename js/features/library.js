@@ -330,6 +330,7 @@ function buildTrackCard(track) {
     +               (track.shared
                       ? '<button role="menuitem" class="is-shared" onclick="event.stopPropagation();closeAllCardMenus();unshareTrack(' + jsq(track.id) + ')">Revoke public link</button>'
                       : '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();shareTrack(' + jsq(track.id) + ')">Share&hellip;</button>')
+    +               '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();openStoryClip(' + jsq(track.id) + ')">Make a story clip</button>'
     +               '<button role="menuitem" class="is-danger" onclick="event.stopPropagation();closeAllCardMenus();deleteTrack(' + jsq(track.id) + ')">Delete track</button>'
     +             '</div>'
     +           '</div>'
@@ -473,6 +474,7 @@ function buildTrackRow(track, index) {
     +         (track.shared
                 ? '<button role="menuitem" class="is-shared" onclick="event.stopPropagation();closeAllCardMenus();unshareTrack(' + jsq(track.id) + ')">Revoke public link</button>'
                 : '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();shareTrack(' + jsq(track.id) + ')">Share&hellip;</button>')
+    +         '<button role="menuitem" onclick="event.stopPropagation();closeAllCardMenus();openStoryClip(' + jsq(track.id) + ')">Make a story clip</button>'
     +         '<button role="menuitem" class="is-danger" onclick="event.stopPropagation();closeAllCardMenus();deleteTrack(' + jsq(track.id) + ')">Delete track</button>'
     +       '</div>'
     +     '</div>'

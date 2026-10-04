@@ -3120,6 +3120,62 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .version-switch:hover{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
 @media (max-width:640px){.version-list{margin-left:0}}
 
+/* Story clips (js/features/story.js): the 9:16 preview beside its
+   settings; stacked on phones. */
+.story-modal{max-width:720px}
+.story-song{margin-top:-.4rem}
+.story-body{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1.4rem;align-items:start;margin-top:1.1rem}
+.story-stage{
+  position:relative;
+  width:min(288px, 40vw);
+  aspect-ratio:9/16;
+  border-radius:22px;
+  overflow:hidden;
+  background:#05060c;
+  box-shadow:0 24px 60px rgba(0,0,0,.45);
+}
+.story-stage canvas,.story-stage video{display:block;width:100%;height:100%;object-fit:cover;background:#05060c}
+.story-stage [hidden]{display:none}
+.story-progress{position:absolute;left:16px;right:16px;bottom:16px;height:4px;border-radius:999px;background:rgba(255,255,255,.22);overflow:hidden}
+.story-progress span{display:block;width:0;height:100%;border-radius:inherit;background:#fff;transition:width .3s linear}
+.story-side{display:flex;flex-direction:column;gap:1.2rem;min-width:0;padding-top:.2rem}
+.story-controls{display:flex;flex-direction:column;gap:1.3rem}
+.story-controls:empty{display:none}
+.story-field{display:flex;flex-direction:column;align-items:flex-start;gap:.55rem}
+.story-label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted2)}
+.story-chips{display:flex;gap:.45rem;flex-wrap:wrap}
+.story-chip{
+  padding:.5rem .95rem;
+  border:none;
+  border-radius:999px;
+  background:var(--surface);
+  color:var(--muted);
+  font-family:var(--sans);
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  transition:background .16s ease,color .16s ease;
+}
+.story-chip:hover:not([disabled]){color:var(--text);background:var(--surface-hover)}
+.story-chip[aria-pressed="true"]{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+.story-chip[disabled]{cursor:default;opacity:.6}
+.story-when{font-size:15px;font-weight:600;color:var(--text)}
+.story-when span{font-weight:500;color:var(--muted)}
+.story-start{width:100%}
+.story-start[disabled]{opacity:.5}
+.story-best{padding:0;border:none;background:none;color:var(--accent-dynamic);font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer}
+.story-best[hidden]{display:none}
+.story-note{margin:0;font-size:13.5px;line-height:1.55;color:var(--muted)}
+.story-note.is-error{color:var(--danger)}
+#story-actions .sec-action{white-space:nowrap}
+@media (max-width:640px){
+  .story-body{grid-template-columns:1fr;gap:1rem}
+  .story-stage{width:min(220px, 58vw);margin:0 auto}
+  /* Full labels, wrapping to a second row, rather than squeezed to the
+     phone dialog's equal thirds. */
+  #story-actions .sec-action{flex:1 0 auto}
+}
+
 /* Search by meaning (js/features/meaning.js): a toggle inside the search
    box, and a status line under it. */
 .search-mode{

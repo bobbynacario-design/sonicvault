@@ -60,6 +60,8 @@ function closeModal(id) {
   } else {
     overlay.classList.remove('open');
   }
+  // A clip being recorded stops when its dialog closes, however it closes.
+  if (id === 'modal-story') onStoryClipClosed();
   var returnTo = _modalReturnFocus[id];
   delete _modalReturnFocus[id];
   if (returnTo && returnTo.focus && document.contains(returnTo)) {
