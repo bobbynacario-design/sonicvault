@@ -65,20 +65,15 @@ function prepareKaraokeSong(track) {
   sub.textContent = track ? [track.genre, track.mood].filter(Boolean).join(' · ') : '';
   var palette = getCoverPalette(track || _currentTrack || {});
   var art = track ? getArtURL(track.id) : '';
-  // The cover itself: large beside the lyrics on a wide screen, small by the
-  // title on a phone (CSS picks which shows). A song without real art shows
-  // its generated cover; art that arrives later is painted in by paintArt.
+  // Cover fills the screen behind the lyrics: the real art, or for a song
+  // without it the generated cover, which paintArt fills in if art arrives.
   var coverTrack = track || _currentTrack;
-  var big = document.getElementById('karaoke-cover');
-  var thumb = document.getElementById('karaoke-thumb');
-  if (coverTrack) {
-    swapCover(big, coverTrack, 'lg', true);
-    swapCover(thumb, coverTrack, 'sm', false);
+  var fill = document.getElementById('karaoke-cover-fill');
+  if (coverTrack && !art) {
+    swapCover(fill, coverTrack, 'lg', false);
   } else {
-    big.innerHTML = '';
-    thumb.innerHTML = '';
-    big.removeAttribute('data-cover');
-    thumb.removeAttribute('data-cover');
+    fill.innerHTML = '';
+    fill.removeAttribute('data-cover');
   }
   artImg.hidden = !art;
   if (art) artImg.src = art;
