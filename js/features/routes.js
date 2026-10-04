@@ -39,6 +39,18 @@ function getPublicTrackPool() {
   return pool;
 }
 
+// The icon and manifest links in index.html are relative, and the browser
+// resolves them when it fetches them -- for the favicon, after boot has
+// already rewritten the address bar to /track/:id, so share pages asked for
+// /track/assets/icons/... and got a 404. Boot runs at the app's own URL, so
+// fixing each href to what it resolves to now keeps it on the app base,
+// through the redirect below and every later push to a share route.
+function pinHeadLinks() {
+  document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"], link[rel="manifest"]').forEach(function(link) {
+    link.setAttribute('href', link.href);
+  });
+}
+
 function applyRedirectedShareRoute() {
   var params = new URLSearchParams(window.location.search);
   var redirected = params.get('sv-route');

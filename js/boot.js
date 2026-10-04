@@ -20,6 +20,7 @@ window.refreshAll = function() {
   scheduleArtSweep(2000);
 };
 
+pinHeadLinks();
 applyRedirectedShareRoute();
 _routeState = parseRouteState(window.location.pathname);
 window.addEventListener('popstate', function() {
