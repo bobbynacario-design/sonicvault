@@ -39,7 +39,7 @@ function mergePlaylistEditDraft(pl) {
   if (!pl || _editingPlaylistId !== pl.id) return;
   var nameInput = document.getElementById('pl-edit-name');
   var descInput = document.getElementById('pl-edit-desc');
-  var colorInput = document.getElementById('pl-edit-color');
+  var colorInput = document.querySelector('input[name="pl-edit-color"]:checked');
   if (nameInput && nameInput.value.trim()) pl.name = nameInput.value.trim();
   if (descInput) pl.desc = descInput.value.trim();
   if (colorInput) pl.color = safePlaylistColor(colorInput.value);
@@ -140,12 +140,12 @@ function onSeqDragEnd() {
   clearSeqDropMarkers();
   _dragFromIndex = -1;
   _dragPlaylistId = '';
-  var dragging = document.querySelector('.playlist-edit-item.dragging');
+  var dragging = document.querySelector('.pl-row.dragging');
   if (dragging) dragging.classList.remove('dragging');
 }
 
 function clearSeqDropMarkers() {
-  document.querySelectorAll('.playlist-edit-item.drop-before, .playlist-edit-item.drop-after').forEach(function(el) {
+  document.querySelectorAll('.pl-row.drop-before, .pl-row.drop-after').forEach(function(el) {
     el.classList.remove('drop-before', 'drop-after');
   });
 }
@@ -177,7 +177,7 @@ function savePlaylistEdits(id) {
   }
   pl.name = nameInput.value.trim();
   var descInput = document.getElementById('pl-edit-desc');
-  var colorInput = document.getElementById('pl-edit-color');
+  var colorInput = document.querySelector('input[name="pl-edit-color"]:checked');
   pl.desc = descInput ? descInput.value.trim() : '';
   pl.color = safePlaylistColor(colorInput ? colorInput.value : pl.color);
   persistPlaylists();
@@ -232,20 +232,32 @@ function renderPlaylistHero() {
     return;
   }
   var featured = getFeaturedPlaylist();
-  var tracksInFeatured = getPlaylistTracks(featured);
-  // The side card used to explain the playlist page to its owner. It now
-  // carries the featured mixtape's running order instead.
-  var previewTracks = tracksInFeatured.slice(0, 6);
-  var remaining = tracksInFeatured.length - previewTracks.length;
-  var sideBody = previewTracks.length
-    ? '<div class="playlist-track-list" style="margin-top:.9rem">' + previewTracks.map(function(track, index) {
-        return '<div class="playlist-track-pill" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ' from ' + (featured.name || 'playlist')) + '" style="cursor:pointer" onclick="playPlaylistTrack(' + jsq(featured.id) + ', ' + jsq(track.id) + ')"><div class="playlist-track-pill-main"><span class="playlist-track-order">' + (index + 1) + '</span><span>' + esc(track.title) + '</span></div><span>' + esc(track.mood || 'Mood') + '</span></div>';
-      }).join('') + '</div>'
-      + (remaining > 0
-          ? '<div class="section-action-row" style="margin-top:.8rem"><button class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open all ' + tracksInFeatured.length + ' tracks</button></div>'
-          : '')
-    : '<div class="side-copy">This mixtape has no tracks yet. Open it to add some from the vault.</div>';
-  el.innerHTML = '<div class="section-card"><div class="section-inner"><div class="playlist-hero-grid"><div class="playlist-hero-main"><div class="section-kicker">Featured mixtape</div><div class="playlist-hero-card">' + buildPlaylistCover(featured, 'sm') + '<div><div class="section-title is-hero">' + esc(featured.name) + '</div><div class="section-sub" style="margin-top:.65rem">' + esc(featured.desc || 'A curated sequence built from your vault.') + '</div><div class="pill-row" style="margin-top:.8rem"><span class="meta-pill highlight">' + tracksInFeatured.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(tracksInFeatured)) + '</span><span class="meta-pill">' + esc((tracksInFeatured[0] && tracksInFeatured[0].source) || 'Mixed') + '</span></div><div class="section-action-row" style="margin-top:1rem"><button class="sec-action primary" onclick="playPlaylist(' + jsq(featured.id) + ')">Play playlist</button><button class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open details</button><button class="sec-action" onclick="sharePlaylist(' + jsq(featured.id) + ')">Share</button></div></div></div></div><div class="side-card"><div class="side-kicker">Running order</div>' + sideBody + '</div></div></div></div>';
+  var items = getPlaylistTracks(featured);
+  var plays = items.reduce(function(sum, track) { return sum + Number(track.plays || 0); }, 0);
+  var order = items.slice(0, 6).map(function(track, index) {
+    return '<li class="pl-order-row" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ' from ' + featured.name) + '" onclick="playPlaylistTrack(' + jsq(featured.id) + ', ' + jsq(track.id) + ')">'
+      + '<span class="pl-order-num">' + (index + 1) + '</span>'
+      + '<span class="pl-order-title">' + esc(track.title) + '</span>'
+      + '<span class="pl-order-time">' + fmtTime(track.duration || 0) + '</span>'
+      + '</li>';
+  }).join('');
+  var more = items.length - 6;
+  el.innerHTML = '<section class="pl-feature" style="' + playlistAccentVars(featured) + '" aria-label="' + attr('Featured mixtape: ' + featured.name) + '">'
+    + '<div class="pl-feature-art">' + buildPlaylistArt(featured, items) + '</div>'
+    + '<div class="pl-feature-main">'
+    +   '<div class="pl-eyebrow">Featured mixtape</div>'
+    +   '<h2 class="pl-feature-title">' + esc(featured.name) + '</h2>'
+    +   (featured.desc ? '<p class="pl-feature-desc">' + esc(featured.desc) + '</p>' : '')
+    +   '<div class="pl-feature-meta">' + esc(playlistMeta(items)) + (plays ? ' \u00b7 ' + fmtCompactNumber(plays) + (plays === 1 ? ' play' : ' plays') : '') + playlistBadges(featured) + '</div>'
+    +   '<div class="pl-actions">'
+    +     (items.length ? '<button type="button" class="sec-action primary has-icon" onclick="playPlaylist(' + jsq(featured.id) + ')">' + icon('play') + 'Play</button>'
+    +       '<button type="button" class="sec-action has-icon" onclick="playPlaylistShuffled(' + jsq(featured.id) + ')">' + icon('shuffle') + 'Shuffle</button>' : '')
+    +     '<button type="button" class="sec-action" onclick="viewPlaylist(' + jsq(featured.id) + ')">Open</button>'
+    +   '</div>'
+    + '</div>'
+    + (order ? '<div class="pl-feature-side"><div class="pl-side-label">Running order</div><ol class="pl-order">' + order + '</ol>'
+        + (more > 0 ? '<button type="button" class="pl-more" onclick="viewPlaylist(' + jsq(featured.id) + ')">and ' + more + ' more</button>' : '') + '</div>' : '')
+    + '</section>';
 }
 
 // Smart mixes: rule-based playlists computed live from the vault. They aren't
@@ -337,17 +349,7 @@ function renderSmartMixes() {
   var mixes = getSmartMixes();
   if (!mixes.length) { if (card) card.style.display = 'none'; return; }
   if (card) card.style.display = '';
-  grid.innerHTML = mixes.map(function(m) {
-    var items = m.trackIds.map(getTrackById).filter(Boolean);
-    var dur = getCollectionDuration(items);
-    var plays = items.reduce(function(s, t) { return s + Number(t.plays || 0); }, 0);
-    return '<div class="smart-mix-card" style="--sm-accent:' + m.color + '">'
-      + '<div class="smart-mix-name">' + esc(m.name) + '</div>'
-      + '<div class="smart-mix-desc">' + esc(m.desc) + '</div>'
-      + '<div class="pill-row" style="margin-top:.6rem"><span class="meta-pill">' + m.trackIds.length + ' tracks</span><span class="meta-pill">' + fmtTime(dur) + '</span><span class="meta-pill">' + fmtCompactNumber(plays) + (plays === 1 ? ' play' : ' plays') + '</span></div>'
-      + '<div class="section-action-row" style="margin-top:.9rem"><button class="sec-action primary" onclick="playSmartMix(' + jsq(m.id) + ')">Play</button><button class="sec-action" onclick="saveSmartMixAsPlaylist(' + jsq(m.id) + ')">Save as playlist</button></div>'
-      + '</div>';
-  }).join('');
+  grid.innerHTML = mixes.map(buildSmartMixCard).join('');
 }
 
 function renderPlaylists() {
@@ -356,25 +358,86 @@ function renderPlaylists() {
   var el = document.getElementById('playlist-grid');
   if (!el) return;
   if (!playlists.length) {
-    el.innerHTML = '<div class="empty-state"><strong>No playlists yet.</strong>Start with a mood, a night drive, or a favorite AI era and build your first mix.</div>';
+    // The section's own New playlist button is right above this.
+    el.innerHTML = '<div class="pl-empty"><strong>No playlists yet.</strong> Start with a mood, a night drive, or a favourite era, and build your first mix.</div>';
     return;
   }
-
-  var html = playlists.slice().sort(function(a, b) {
+  el.innerHTML = playlists.slice().sort(function(a, b) {
     return playlistTimestamp(b) - playlistTimestamp(a);
-  }).map(function(pl) {
-    var items = getPlaylistTracks(pl);
-    var totalDuration = getCollectionDuration(items);
-    return '<div class="playlist-card" style="' + playlistAccentVars(pl) + '" onclick="viewPlaylist(' + jsq(pl.id) + ')"><div class="playlist-card-top">' + buildPlaylistCover(pl, 'sm') + '<div><div class="playlist-name">' + esc(pl.name) + '</div><div class="playlist-desc">' + esc(pl.desc || 'An editorial mix from the vault.') + '</div><div class="pill-row" style="margin-top:.7rem"><span class="meta-pill highlight" style="color:var(--pl-accent);border-color:var(--pl-accent-rim);background:var(--pl-accent-soft)">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(totalDuration) + '</span>' + (isPlaylistOffline(pl.id) ? '<span class="meta-pill">Offline</span>' : '') + '<span class="meta-pill">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + ' plays</span></div></div></div><div class="playlist-track-list">' + (items.slice(0, 3).map(function(track, index) {
-      return '<div class="playlist-track-pill"><div class="playlist-track-pill-main"><span class="playlist-track-order">' + (index + 1) + '</span><span>' + esc(track.title) + '</span></div><span>' + esc(track.mood || 'Mood') + '</span></div>';
-    }).join('') || '<div class="playlist-track-pill"><span>Empty playlist</span><span>Ready for curation</span></div>') + '</div><div class="section-action-row"><button class="sec-action primary" onclick="event.stopPropagation();playPlaylist(' + jsq(pl.id) + ')">Play</button><button class="sec-action" onclick="event.stopPropagation();viewPlaylist(' + jsq(pl.id) + ')">Open</button>' + (pl.shared ? '<button class="sec-action is-shared" title="This playlist has a live public link" onclick="event.stopPropagation();unsharePlaylist(' + jsq(pl.id) + ')">Unshare</button>' : '<button class="sec-action" onclick="event.stopPropagation();sharePlaylist(' + jsq(pl.id) + ')">Share</button>') + '<button class="sec-action" onclick="event.stopPropagation();deletePlaylist(' + jsq(pl.id) + ')">Delete</button></div></div>';
-  }).join('');
+  }).map(buildPlaylistCard).join('');
+}
 
-  // The card stays clickable for pointers, but the keyboard path is the real
-  // button inside it — a focusable card wrapping focusable buttons would be a
-  // duplicate tab stop for the same action.
-  html += '<div class="playlist-card playlist-card-new" onclick="openModal(\'modal-playlist\')"><div class="playlist-name">Create another playlist</div><div class="playlist-desc">Turn a cluster of tracks into a stronger editorial sequence.</div><div class="section-action-row"><button class="sec-action primary" onclick="event.stopPropagation();openModal(\'modal-playlist\')">Start playlist</button></div></div>';
-  el.innerHTML = html;
+// ── Cards ──────────────────────────────────────────────────────────────────
+
+// A playlist's artwork: four covers in a square from four tracks up, the
+// first track's cover below that, an empty frame with none.
+function buildPlaylistArt(pl, items) {
+  items = items || getPlaylistTracks(pl);
+  if (!items.length) return '<div class="pl-art is-empty" aria-hidden="true">' + icon('playlists') + '</div>';
+  if (items.length < 4) return '<div class="pl-art" aria-hidden="true">' + buildCoverArt(items[0], 'sm', false) + '</div>';
+  return '<div class="pl-art is-quad" aria-hidden="true">' + items.slice(0, 4).map(function(track) {
+    return buildCoverArt(track, 'sm', false);
+  }).join('') + '</div>';
+}
+
+function playlistMeta(items) {
+  if (!items.length) return 'No tracks yet';
+  return items.length + ' track' + (items.length === 1 ? '' : 's') + ' \u00b7 ' + fmtLongDuration(getCollectionDuration(items));
+}
+
+function playlistBadges(pl) {
+  var out = '';
+  if (typeof isPlaylistOffline === 'function' && isPlaylistOffline(pl.id)) out += '<span class="pl-badge">' + icon('download') + 'Offline</span>';
+  if (pl.shared) out += '<span class="pl-badge is-shared">Public link</span>';
+  return out;
+}
+
+// Whether this playlist is what is playing now.
+function isPlaylistPlaying(pl, items) {
+  return !!(_currentTrack && _isPlaying && _playQueueLabel === pl.name && items.some(function(track) { return track.id === _currentTrack.id; }));
+}
+
+function playOverlayHTML(label, playing, action) {
+  return '<button type="button" class="pl-play' + (playing ? ' is-playing' : '') + '" aria-label="' + attr((playing ? 'Pause ' : 'Play ') + label) + '" onclick="event.stopPropagation();' + (playing ? 'togglePlayback()' : action) + '">' + icon(playing ? 'pause' : 'play') + '</button>';
+}
+
+// Cover, name and a line of facts; the play button rises over the cover on
+// hover (always there on touch). Sharing, offline and deleting live in the
+// playlist's dialog, not on every card.
+function buildPlaylistCard(pl) {
+  var items = getPlaylistTracks(pl);
+  var badges = playlistBadges(pl);
+  return '<article class="pl-card" style="' + playlistAccentVars(pl) + '" role="button" tabindex="0" aria-label="' + attr('Open playlist ' + pl.name) + '" onclick="viewPlaylist(' + jsq(pl.id) + ')">'
+    + '<div class="pl-cover">' + buildPlaylistArt(pl, items)
+    +   (items.length ? playOverlayHTML(pl.name, isPlaylistPlaying(pl, items), 'playPlaylist(' + jsq(pl.id) + ')') : '')
+    + '</div>'
+    + '<div class="pl-card-title">' + esc(pl.name) + '</div>'
+    + '<div class="pl-card-meta">' + esc(playlistMeta(items)) + '</div>'
+    + (badges ? '<div class="pl-badges">' + badges + '</div>' : '')
+    + '</article>';
+}
+
+function buildSmartMixCard(mix) {
+  var items = mix.trackIds.map(getTrackById).filter(Boolean);
+  var playing = !!(_currentTrack && _isPlaying && _playQueueLabel === mix.name);
+  return '<article class="pl-card is-smart" style="--pl-accent:' + mix.color + '" role="button" tabindex="0" title="' + attr(mix.desc) + '" aria-label="' + attr('Play smart mix ' + mix.name) + '" onclick="playSmartMix(' + jsq(mix.id) + ')">'
+    + '<div class="pl-cover">' + buildPlaylistArt(null, items)
+    +   '<span class="pl-auto">Auto</span>'
+    +   playOverlayHTML(mix.name, playing, 'playSmartMix(' + jsq(mix.id) + ')')
+    + '</div>'
+    + '<div class="pl-card-title">' + esc(mix.name) + '</div>'
+    + '<div class="pl-card-meta">' + esc(playlistMeta(items)) + '</div>'
+    + '<button type="button" class="pl-save" onclick="event.stopPropagation();saveSmartMixAsPlaylist(' + jsq(mix.id) + ')">Save as playlist</button>'
+    + '</article>';
+}
+
+// Play the playlist from a random track with shuffle on.
+function playPlaylistShuffled(id) {
+  var pl = getPlaylistById(id);
+  if (!pl || !pl.trackIds || !pl.trackIds.length) return;
+  if (!_shuffleMode) toggleShuffle();
+  var ids = pl.trackIds.slice();
+  startPlayback(ids[Math.floor(Math.random() * ids.length)], ids, pl.name);
 }
 
 function populatePlaylistCheckboxes() {
@@ -434,47 +497,121 @@ function viewPlaylist(id) {
   var items = getPlaylistTracks(pl);
   var isPrivatePlaylist = playlists.some(function(item) { return item.id === id; });
   var isEditing = isPrivatePlaylist && _editingPlaylistId === id;
-  var colorOptions = PLAYLIST_COLOR_OPTIONS;
-  var actionRow = '<button class="sec-action primary" onclick="playPlaylist(' + jsq(pl.id) + ');closeModal(\'modal-playlist-detail\')">Play all</button>';
-  if (isPrivatePlaylist) {
-    actionRow += '<button class="sec-action" onclick="shufflePlaylistMix(' + jsq(pl.id) + ')">Shuffle this mix</button><button class="sec-action" onclick="duplicatePlaylist(' + jsq(pl.id) + ')">Duplicate</button><button class="sec-action" onclick="' + (isEditing ? 'savePlaylistEdits(' + jsq(pl.id) + ')' : 'setPlaylistEditMode(' + jsq(pl.id) + ', true)') + '">' + (isEditing ? 'Save edits' : 'Edit mix') + '</button>' + (pl.shared ? '<button class="sec-action is-shared" onclick="unsharePlaylist(' + jsq(pl.id) + ')">Revoke public link</button>' : '<button class="sec-action" onclick="sharePlaylist(' + jsq(pl.id) + ')">Share playlist</button>');
-  } else {
-    actionRow += '<button class="sec-action" onclick="openShareLinkModal(' + jsq('Share \"' + pl.name + '\"') + ', ' + jsq('Send the playlist link for a front-to-back listen.') + ', ' + jsq(buildShareURL('playlist', pl.id)) + ')">Copy share link</button>';
+  var plays = items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0);
+  var close = "closeModal('modal-playlist-detail')";
+
+  var actions = '';
+  if (!isEditing) {
+    if (items.length) {
+      actions += '<button type="button" class="sec-action primary has-icon" onclick="playPlaylist(' + jsq(pl.id) + ');' + close + '">' + icon('play') + 'Play</button>'
+        + '<button type="button" class="sec-action has-icon" onclick="playPlaylistShuffled(' + jsq(pl.id) + ');' + close + '">' + icon('shuffle') + 'Shuffle</button>';
+    }
+    if (isPrivatePlaylist) {
+      var offlineOn = typeof isPlaylistOffline === 'function' && isPlaylistOffline(pl.id);
+      actions += (pl.shared
+          ? '<button type="button" class="sec-action is-shared" onclick="unsharePlaylist(' + jsq(pl.id) + ')">Revoke link</button>'
+          : '<button type="button" class="sec-action" onclick="sharePlaylist(' + jsq(pl.id) + ')">Share</button>')
+        + '<div class="card-menu-wrap">'
+        +   '<button type="button" class="icon-btn card-menu-btn" id="menubtn-pld" aria-haspopup="menu" aria-expanded="false" aria-label="More for this playlist" onclick="toggleCardMenu(\'pld\', event)">' + icon('more') + '</button>'
+        +   '<div class="card-menu drops-down" id="menu-pld" role="menu" aria-label="Playlist actions">'
+        +     '<button role="menuitem" onclick="closeAllCardMenus();setPlaylistEditMode(' + jsq(pl.id) + ', true)">Edit details and order</button>'
+        +     (items.length > 1 ? '<button role="menuitem" onclick="closeAllCardMenus();shufflePlaylistMix(' + jsq(pl.id) + ')">Shuffle the order</button>' : '')
+        +     '<button role="menuitem" onclick="closeAllCardMenus();duplicatePlaylist(' + jsq(pl.id) + ')">Duplicate</button>'
+        +     (typeof offlineSupported === 'function' && offlineSupported() && offlineTracksOf(pl).length
+                ? (offlineOn
+                    ? '<button role="menuitem" onclick="closeAllCardMenus();removePlaylistOffline(' + jsq(pl.id) + ').then(function(){viewPlaylist(' + jsq(pl.id) + ')})">Remove offline copy</button>'
+                    : '<button role="menuitem" onclick="closeAllCardMenus();keepPlaylistOffline(' + jsq(pl.id) + ')">Keep offline</button>')
+                : '')
+        +     '<button role="menuitem" class="is-danger" onclick="closeAllCardMenus();deletePlaylistFromDialog(' + jsq(pl.id) + ')">Delete playlist</button>'
+        +   '</div>'
+        + '</div>';
+    } else {
+      actions += '<button type="button" class="sec-action" onclick="openShareLinkModal(' + jsq('Share \u201c' + pl.name + '\u201d') + ', ' + jsq('Send the playlist link for a front-to-back listen.') + ', ' + jsq(buildShareURL('playlist', pl.id)) + ')">Copy share link</button>';
+    }
   }
-  if (isPrivatePlaylist) actionRow += offlineControlsHTML(pl);
-  var html = '<div class="playlist-modal-hero" style="' + playlistAccentVars(pl) + '">' + buildPlaylistCover(pl, 'sm') + '<div><div class="section-kicker" style="color:var(--pl-accent)">' + (isEditing ? 'Edit mixtape' : 'Playlist detail') + '</div><div class="modal-title" style="margin-bottom:.55rem;color:var(--pl-accent)">' + esc(pl.name) + '</div><div class="section-sub">' + esc(pl.desc || 'An editorial mix from the vault.') + '</div><div class="pill-row" style="margin-top:.85rem"><span class="meta-pill highlight" style="color:var(--pl-accent);border-color:var(--pl-accent-rim);background:var(--pl-accent-soft)">' + items.length + ' tracks</span><span class="meta-pill">' + fmtTime(getCollectionDuration(items)) + '</span><span class="meta-pill">' + fmtCompactNumber(items.reduce(function(sum, item) { return sum + Number(item.plays || 0); }, 0)) + ' plays</span></div><div class="section-action-row" style="margin-top:1rem">' + actionRow + '</div></div></div>';
+
+  var offlineLine = !isEditing && isPrivatePlaylist && typeof offlineControlsHTML === 'function'
+    && (isPlaylistOffline(pl.id) || (_offlineRun && _offlineRun.playlistId === pl.id)) ? offlineControlsHTML(pl) : '';
+
+  var html = '<div class="pld-head" style="' + playlistAccentVars(pl) + '">'
+    + '<div class="pld-art">' + buildPlaylistArt(pl, items) + '</div>'
+    + '<div class="pld-info">'
+    +   '<div class="pl-eyebrow">' + (isEditing ? 'Editing playlist' : 'Playlist') + '</div>'
+    +   '<h2 class="pld-title">' + esc(pl.name) + '</h2>'
+    +   (pl.desc && !isEditing ? '<p class="pld-desc">' + esc(pl.desc) + '</p>' : '')
+    +   '<div class="pld-meta">' + esc(playlistMeta(items)) + (plays ? ' \u00b7 ' + fmtCompactNumber(plays) + (plays === 1 ? ' play' : ' plays') : '') + playlistBadges(pl) + '</div>'
+    +   (actions ? '<div class="pl-actions">' + actions + '</div>' : '')
+    +   offlineLine
+    + '</div>'
+    + '</div>';
 
   if (isEditing) {
-    html += '<div class="playlist-edit-shell"><div class="playlist-edit-card"><div class="form-grid"><div class="form-group"><label class="form-label">Playlist name</label><input class="form-input" type="text" id="pl-edit-name" value="' + attr(pl.name) + '"></div><div class="form-group"><label class="form-label">Accent color</label><select class="form-input" id="pl-edit-color">' + colorOptions.map(function(option) { return '<option value="' + option.value + '"' + ((pl.color || '#F08B62') === option.value ? ' selected' : '') + '>' + option.label + '</option>'; }).join('') + '</select></div></div><div class="form-group" style="margin-top:.8rem"><label class="form-label">Description</label><textarea class="form-input" id="pl-edit-desc" rows="4">' + esc(pl.desc || '') + '</textarea></div><div class="playlist-edit-actions"><button class="sec-action" onclick="setPlaylistEditMode(' + jsq(pl.id) + ', false)">Cancel</button><button class="sec-action primary" onclick="savePlaylistEdits(' + jsq(pl.id) + ')">Save mixtape</button></div></div>';
-    if (!items.length) {
-      html += '<div class="empty-state"><strong>Empty mix.</strong>Add tracks from the library or expanded player, then arrange the order here.</div>';
-    } else {
-      html += '<div class="playlist-edit-card"><div class="section-kicker">Sequence editor</div><div class="section-sub" style="margin-bottom:1rem">Drag a row to reorder it, or use Up and Down to move it from the keyboard. This order is used everywhere SonicVault treats this as a mixtape: playlist page, detail modal, and playback queue.</div><div class="playlist-edit-list">';
-      items.forEach(function(track, index) {
-        html += '<div class="playlist-edit-item" draggable="true"'
-          + ' ondragstart="onSeqDragStart(event, ' + jsq(pl.id) + ', ' + index + ')"'
-          + ' ondragover="onSeqDragOver(event, ' + jsq(pl.id) + ', ' + index + ')"'
-          + ' ondrop="onSeqDrop(event, ' + jsq(pl.id) + ', ' + index + ')"'
-          + ' ondragend="onSeqDragEnd()">'
-          + '<div class="playlist-drag-handle" aria-hidden="true" title="Drag to reorder">::</div>'
-          + '<div class="playlist-edit-index">' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div class="playlist-edit-copy"><div class="playlist-edit-title">' + esc(track.title) + '</div><div class="playlist-edit-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + fmtTime(track.duration || 0) + '</div></div><div class="playlist-seq-actions"><button class="playlist-seq-btn" onclick="movePlaylistTrack(' + jsq(pl.id) + ', ' + index + ', -1)"' + (index === 0 ? ' disabled' : '') + '>Up</button><button class="playlist-seq-btn" onclick="movePlaylistTrack(' + jsq(pl.id) + ', ' + index + ', 1)"' + (index === items.length - 1 ? ' disabled' : '') + '>Down</button><button class="playlist-seq-btn" onclick="removePlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ')">Remove</button></div></div>';
-      });
-      html += '</div></div>';
-    }
+    var current = safePlaylistColor(pl.color).toUpperCase();
+    html += '<div class="pld-edit">'
+      + '<div class="form-group"><label class="form-label" for="pl-edit-name">Name</label><input class="form-input" type="text" id="pl-edit-name" maxlength="80" value="' + attr(pl.name) + '"></div>'
+      + '<div class="form-group"><label class="form-label" for="pl-edit-desc">Description <span class="form-label-note">optional</span></label><textarea class="form-input" id="pl-edit-desc" rows="2">' + esc(pl.desc || '') + '</textarea></div>'
+      + '<div class="form-group"><span class="form-label" id="pl-edit-color-label">Colour</span><div class="pl-swatches" role="radiogroup" aria-labelledby="pl-edit-color-label">'
+      +   PLAYLIST_COLOR_OPTIONS.map(function(option) {
+            return '<label class="pl-swatch" title="' + attr(option.label) + '"><input type="radio" name="pl-edit-color" value="' + attr(option.value) + '"' + (option.value.toUpperCase() === current ? ' checked' : '') + ' aria-label="' + attr(option.label) + '"><span style="--sw:' + option.value + '"></span></label>';
+          }).join('')
+      + '</div></div>'
+      + '<div class="pld-edit-actions"><button type="button" class="sec-action" onclick="setPlaylistEditMode(' + jsq(pl.id) + ', false)">Cancel</button><button type="button" class="sec-action primary" onclick="savePlaylistEdits(' + jsq(pl.id) + ')">Save</button></div>'
+      + '</div>';
+  }
+
+  if (!items.length) {
+    html += '<div class="pl-empty in-dialog">Add tracks from a track\u2019s menu in the library, or with Add to playlist in the player.'
+      + '<button type="button" class="sec-action" onclick="' + close + ';switchView(\'library\')">Browse the library</button></div>';
   } else {
-    if (!items.length) {
-      html += '<div class="empty-state"><strong>Empty mix.</strong>Add tracks to give this room some shape.</div>';
-    } else {
-      html += '<div class="playlist-modal-list">';
-      items.forEach(function(track, index) {
-        html += '<div class="playlist-modal-item" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ', position ' + (index + 1)) + '" onclick="playPlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ');closeModal(\'modal-playlist-detail\')"><div class="mini-track-meta" aria-hidden="true">#' + (index + 1) + '</div>' + buildCoverArt(track, 'xs', false) + '<div><div class="playlist-picker-title">' + esc(track.title) + '</div><div class="playlist-picker-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 86), 86) + '</div></div><div class="mini-track-meta">' + fmtTime(track.duration || 0) + '</div></div>';
-      });
-      html += '</div>';
-    }
+    html += (isEditing ? '<div class="pld-hint">Move tracks with the arrows<span class="pld-hint-drag">, or drag them</span>.</div>' : '')
+      + '<div class="pld-list">' + items.map(function(track, index) {
+        return isEditing ? playlistEditRow(pl, track, index, items.length) : playlistRow(pl, track, index);
+      }).join('') + '</div>';
   }
 
   document.getElementById('pld-body').innerHTML = html;
   openModal('modal-playlist-detail');
+}
+
+function playlistRow(pl, track, index) {
+  var isCurrent = _currentTrack && _currentTrack.id === track.id;
+  return '<div class="pl-row' + (isCurrent ? ' current' : '') + '" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ', number ' + (index + 1)) + '" onclick="playPlaylistTrack(' + jsq(pl.id) + ', ' + jsq(track.id) + ');closeModal(\'modal-playlist-detail\')">'
+    + '<span class="pl-row-index" aria-hidden="true">' + (isCurrent ? eqBars() : index + 1) + '</span>'
+    + buildCoverArt(track, 'xs', false)
+    + '<div class="pl-row-main"><div class="pl-row-title">' + esc(track.title) + '</div><div class="pl-row-sub">' + esc(track.genre || 'Other') + ' \u00b7 ' + esc(track.mood || 'Mood') + '</div></div>'
+    + '<span class="pl-row-time">' + fmtTime(track.duration || 0) + '</span>'
+    + '</div>';
+}
+
+function playlistEditRow(pl, track, index, count) {
+  var id = jsq(pl.id);
+  return '<div class="pl-row is-editing" draggable="true"'
+    + ' ondragstart="onSeqDragStart(event, ' + id + ', ' + index + ')"'
+    + ' ondragover="onSeqDragOver(event, ' + id + ', ' + index + ')"'
+    + ' ondrop="onSeqDrop(event, ' + id + ', ' + index + ')"'
+    + ' ondragend="onSeqDragEnd()">'
+    + '<span class="pl-grip" aria-hidden="true" title="Drag to move">' + icon('grip') + '</span>'
+    + '<span class="pl-row-index" aria-hidden="true">' + (index + 1) + '</span>'
+    + buildCoverArt(track, 'xs', false)
+    + '<div class="pl-row-main"><div class="pl-row-title">' + esc(track.title) + '</div><div class="pl-row-sub">' + esc(track.genre || 'Other') + ' \u00b7 ' + fmtTime(track.duration || 0) + '</div></div>'
+    + '<div class="pl-row-tools">'
+    +   '<button type="button" class="pl-tool" aria-label="' + attr('Move ' + track.title + ' up') + '" onclick="movePlaylistTrack(' + id + ', ' + index + ', -1)"' + (index === 0 ? ' disabled' : '') + '>' + icon('chevron-up') + '</button>'
+    +   '<button type="button" class="pl-tool" aria-label="' + attr('Move ' + track.title + ' down') + '" onclick="movePlaylistTrack(' + id + ', ' + index + ', 1)"' + (index === count - 1 ? ' disabled' : '') + '>' + icon('chevron-down') + '</button>'
+    +   '<button type="button" class="pl-tool is-danger" aria-label="' + attr('Remove ' + track.title + ' from the playlist') + '" onclick="removePlaylistTrack(' + id + ', ' + jsq(track.id) + ')">' + icon('x') + '</button>'
+    + '</div>'
+    + '</div>';
+}
+
+// The dialog stays open while a playlist downloads, so the menu's "Keep
+// offline" re-renders it with the progress line.
+function keepPlaylistOffline(id) {
+  savePlaylistOffline(id);
+  viewPlaylist(id);
+}
+
+function deletePlaylistFromDialog(id) {
+  deletePlaylist(id);
+  if (!getPlaylistById(id)) closeModal('modal-playlist-detail');
 }
 
 var _editingPlaylistId = '';
