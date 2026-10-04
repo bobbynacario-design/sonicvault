@@ -24,10 +24,12 @@ function translateEndpoint() {
   try { return new URL('/translate', _aiConfig.endpoint).toString(); } catch (e) { return ''; }
 }
 
-// The saved translation when it still belongs to these lyrics and this language.
+// The saved translation when it still belongs to these lyrics and this
+// language. A shared song's visitors get whichever language was saved.
 function getTranslation(track, lang) {
   var tr = track && track.translation;
-  if (!tr || !hasLyrics(track) || tr.key !== lyricSyncKey(getTrackLyrics(track)) || tr.lang !== (lang || translateLanguage())) return null;
+  if (!tr || !hasLyrics(track) || tr.key !== lyricSyncKey(getTrackLyrics(track))) return null;
+  if (getVaultTrack(track.id) && tr.lang !== (lang || translateLanguage())) return null;
   return tr;
 }
 
@@ -42,7 +44,8 @@ function shownTranslationLines(track) {
 }
 
 function translateTrack() {
-  return _currentTrack ? getVaultTrack(_currentTrack.id) : null;
+  if (!_currentTrack) return null;
+  return getVaultTrack(_currentTrack.id) || (_currentTrack.translation ? _currentTrack : null);
 }
 
 function toggleTranslation() {
@@ -50,7 +53,7 @@ function toggleTranslation() {
   if (!track || !hasLyrics(track)) return;
   _translateOpen = _translateOpen === track.id ? '' : track.id;
   if (_translateOpen && typeof _sungCheckOpen !== 'undefined') _sungCheckOpen = '';
-  if (_translateOpen && !getTranslation(track) && translateEndpoint()) requestTranslation(track, translateLanguage());
+  if (_translateOpen && !getTranslation(track) && getVaultTrack(track.id) && translateEndpoint()) requestTranslation(track, translateLanguage());
   refreshTranslationViews();
 }
 
@@ -132,6 +135,14 @@ function renderTranslatePanel() {
   if (panel.hidden) { panel.innerHTML = ''; return; }
   var lang = translateLanguage();
   var tr = getTranslation(track, lang);
+  var mine = !!getVaultTrack(track.id);
+  if (!mine) {
+    // A visitor sees the owner's saved translation, in its language.
+    panel.innerHTML = tr ? '<div class="translate-head"><span class="player-copy-kicker">What it means</span><span class="translate-lang">' + esc(tr.lang) + '</span></div>'
+      + (tr.about ? '<p class="translate-about">' + esc(tr.about) + '</p>' : '') : '';
+    panel.hidden = !tr;
+    return;
+  }
   var picker = '<label class="translate-lang"><span>Into</span><select onchange="setTranslateLanguage(this.value)" aria-label="Translate into">'
     + TRANSLATE_LANGUAGES.map(function(name) {
         return '<option' + (name === lang ? ' selected' : '') + '>' + esc(name) + '</option>';

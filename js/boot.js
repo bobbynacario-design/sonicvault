@@ -18,6 +18,7 @@ window.refreshAll = function() {
   scheduleAutoDescribe();
   scheduleOfflineTopUp();
   scheduleMeaningIndex();
+  scheduleShareRefresh();
   renderSyncBanner();
   renderBackupPanel();
   renderRouteAwareView(true);

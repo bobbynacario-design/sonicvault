@@ -2100,6 +2100,16 @@ body.light .playlist-modal-item{background:rgba(0,0,0,.03)}
 .public-section-title{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:-.01em;line-height:1.05}
 .public-lyrics{max-width:720px;font-size:15px;line-height:1.85;color:var(--text)}
 .public-lyrics .lyric-line{font-size:15px}
+/* Live lyrics on a share page (publicLyricsSection, js/features/share.js). */
+.public-section-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.8rem}
+.public-lyric-tools{display:flex;flex-wrap:wrap;gap:.5rem}
+.public-lyrics.synced{max-height:min(60vh, 560px);overflow:auto;padding:.3rem .6rem .3rem .7rem;margin-left:-.7rem;scroll-behavior:smooth}
+.public-lyrics.synced .lyric-line{cursor:pointer;border-radius:8px;color:var(--muted);transition:color .3s ease, background .3s ease}
+.public-lyrics.synced .lyric-line.lyric-past{color:var(--muted2)}
+.public-lyrics.synced .lyric-line.lyric-current{color:var(--text);font-weight:600;background:var(--accent-dynamic-soft);box-shadow:inset 2px 0 0 var(--accent-dynamic);padding:.12rem .55rem;margin-left:-.55rem}
+@media (hover:hover){.public-lyrics.synced .lyric-line:hover{background:var(--surface)}}
+.public-lyrics-about{max-width:720px;margin:0;font-size:15px;line-height:1.65;color:var(--muted)}
+.public-lyrics-hint{margin:0;font-size:12.5px;color:var(--muted2)}
 .public-lyrics-text{color:var(--muted)}
 .public-related-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem}
 .public-related-grid .cover-art{width:100%;height:auto;aspect-ratio:1/1}

@@ -11,9 +11,36 @@ function getPlaylistAnchorTrack(pl) {
   };
 }
 
-function makeTrackSnapshot(track) {
-  if (!track) return null;
+// What a share page needs to play the lyrics along with a song: the line
+// and word timings (not what the transcription heard), and the saved
+// translation. null where there is none.
+function publicLyricSync(track) {
+  var sync = getLyricSync(track);
+  if (!sync || sync.source === 'unmatched' || !sync.lines.some(Boolean)) return null;
+  return packLyricSync(getTrackLyrics(track), sync.lines, sync.source, sync.at || '', null, sync.words);
+}
+
+function publicTranslation(track) {
+  var tr = track && track.translation;
+  if (!tr || !hasLyrics(track) || tr.key !== lyricSyncKey(getTrackLyrics(track))) return null;
   return {
+    key:tr.key,
+    lang:String(tr.lang || ''),
+    from:String(tr.from || ''),
+    same:!!tr.same,
+    lines:(tr.lines || []).map(function(line) { return String(line || ''); }),
+    about:String(tr.about || ''),
+    notes:(tr.notes || []).map(function(item) { return { line:Number(item.line) || 0, note:String(item.note || '') }; }),
+    at:String(tr.at || '')
+  };
+}
+
+// full: the whole sheet with its timings and translation, for a song the
+// page plays (the shared song, a shared playlist's songs) rather than one
+// it only links to.
+function makeTrackSnapshot(track, full) {
+  if (!track) return null;
+  var snapshot = {
     id: track.id,
     title: track.title || 'Untitled release',
     genre: track.genre || 'Other',
@@ -37,11 +64,17 @@ function makeTrackSnapshot(track) {
     lyricsExcerpt: trimLyricsPreview(getTrackLyrics(track), 900),
     hasLyrics: hasLyrics(track)
   };
+  if (full) {
+    snapshot.lyrics = getTrackLyrics(track);
+    snapshot.lyricSync = publicLyricSync(track);
+    snapshot.translation = publicTranslation(track);
+  }
+  return snapshot;
 }
 
 function makePlaylistSnapshot(pl, limit) {
   if (!pl) return null;
-  var items = getPlaylistTracks(pl).slice(0, limit || 4).map(makeTrackSnapshot).filter(Boolean);
+  var items = getPlaylistTracks(pl).slice(0, limit || 4).map(function(item) { return makeTrackSnapshot(item); }).filter(Boolean);
   return {
     id: pl.id,
     name: pl.name || 'Untitled playlist',
@@ -56,13 +89,13 @@ function makePlaylistSnapshot(pl, limit) {
 function buildTrackSharePayload(track) {
   var related = getSimilarTracks(track, 8).filter(function(item) {
     return !!item.shared;
-  }).slice(0, 4).map(makeTrackSnapshot).filter(Boolean);
+  }).slice(0, 4).map(function(item) { return makeTrackSnapshot(item); }).filter(Boolean);
   var contextPlaylists = playlists.filter(function(pl) {
     return !!pl.shared && (pl.trackIds || []).indexOf(track.id) !== -1;
   }).slice(0, 4).map(function(pl) {
     return makePlaylistSnapshot(pl, 4);
   }).filter(Boolean);
-  return Object.assign(makeTrackSnapshot(track), {
+  return Object.assign(makeTrackSnapshot(track, true), {
     kind: 'track',
     related: related,
     playlists: contextPlaylists,
@@ -71,7 +104,7 @@ function buildTrackSharePayload(track) {
 }
 
 function buildPlaylistSharePayload(pl) {
-  var items = getPlaylistTracks(pl).map(makeTrackSnapshot).filter(Boolean);
+  var items = getPlaylistTracks(pl).map(function(track) { return makeTrackSnapshot(track, true); }).filter(Boolean);
   return {
     kind: 'playlist',
     id: pl.id,
@@ -83,7 +116,7 @@ function buildPlaylistSharePayload(pl) {
     tracks: items,
     related: getPlaylistRelatedTracks(pl, 8).filter(function(item) {
       return !!item.shared;
-    }).slice(0, 4).map(makeTrackSnapshot).filter(Boolean),
+    }).slice(0, 4).map(function(item) { return makeTrackSnapshot(item); }).filter(Boolean),
     totalDuration: getCollectionDuration(items),
     sharedAt: new Date().toISOString()
   };
@@ -139,6 +172,116 @@ function publicLyricsHTML(text) {
 
 // Visitors cannot open a private vault, so the way back into the app is
 // offered only to the signed-in owner.
+// ── Live lyrics on a share page ──────────────────────────────────────
+// A shared song with timed lyrics shows its whole sheet, lighting the line
+// being sung while it plays -- the translation under each line when the
+// owner saved one (shown at first; a song in another language is the
+// reason to share one) -- and opens karaoke ("Sing along"). Tapping a line
+// plays from there.
+
+var _publicLyricIdx = -1;
+var _publicTranslationShown = {};   // track id -> true once shown by default
+
+function publicSyncedLyrics(track) {
+  return !!(track && hasLyrics(track) && hasUsableLyricTimes(track));
+}
+
+function publicSyncedLyricsHTML(track) {
+  var translations = shownTranslationLines(track);
+  return parseLyricSheet(getTrackLyrics(track)).map(function(row) {
+    if (row.kind === 'gap') return '<div class="lyric-gap"></div>';
+    if (row.kind === 'header') return '<div class="lyric-section-header">' + esc(row.text) + '</div>';
+    var tr = translations && translations[row.index];
+    return '<div class="lyric-line" role="button" tabindex="0" data-line="' + row.index + '" onclick="playSharedLyric(' + jsq(track.id) + ', ' + row.index + ')">'
+      + esc(row.text) + (tr ? '<span class="lyric-tr">' + esc(tr) + '</span>' : '') + '</div>';
+  }).join('');
+}
+
+function sharedQueueFor(track) {
+  var related = Array.isArray(track.related) ? track.related : [];
+  return [track.id].concat(related.map(function(item) { return item.id; }));
+}
+
+// Plays the shared song from a line: straight there when it is already
+// the song playing, else once the new song knows its length.
+function playSharedLyric(id, index) {
+  var seek = function() {
+    var times = getCurrentLyricTimes();
+    if (times && times[index]) _audio.currentTime = Math.max(0, times[index][0] - .2);
+    updatePublicLyricHighlight(true);
+  };
+  if (_currentTrack && _currentTrack.id === id) {
+    seek();
+    if (_audio.paused) togglePlayback();
+    return;
+  }
+  var track = getTrackById(id);
+  if (!track) return;
+  var once = function() { _audio.removeEventListener('loadedmetadata', once); seek(); };
+  _audio.addEventListener('loadedmetadata', once);
+  startPlayback(id, sharedQueueFor(_publicRoutePayload && _publicRoutePayload.id === id ? _publicRoutePayload : track), 'Shared track');
+}
+
+function singAlongShared(id) {
+  if (!_currentTrack || _currentTrack.id !== id) {
+    var track = getTrackById(id);
+    if (!track) return;
+    startPlayback(id, sharedQueueFor(_publicRoutePayload && _publicRoutePayload.id === id ? _publicRoutePayload : track), 'Shared track');
+  } else if (_audio.paused) {
+    togglePlayback();
+  }
+  openKaraoke();
+}
+
+function toggleSharedTranslation(id) {
+  _translateOpen = _translateOpen === id ? '' : id;
+  _publicTranslationShown[id] = true;
+  renderRouteAwareView(true);
+  if (_currentTrack && typeof updateExpandedPlayer === 'function') updateExpandedPlayer();
+}
+
+// The line being sung, lit within the lyric box (never scrolling the page).
+function updatePublicLyricHighlight(force) {
+  var box = document.getElementById('public-lyrics');
+  if (!box) return;
+  var playingThis = _currentTrack && box.getAttribute('data-track') === _currentTrack.id;
+  var lines = box.querySelectorAll('.lyric-line');
+  var times = playingThis ? getCurrentLyricTimes() : null;
+  var idx = times && times.length === lines.length ? currentLyricIndex(times, _audio.currentTime || 0) : -1;
+  if (idx === _publicLyricIdx && !force) return;
+  _publicLyricIdx = idx;
+  for (var i = 0; i < lines.length; i++) {
+    lines[i].classList.toggle('lyric-current', i === idx);
+    lines[i].classList.toggle('lyric-past', idx >= 0 && i < idx);
+  }
+  if (idx >= 0) box.scrollTop = lines[idx].offsetTop - box.clientHeight / 2 + lines[idx].offsetHeight / 2;
+}
+
+_audio.addEventListener('timeupdate', function() { updatePublicLyricHighlight(false); });
+_audio.addEventListener('seeked', function() { updatePublicLyricHighlight(true); });
+
+function publicLyricsSection(track, lyrics) {
+  if (!publicSyncedLyrics(track)) {
+    return lyrics ? '<section class="public-section"><h2 class="public-section-title">Lyrics</h2><div class="public-lyrics">' + publicLyricsHTML(lyrics) + '</div></section>' : '';
+  }
+  var tr = getTranslation(track);
+  var hasLines = !!(tr && !tr.same && tr.lines && tr.lines.length);
+  if (hasLines && !_publicTranslationShown[track.id]) {
+    _publicTranslationShown[track.id] = true;
+    _translateOpen = track.id;
+  }
+  var shown = hasLines && _translateOpen === track.id;
+  return '<section class="public-section">'
+    + '<div class="public-section-head"><h2 class="public-section-title">Lyrics</h2><div class="public-lyric-tools">'
+    +   (hasLines ? '<button class="sec-action" aria-pressed="' + shown + '" onclick="toggleSharedTranslation(' + jsq(track.id) + ')">' + (shown ? 'Hide ' : 'Show ') + esc(tr.lang || 'translation') + '</button>' : '')
+    +   '<button class="sec-action primary has-icon" onclick="singAlongShared(' + jsq(track.id) + ')">' + icon('play') + 'Sing along</button>'
+    + '</div></div>'
+    + (shown && tr.about ? '<p class="public-lyrics-about">' + esc(tr.about) + '</p>' : '')
+    + '<div class="public-lyrics synced" id="public-lyrics" data-track="' + attr(track.id) + '">' + publicSyncedLyricsHTML(track) + '</div>'
+    + '<p class="public-lyrics-hint">The lyrics follow the song as it plays. Tap a line to play from there.</p>'
+    + '</section>';
+}
+
 function publicOwnerAction(view) {
   return window.fbOwnerUser ? '<button class="sec-action" onclick="navigateToApp(' + jsq(view) + ')">Open vault</button>' : '';
 }
@@ -175,7 +318,7 @@ function renderPublicTrackPage(track) {
   var playLabel = _currentTrack && _currentTrack.id === track.id && _isPlaying ? 'Pause' : 'Play';
   var summary = getTrackSummary(track);
   var tags = sanitizeMetadataArray(track.aiTags || getTrackAITags(track), 6);
-  var lyrics = String(track.lyricsExcerpt || trimLyricsPreview(getTrackLyrics(track), 900) || '').trim();
+  var lyrics = String(track.lyrics || track.lyricsExcerpt || trimLyricsPreview(getTrackLyrics(track), 900) || '').trim();
   // Records shared before 2026-10-04 kept their excerpt as one long line.
   // The song file's own sheet, once read, gives the lines back; until then
   // the sections at least.
@@ -204,7 +347,7 @@ function renderPublicTrackPage(track) {
     +       '</div>'
     +     '</div>'
     +   '</section>'
-    +   (lyrics ? '<section class="public-section"><h2 class="public-section-title">Lyrics</h2><div class="public-lyrics">' + publicLyricsHTML(lyrics) + '</div></section>' : '')
+    +   publicLyricsSection(track, lyrics)
     +   (related.length ? '<section class="public-section"><h2 class="public-section-title">More like this</h2><div class="public-related-grid">' + publicRelatedCards(related) + '</div></section>' : '')
     +   (collections.length ? '<section class="public-section"><h2 class="public-section-title">In playlists</h2><div class="public-link-list">' + collections.map(function(pl) {
           var items = getPlaylistTracks(pl);
@@ -213,6 +356,8 @@ function renderPublicTrackPage(track) {
     + '</div>';
 
   updatePageChrome(track.title + ' | SonicVault', track);
+  _publicLyricIdx = -2;
+  updatePublicLyricHighlight(true);
 }
 
 function renderPublicPlaylistPage(pl) {
@@ -264,6 +409,52 @@ function renderPublicPlaylistPage(pl) {
   updatePageChrome(pl.name + ' | SonicVault', anchor);
 }
 
+// ── Keeping a shared song's page current ──────────────────────────────
+// A song is published when it is shared. A later change that shows on its
+// page -- the lyrics, their timings or translation, the description, the
+// cover -- republishes it a few seconds after the change settles. Plays
+// don't count. What was last published is remembered per song
+// (localStorage.sv_share_sigs), so each change goes out once.
+var _shareRefreshTimer = null;
+
+function trackShareSignature(track) {
+  var sync = publicLyricSync(track);
+  var tr = publicTranslation(track);
+  return hashString([
+    track.title, track.genre, track.mood, track.audioURL, getCoverStyle(track), getTrackSummary(track),
+    getTrackAITags(track).join(','), getTrackLyrics(track),
+    sync ? sync.key + sync.at + sync.source + (sync.words ? sync.words.length : 0) : '',
+    tr ? tr.lang + tr.at : '', getRealPeaksForTrack(track).length
+  ].join('|'));
+}
+
+function loadShareSignatures() {
+  try { return JSON.parse(localStorage.getItem('sv_share_sigs') || '{}') || {}; } catch (e) { return {}; }
+}
+
+function rememberShareSignature(track) {
+  var sigs = loadShareSignatures();
+  sigs[track.id] = trackShareSignature(track);
+  try { localStorage.setItem('sv_share_sigs', JSON.stringify(sigs)); } catch (e) {}
+}
+
+function scheduleShareRefresh() {
+  clearTimeout(_shareRefreshTimer);
+  _shareRefreshTimer = setTimeout(refreshSharedTracks, 4000);
+}
+
+function refreshSharedTracks() {
+  // Only the signed-in owner can write a share, and only once synced.
+  if (!window.fbOwnerUser || !window.fbPublishShare || !window.svVaultSettingsLoaded) return;
+  var sigs = loadShareSignatures();
+  tracks.filter(function(track) { return track && track.shared; }).forEach(function(track) {
+    if (sigs[track.id] === trackShareSignature(track)) return;
+    window.fbPublishShare('track', track.id, buildTrackSharePayload(track)).then(function() {
+      rememberShareSignature(track);
+    }).catch(function(e) { console.warn('Share refresh failed for', track.id, e); });
+  });
+}
+
 async function shareTrack(id) {
   var track = getTrackById(id);
   if (!track) return;
@@ -273,6 +464,7 @@ async function shareTrack(id) {
   showToast('Creating share link\u2026');
   try {
     if (window.fbPublishShare) await window.fbPublishShare('track', track.id, buildTrackSharePayload(track));
+    rememberShareSignature(track);
     openShareLinkModal('Share "' + track.title + '"', 'Anyone with the link can jump straight into this track.', buildShareURL('track', track.id));
   } catch (e) {
     console.error('Track share publish failed:', e);

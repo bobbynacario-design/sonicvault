@@ -60,4 +60,5 @@ function persistTracks() {
   }
   syncTrackDocs();
   invalidateFilterCache();
+  if (typeof scheduleShareRefresh === 'function') scheduleShareRefresh();
 }

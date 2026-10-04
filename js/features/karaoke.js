@@ -18,8 +18,10 @@ var KARAOKE_BACKGROUNDS = [
 ];
 var _karaoke = null;         // { trackId, key, index, words: { line: [...] }, playing, frame }
 
+// The vault's copy, or on a share page the shared song itself.
 function karaokeTrack() {
-  return _currentTrack ? getVaultTrack(_currentTrack.id) : null;
+  if (!_currentTrack) return null;
+  return getVaultTrack(_currentTrack.id) || (hasLyrics(_currentTrack) ? _currentTrack : null);
 }
 
 function karaokeAvailable(track) {
@@ -87,7 +89,7 @@ function prepareKaraokeSong(track) {
   document.getElementById('modal-karaoke').style.setProperty('--k-accent', palette.accent || palette.a);
   // Songs timed before word times were kept get them once.
   var sync = track && getLyricSync(track);
-  if (sync && !sync.words && lyricSyncEndpoint() && !_sungCheckJobs[track.id] && !_sungCheckFailed[track.id]) requestSungCheck(track);
+  if (sync && !sync.words && getVaultTrack(track.id) && lyricSyncEndpoint() && !_sungCheckJobs[track.id] && !_sungCheckFailed[track.id]) requestSungCheck(track);
 }
 
 function karaokeLineWords(track, index, times) {
