@@ -21,8 +21,8 @@
 <meta name="twitter:description" content="Curate tracks, build mixtapes, and stream your AI-generated music from anywhere.">
 <title>SonicVault - Private AI Music Vault</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<script type="module" src="js/app.js?v=20261004q"></script>
-<link rel="stylesheet" href="styles/app.css?v=20261004q">
+<script type="module" src="js/app.js?v=20261004r"></script>
+<link rel="stylesheet" href="styles/app.css?v=20261004r">
 </head>
 <body>
 <!-- Icon sprite. Every glyph in the app is <svg class="ic"><use href="#i-NAME"/></svg>,
@@ -53,6 +53,64 @@
     <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></symbol>
   </defs>
 </svg>
+<!-- Sign-in page, laid out like PokerHQ's and Enclave's: the private vault
+     stays behind it until its owner signs in (js/features/sign-in.js). The
+     script under it (js/first-paint.js) decides the first paint before the
+     rest is parsed: hidden on share links and for whoever was signed in last
+     time on this device. -->
+<div id="login-overlay" class="login-overlay" hidden>
+  <main class="login-wrap" aria-labelledby="login-title">
+    <div class="login-shell">
+      <section class="login-story">
+        <div class="login-brand">
+          <div class="nav-mark login-mark" aria-hidden="true"></div>
+          <div>
+            <div class="login-logo-text">SonicVault</div>
+            <div class="login-tagline">Private AI listening room</div>
+          </div>
+        </div>
+        <p class="login-eyebrow">Your private music vault</p>
+        <h1 class="login-headline" id="login-title">All your songs, in one private room.</h1>
+        <p class="login-desc">SonicVault keeps the music you make with Suno and Lyria together: real covers, lyrics that follow the song as it plays, and playlists that sync to every device you sign in on.</p>
+        <div class="login-benefits" aria-label="What SonicVault does">
+          <article class="login-benefit">
+            <span class="login-benefit-index">01</span>
+            <div><h2>Listen properly</h2><p>Real covers and waveforms, and lyrics that light up line by line as the song plays.</p></div>
+          </article>
+          <article class="login-benefit">
+            <span class="login-benefit-index">02</span>
+            <div><h2>Make more</h2><p>Draft lyrics with Claude, make new songs with Lyria, and keep the takes you love.</p></div>
+          </article>
+          <article class="login-benefit">
+            <span class="login-benefit-index">03</span>
+            <div><h2>Share the good ones</h2><p>Send a track or a playlist as a link that previews with its cover. No sign-in needed to listen.</p></div>
+          </article>
+        </div>
+        <div class="login-trust" aria-label="Privacy and access">
+          <span>Owner-only vault</span>
+          <span>Synced across devices</span>
+          <span>Google verified sign-in</span>
+        </div>
+      </section>
+      <aside class="login-card" aria-labelledby="login-access-title">
+        <div class="login-wave" aria-hidden="true"><i style="--h:28%;--d:0.00s"></i><i style="--h:46%;--d:0.07s"></i><i style="--h:64%;--d:0.14s"></i><i style="--h:38%;--d:0.21s"></i><i style="--h:72%;--d:0.28s"></i><i style="--h:90%;--d:0.35s"></i><i style="--h:58%;--d:0.42s"></i><i style="--h:34%;--d:0.49s"></i><i style="--h:52%;--d:0.56s"></i><i style="--h:80%;--d:0.63s"></i><i style="--h:100%;--d:0.70s"></i><i style="--h:66%;--d:0.77s"></i><i style="--h:42%;--d:0.84s"></i><i style="--h:60%;--d:0.91s"></i><i style="--h:86%;--d:0.98s"></i><i style="--h:70%;--d:1.05s"></i><i style="--h:48%;--d:1.12s"></i><i style="--h:30%;--d:1.19s"></i><i style="--h:56%;--d:1.26s"></i><i style="--h:78%;--d:1.33s"></i><i style="--h:94%;--d:1.40s"></i><i style="--h:62%;--d:1.47s"></i><i style="--h:40%;--d:1.54s"></i><i style="--h:54%;--d:1.61s"></i><i style="--h:74%;--d:1.68s"></i><i style="--h:50%;--d:1.75s"></i><i style="--h:36%;--d:1.82s"></i><i style="--h:58%;--d:1.89s"></i><i style="--h:44%;--d:1.96s"></i><i style="--h:26%;--d:2.03s"></i><i style="--h:38%;--d:2.10s"></i><i style="--h:22%;--d:2.17s"></i></div>
+        <p class="login-card-kicker">Owner access</p>
+        <h2 id="login-access-title">Open your vault</h2>
+        <p class="login-card-desc">Continue with the Google account that owns this vault.</p>
+        <div class="login-status" id="login-status" role="status" aria-live="polite">Checking sign-in&hellip;</div>
+        <div class="login-error" id="login-error" role="alert" hidden></div>
+        <button type="button" class="btn-google" id="login-google-btn" hidden onclick="ownerSignIn()"><svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg><span>Continue with Google</span></button>
+        <button type="button" class="login-alt" id="login-demo-btn" onclick="enterVaultDemo()">Look around with demo tracks</button>
+        <button type="button" class="login-alt" id="login-install-btn" hidden onclick="installVaultApp()">Install as an app</button>
+        <div class="login-card-footer">
+          <span>Shared links open without signing in.</span>
+          <span>Private by design</span>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+<script src="js/first-paint.js?v=20261004r"></script>
 <!-- Unsynced writes are a data-loss state, so they get a persistent bar with
      an action rather than the 10px status pill, which the next operation
      overwrites within a second. -->
@@ -714,39 +772,40 @@
      global scope, which is what lets the inline onclick handlers above reach
      feature functions. On deploy, bump the ?v= token on every local asset
      together; sw.js serves them cache-first. -->
-<script src="js/data/util.js?v=20261004q"></script>
-<script src="js/data/tracks.js?v=20261004q"></script>
-<script src="js/data/covers.js?v=20261004q"></script>
-<script src="js/data/artwork.js?v=20261004q"></script>
-<script src="js/data/lyric-sync.js?v=20261004q"></script>
-<script src="js/data/metadata.js?v=20261004q"></script>
-<script src="js/data/waveform.js?v=20261004q"></script>
-<script src="js/data/routes.js?v=20261004q"></script>
-<script src="js/data/backup-format.js?v=20261004q"></script>
-<script src="js/data/create.js?v=20261004q"></script>
-<script src="js/features/vault.js?v=20261004q"></script>
-<script src="js/features/sync.js?v=20261004q"></script>
-<script src="js/features/shell.js?v=20261004q"></script>
-<script src="js/features/modals.js?v=20261004q"></script>
-<script src="js/features/routes.js?v=20261004q"></script>
-<script src="js/features/covers.js?v=20261004q"></script>
-<script src="js/features/artwork.js?v=20261004q"></script>
-<script src="js/features/lyric-sync.js?v=20261004q"></script>
-<script src="js/features/waveform.js?v=20261004q"></script>
-<script src="js/features/media-session.js?v=20261004q"></script>
-<script src="js/features/player.js?v=20261004q"></script>
-<script src="js/features/expanded-player.js?v=20261004q"></script>
-<script src="js/features/library.js?v=20261004q"></script>
-<script src="js/features/home.js?v=20261004q"></script>
-<script src="js/features/insights.js?v=20261004q"></script>
-<script src="js/features/playlists.js?v=20261004q"></script>
-<script src="js/features/share.js?v=20261004q"></script>
-<script src="js/features/edit-track.js?v=20261004q"></script>
-<script src="js/features/ai-metadata.js?v=20261004q"></script>
-<script src="js/features/upload.js?v=20261004q"></script>
-<script src="js/features/create.js?v=20261004q"></script>
-<script src="js/features/backup.js?v=20261004q"></script>
-<script src="js/features/keyboard.js?v=20261004q"></script>
-<script src="js/boot.js?v=20261004q"></script>
+<script src="js/data/util.js?v=20261004r"></script>
+<script src="js/data/tracks.js?v=20261004r"></script>
+<script src="js/data/covers.js?v=20261004r"></script>
+<script src="js/data/artwork.js?v=20261004r"></script>
+<script src="js/data/lyric-sync.js?v=20261004r"></script>
+<script src="js/data/metadata.js?v=20261004r"></script>
+<script src="js/data/waveform.js?v=20261004r"></script>
+<script src="js/data/routes.js?v=20261004r"></script>
+<script src="js/data/backup-format.js?v=20261004r"></script>
+<script src="js/data/create.js?v=20261004r"></script>
+<script src="js/features/vault.js?v=20261004r"></script>
+<script src="js/features/sync.js?v=20261004r"></script>
+<script src="js/features/shell.js?v=20261004r"></script>
+<script src="js/features/modals.js?v=20261004r"></script>
+<script src="js/features/routes.js?v=20261004r"></script>
+<script src="js/features/covers.js?v=20261004r"></script>
+<script src="js/features/artwork.js?v=20261004r"></script>
+<script src="js/features/lyric-sync.js?v=20261004r"></script>
+<script src="js/features/waveform.js?v=20261004r"></script>
+<script src="js/features/media-session.js?v=20261004r"></script>
+<script src="js/features/player.js?v=20261004r"></script>
+<script src="js/features/expanded-player.js?v=20261004r"></script>
+<script src="js/features/library.js?v=20261004r"></script>
+<script src="js/features/home.js?v=20261004r"></script>
+<script src="js/features/insights.js?v=20261004r"></script>
+<script src="js/features/playlists.js?v=20261004r"></script>
+<script src="js/features/share.js?v=20261004r"></script>
+<script src="js/features/edit-track.js?v=20261004r"></script>
+<script src="js/features/ai-metadata.js?v=20261004r"></script>
+<script src="js/features/upload.js?v=20261004r"></script>
+<script src="js/features/create.js?v=20261004r"></script>
+<script src="js/features/backup.js?v=20261004r"></script>
+<script src="js/features/sign-in.js?v=20261004r"></script>
+<script src="js/features/keyboard.js?v=20261004r"></script>
+<script src="js/boot.js?v=20261004r"></script>
 </body>
 </html>

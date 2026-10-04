@@ -41,6 +41,8 @@ document.addEventListener('keydown', function(e) {
 
 document.addEventListener('keydown', function(e) {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  // Nothing behind the sign-in page answers the keyboard.
+  if (typeof isSignInLocked === 'function' && isSignInLocked()) return;
 
   var target = e.target || {};
   var tag = (target.tagName || '').toUpperCase();

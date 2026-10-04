@@ -3068,6 +3068,218 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .queue-reorder button,.playlist-seq-btn{min-height:44px;min-width:44px}
 }
 
+/* ── Sign-in ────────────────────────────────────────────────────────────
+   PokerHQ's and Enclave's layout -- the story on the left, the access card
+   on the right, the card first on a phone -- in the vault's aurora glass.
+   Above dialogs (100), under the toast (110). */
+.login-overlay{position:fixed;inset:0;z-index:105;overflow:auto;background:var(--bg);color:var(--text)}
+.login-overlay[hidden]{display:none}
+html.sv-locked,html.sv-locked body{overflow:hidden}
+.login-wrap{
+  position:relative;
+  min-height:100%;
+  display:grid;
+  place-items:center;
+  padding:56px 40px;
+  overflow:hidden;
+  isolation:isolate;
+}
+.login-wrap::before{
+  content:'';
+  position:absolute;
+  inset:-20%;
+  z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(38% 42% at 20% 22%, rgba(167,148,255,.26), transparent 70%),
+    radial-gradient(36% 40% at 80% 78%, rgba(240,139,98,.24), transparent 70%),
+    radial-gradient(26% 28% at 72% 14%, rgba(121,166,255,.14), transparent 70%);
+  animation:loginAurora 28s ease-in-out infinite alternate;
+}
+.login-wrap::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 120px);
+  -webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.8), transparent 85%);
+  mask-image:linear-gradient(to bottom, rgba(0,0,0,.8), transparent 85%);
+}
+body.light .login-wrap::after{background:repeating-linear-gradient(90deg, rgba(0,0,0,.025) 0 1px, transparent 1px 120px)}
+@keyframes loginAurora{
+  0%{transform:translate3d(0,0,0) scale(1)}
+  100%{transform:translate3d(-3%,2%,0) scale(1.08)}
+}
+.login-shell{
+  position:relative;
+  width:min(100%,1120px);
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 380px;
+  align-items:center;
+  gap:clamp(48px,7vw,96px);
+}
+.login-story{min-width:0}
+.login-brand{display:flex;align-items:center;gap:14px;margin-bottom:56px}
+.nav-mark.login-mark{width:52px;height:52px;border-radius:16px}
+.login-logo-text{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:-.01em;line-height:1}
+.login-tagline{margin-top:6px;font-size:13px;color:var(--muted)}
+.login-eyebrow{margin-bottom:14px;font-size:14px;font-weight:600;color:var(--accent-dynamic)}
+.login-headline{
+  max-width:720px;
+  font-family:var(--display);
+  font-weight:700;
+  font-size:clamp(40px,4.4vw,62px);
+  line-height:1.02;
+  letter-spacing:-.025em;
+  text-wrap:balance;
+}
+.login-desc{max-width:620px;margin-top:22px;font-size:17px;line-height:1.65;color:var(--muted)}
+.login-benefits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:38px}
+.login-benefit{
+  min-height:170px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  gap:22px;
+  padding:18px;
+  border-radius:20px;
+  border:1px solid var(--rim);
+  background:var(--surface);
+}
+.login-benefit-index{font-family:var(--mono);font-size:11px;color:var(--accent-dynamic)}
+.login-benefit h2{margin-bottom:6px;font-size:15px;font-weight:600}
+.login-benefit p{font-size:13px;line-height:1.55;color:var(--muted)}
+.login-trust{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:24px;font-size:13px;color:var(--muted)}
+.login-trust span::before{content:'\2713';margin-right:7px;font-weight:700;color:var(--success)}
+.login-card{
+  width:100%;
+  padding:34px;
+  border-radius:28px;
+  border:1px solid var(--rim2);
+  background:var(--panel-strong);
+  box-shadow:0 30px 90px -20px rgba(0,0,0,.6);
+  backdrop-filter:blur(18px);
+}
+body.light .login-card{box-shadow:0 30px 80px -24px rgba(48,32,20,.25)}
+/* The card's signature: a waveform breathing, as the player's does. */
+.login-wave{display:flex;align-items:flex-end;gap:3px;height:34px;margin-bottom:24px}
+.login-wave i{
+  flex:1;
+  max-width:5px;
+  height:var(--h);
+  border-radius:3px;
+  background:linear-gradient(180deg, var(--accent2), var(--violet));
+  transform-origin:bottom;
+  animation:loginWave 1.8s ease-in-out var(--d) infinite alternate;
+}
+@keyframes loginWave{0%{transform:scaleY(.35);opacity:.55}100%{transform:scaleY(1);opacity:1}}
+.login-card-kicker{margin-bottom:8px;font-size:13px;font-weight:600;color:var(--muted)}
+.login-card h2{margin-bottom:10px;font-family:var(--display);font-weight:700;font-size:30px;line-height:1.05;letter-spacing:-.01em}
+.login-card-desc{margin-bottom:22px;font-size:14px;line-height:1.6;color:var(--muted)}
+.login-status{display:flex;align-items:center;gap:.6rem;padding:12px 0 14px;font-size:13px;color:var(--muted)}
+.login-status::before{
+  content:'';
+  flex:none;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--accent-dynamic);
+  animation:takePulse 1.4s ease-in-out infinite;
+}
+.login-error{
+  margin-bottom:16px;
+  padding:.75rem .9rem;
+  border-radius:14px;
+  border:1px solid rgba(255,124,116,.28);
+  background:rgba(255,124,116,.08);
+  font-size:13px;
+  line-height:1.6;
+  color:var(--danger);
+}
+.btn-google{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:14px 16px;
+  border-radius:999px;
+  background:#fff;
+  color:#1f1f1f;
+  font-family:var(--sans);
+  font-size:14.5px;
+  font-weight:600;
+  cursor:pointer;
+  box-shadow:0 14px 34px rgba(0,0,0,.3);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.btn-google:hover{transform:translateY(-1px);box-shadow:0 18px 40px rgba(0,0,0,.36)}
+body.light .btn-google{box-shadow:inset 0 0 0 1px #747775}
+.login-alt{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-top:.7rem;
+  padding:12px 16px;
+  border-radius:999px;
+  background:var(--surface);
+  color:var(--muted);
+  font-family:var(--sans);
+  font-size:13.5px;
+  font-weight:500;
+  cursor:pointer;
+  transition:background .16s ease, color .16s ease;
+}
+.login-alt:hover{background:var(--surface-hover);color:var(--text)}
+.login-status[hidden],.login-error[hidden],.btn-google[hidden],.login-alt[hidden]{display:none}
+.login-card-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:26px;
+  padding-top:18px;
+  border-top:1px solid var(--rim);
+  font-size:12px;
+  line-height:1.45;
+  color:var(--muted2);
+}
+.login-card-footer span:first-child{max-width:230px}
+.login-card-footer span:last-child{flex:none;white-space:nowrap}
+@media (max-width:900px){
+  .login-wrap{padding:40px 24px}
+  .login-shell{display:flex;flex-direction:column;align-items:stretch;gap:0;max-width:720px}
+  .login-story{display:contents}
+  .login-story>*{order:3}
+  .login-brand{order:1;margin-bottom:28px}
+  .login-card{order:2;max-width:520px}
+  .login-eyebrow{margin-top:52px}
+}
+@media (max-width:600px){
+  .login-wrap{display:block;padding:26px 16px 34px}
+  .login-brand{margin-bottom:22px}
+  .nav-mark.login-mark{width:44px;height:44px;border-radius:14px}
+  .login-logo-text{font-size:21px}
+  .login-eyebrow{margin-top:40px}
+  .login-card{max-width:none;padding:26px 22px}
+  .login-headline{font-size:clamp(34px,10vw,46px)}
+  .login-desc{font-size:15px}
+  .login-benefits{grid-template-columns:1fr}
+  .login-benefit{min-height:0;flex-direction:row;justify-content:flex-start;gap:16px}
+  .login-benefit-index{padding-top:3px}
+  .login-trust{flex-direction:column;gap:9px}
+  .login-card-footer{align-items:flex-start}
+}
+@media (max-width:900px) and (max-height:520px){
+  .login-wrap{padding:16px 24px}
+  .login-brand{margin-bottom:14px}
+  .login-card{padding:18px 22px}
+  .login-wave,.login-card-desc,.login-card-footer{display:none}
+  .login-eyebrow{margin-top:34px}
+}
+
 /* ── Create ─────────────────────────────────────────────────────────────
    A form for one song, then its takes as rows: cover, title, a small player,
    and what to do with it. */
@@ -3285,4 +3497,6 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
   .view-switch-btn:active{transform:none}
   .player-lyrics{scroll-behavior:auto}
   .create-take-pulse,.create-take.is-generating .create-take-cover .cover-art{animation:none}
+  .login-wrap::before,.login-wave i,.login-status::before{animation:none}
+  .btn-google{transition:none}
 }

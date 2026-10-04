@@ -5,7 +5,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, collection, setDoc, getDoc, getDocs, deleteDoc, writeBatch, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB_6PnXWdtpR-x-jcJIuzOaROoVRplY5SM",
@@ -38,6 +38,14 @@ function settleBoot() {
   if (!window.svBootPending) return;
   window.svBootPending = false;
   if (window.refreshAll) window.refreshAll();
+}
+
+// A signed-in account the rules refuse is not the vault's owner. The sign-in
+// page (js/features/sign-in.js) decides what to tell them.
+function reportDenied(err) {
+  if (err && err.code === 'permission-denied' && window.fbOwnerUser && window.svAccessDenied) {
+    window.svAccessDenied(window.fbOwnerUser.email);
+  }
 }
 
 function getInitialRouteState() {
@@ -232,6 +240,7 @@ async function fbLoadAll() {
     setSyncStatus('error', e && e.code === 'permission-denied' ? 'Permission denied' : 'Local only');
     console.error('fbLoadAll error:', e && e.code, e);
     settleBoot();
+    reportDenied(e);
   }
 }
 
@@ -289,6 +298,7 @@ function startPrivateSync() {
       var who = window.fbOwnerUser && window.fbOwnerUser.email;
       setSyncStatus('error', who ? 'Blocked: ' + who : 'Sign in required');
       console.error('onSnapshot error:', err);
+      reportDenied(err);
     });
     _privateUnsubs.push(unsub);
   });
@@ -311,13 +321,28 @@ function subscribeTracks() {
     var who = window.fbOwnerUser && window.fbOwnerUser.email;
     setSyncStatus('error', who ? 'Blocked: ' + who : 'Sign in required');
     console.error('tracks onSnapshot error:', err);
+    reportDenied(err);
   });
   _privateUnsubs.push(function() { _tracksUnsub = null; });
   _privateUnsubs.push(_tracksUnsub);
 }
 
+// A popup first; where popups are blocked or unsupported (home-screen apps,
+// some in-app browsers) the whole page goes to Google and back instead, and
+// getRedirectResult below picks the session up. A popup the person closed
+// is their answer, not a reason to redirect.
+const REDIRECT_FALLBACK_CODES = ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'];
+
 async function fbSignIn() {
-  await signInWithPopup(auth, provider);
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (err) {
+    if (err && REDIRECT_FALLBACK_CODES.indexOf(err.code) !== -1) {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
+    throw err;
+  }
 }
 
 async function fbSignOutOwner() {
@@ -350,7 +375,14 @@ onAuthStateChanged(auth, function(user) {
     setSyncStatus('offline', user ? 'Sign in required' : 'Local only');
     settleBoot();
   }
+  if (window.svSignInGate) window.svSignInGate(ownerCandidate ? 'owner' : 'signed-out');
   if (window.refreshAll) window.refreshAll();
+});
+
+// The answer to a redirect sign-in arrives through onAuthStateChanged; only
+// a failure needs saying.
+getRedirectResult(auth).catch(function(err) {
+  if (window.svSignInError) window.svSignInError(err);
 });
 
 var initialRoute = getInitialRouteState();

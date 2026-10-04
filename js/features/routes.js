@@ -168,7 +168,9 @@ function navigateToApp(view, replace) {
   _routeState = parseRouteState(window.location.pathname);
   _publicRoutePayload = null;
   window._publicShareData = null;
-  if (window.fbStartPrivateSync) window.fbStartPrivateSync();
+  // Only the owner's vault can sync; anyone else meets the sign-in page,
+  // and starting it for them only collected permission errors.
+  if (window.fbStartPrivateSync && window.fbOwnerUser) window.fbStartPrivateSync();
   renderRouteAwareView(true);
 }
 
@@ -230,4 +232,6 @@ function renderRouteAwareView(skipScroll) {
     updatePageChrome(null, _currentTrack || null);
   }
   if (!skipScroll) scrollContentToTop(true);
+  // Leaving a share link for the app itself meets the sign-in page.
+  if (typeof refreshSignInGate === 'function') refreshSignInGate();
 }

@@ -61,7 +61,9 @@ function startCoverDemo() {
   showToast('Loaded local cover demo. Nothing will be saved.');
 }
 
-function exitCoverDemo() {
+// quiet: no toast, for leaving the demo by signing in. Without a signed-in
+// owner, the sign-in page comes back.
+function exitCoverDemo(quiet) {
   _coverDemoActive = false;
   tracks = load('tracks', []);
   playlists = load('playlists', []);
@@ -69,7 +71,8 @@ function exitCoverDemo() {
   window.playlists = playlists;
   invalidateFilterCache();
   window.refreshAll();
-  showToast('Cover demo cleared');
+  if (!quiet) showToast('Cover demo cleared');
+  if (typeof refreshSignInGate === 'function') refreshSignInGate();
 }
 
 // Tracks with embedded artwork (js/features/artwork.js) show the real
