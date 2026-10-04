@@ -2,14 +2,17 @@
 // paged queue panel, add-to-playlist, and the similar-vibe row.
 
 // Section labels and blank gaps are layout; only sung lines are numbered,
-// timed and tappable (js/features/lyric-sync.js).
-function formatLyricsHTML(rawLyrics) {
+// timed and tappable (js/features/lyric-sync.js). translations: one line
+// per sung line, shown under each (js/features/translate.js), or nothing.
+function formatLyricsHTML(rawLyrics, translations) {
   var rows = parseLyricSheet(rawLyrics);
   if (!rows.some(function(row) { return row.kind !== 'gap'; })) return '';
   return rows.map(function(row) {
     if (row.kind === 'gap') return '<div class="lyric-gap"></div>';
     if (row.kind === 'header') return '<div class="lyric-section-header">' + esc(row.text) + '</div>';
-    return '<div class="lyric-line" role="button" tabindex="0" data-line="' + row.index + '" onclick="onLyricLineTap(' + row.index + ')">' + esc(row.text) + '</div>';
+    var tr = translations && translations[row.index];
+    return '<div class="lyric-line" role="button" tabindex="0" data-line="' + row.index + '" onclick="onLyricLineTap(' + row.index + ')">' + esc(row.text)
+      + (tr ? '<span class="lyric-tr">' + esc(tr) + '</span>' : '') + '</div>';
   }).join('');
 }
 
@@ -222,10 +225,12 @@ function updateExpandedPlayer() {
   // started (the artwork sweep fills empty sheets from the file).
   var lyricTrack = getVaultTrack(_currentTrack.id) || _currentTrack;
   var lyricsEl = document.getElementById('xp-lyrics');
-  var lyricsKey = _currentTrack.id + '|' + (hasLyrics(lyricTrack) ? lyricSyncKey(getTrackLyrics(lyricTrack)) : 'none');
+  var translated = hasLyrics(lyricTrack) ? shownTranslationLines(lyricTrack) : null;
+  var lyricsKey = _currentTrack.id + '|' + (hasLyrics(lyricTrack) ? lyricSyncKey(getTrackLyrics(lyricTrack)) : 'none')
+    + '|' + (translated ? lyricTrack.translation.lang + lyricTrack.translation.at : '');
   if (lyricsEl.getAttribute('data-key') !== lyricsKey) {
     lyricsEl.setAttribute('data-key', lyricsKey);
-    lyricsEl.innerHTML = hasLyrics(lyricTrack) ? formatLyricsHTML(getTrackLyrics(lyricTrack)) : 'Lyrics have not been added yet for this track.';
+    lyricsEl.innerHTML = hasLyrics(lyricTrack) ? formatLyricsHTML(getTrackLyrics(lyricTrack), translated) : 'Lyrics have not been added yet for this track.';
     lyricsEl.className = 'player-lyrics' + (hasLyrics(lyricTrack) ? ' synced' : ' empty');
     lyricsEl.scrollTop = 0;
     _lyricLineIdx = -1;

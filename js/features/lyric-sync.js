@@ -185,6 +185,7 @@ function undoLyricFix() {
 
 function renderLyricStatus() {
   if (typeof renderKaraokeButton === 'function') renderKaraokeButton();
+  if (typeof renderTranslatePanel === 'function') renderTranslatePanel();
   var el = document.getElementById('xp-lyrics-status');
   if (!el) return;
   var track = _currentTrack && (getVaultTrack(_currentTrack.id) || _currentTrack);

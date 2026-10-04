@@ -36,7 +36,9 @@ function onKaraokeClosed() {
 // its timings do (word times arriving, a line re-timed by hand).
 function karaokeSongKey(track) {
   var sync = getLyricSync(track);
-  return track.id + '|' + (sync ? sync.at + sync.source + (sync.words ? 'w' : '') : '') + '|' + (_audio.duration || 0);
+  var tr = shownTranslation(track);
+  return track.id + '|' + (sync ? sync.at + sync.source + (sync.words ? 'w' : '') : '') + '|' + (_audio.duration || 0)
+    + '|' + (tr ? tr.lang + tr.at : '');
 }
 
 function prepareKaraokeSong(track) {
@@ -81,9 +83,10 @@ function karaokeLineHTML(track, index, times, role) {
   var lines = sungLyricLines(getTrackLyrics(track));
   if (index < 0 || index >= lines.length) return '<div class="k-line k-' + role + '" aria-hidden="true">&nbsp;</div>';
   if (role !== 'now') return '<div class="k-line k-' + role + '">' + esc(lines[index]) + '</div>';
+  var translated = shownTranslationLines(track);
   return '<div class="k-line k-now">' + karaokeLineWords(track, index, times).map(function(word, w) {
     return '<span class="kw" data-w="' + w + '">' + esc(word.text) + '</span>' + esc(word.space);
-  }).join('') + '</div>';
+  }).join('') + (translated && translated[index] ? '<span class="k-tr">' + esc(translated[index]) + '</span>' : '') + '</div>';
 }
 
 // The lines on screen: the one just sung, the one being sung, and the two

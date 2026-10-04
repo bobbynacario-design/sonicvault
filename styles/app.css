@@ -3245,6 +3245,24 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .player-copy-head{display:flex;align-items:center;justify-content:space-between;gap:.8rem}
 .player-copy-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.4rem}
 
+/* Translate and explain (js/features/translate.js): the translation under
+   each lyric line, and the panel above them. */
+.lyric-tr{display:block;margin-top:.2rem;font-size:.84em;font-weight:400;font-style:italic;line-height:1.4;color:var(--muted2)}
+.lyric-current .lyric-tr{color:var(--muted)}
+.translate-panel{display:grid;gap:.6rem;margin:.2rem 0 .9rem;padding:.85rem .95rem;border-radius:14px;background:var(--surface)}
+.translate-panel[hidden]{display:none}
+.translate-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
+.translate-lang{display:flex;align-items:center;gap:.4rem;font-size:12px;color:var(--muted2)}
+.translate-lang select{padding:.3rem .5rem;border-radius:8px;border:1px solid var(--rim2);background:var(--bg3);color:var(--text);font-family:var(--sans);font-size:12.5px}
+.translate-from{font-size:12.5px;color:var(--muted2)}
+.translate-about{margin:0;font-size:14px;line-height:1.55;color:var(--text)}
+.translate-details summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)}
+.translate-details[open] summary{margin-bottom:.5rem}
+.translate-notes{margin:0;padding-left:1.1rem;display:grid;gap:.5rem;font-size:13px;line-height:1.5;color:var(--muted)}
+.translate-quote{display:block;color:var(--text);font-style:italic}
+.translate-note{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;font-size:13.5px;color:var(--muted)}
+.k-tr{display:block;margin-top:.45em;font-size:.42em;font-weight:600;font-style:italic;line-height:1.3;color:var(--k-accent, #fff);opacity:.9;letter-spacing:0}
+
 /* Karaoke (js/features/karaoke.js): the lyrics full screen, each word
    filling in as it is sung (--p, 0 to 1, set per frame). */
 .modal-overlay.karaoke{padding:0;align-items:stretch;justify-content:center;background:#05060c;backdrop-filter:none;overflow:hidden;z-index:105}

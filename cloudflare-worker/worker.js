@@ -104,6 +104,7 @@ export default {
     if (route === "/lyrics") return handleLyrics(request, env);
     if (route === "/cover") return handleCover(request, env);
     if (route === "/embed") return handleEmbed(request, env);
+    if (route === "/translate") return handleTranslate(request, env);
 
     let payload;
     try {
@@ -589,6 +590,113 @@ async function handleCover(request, env) {
 // songs as well as English), one vector per text. The app sends a song's
 // words a few at a time, and a search query on its own; batches stay small
 // so turning the answer into JSON never costs the worker much CPU.
+// ── Translate and explain ────────────────────────────────────────────────
+// POST /translate { title, lyrics, lines: [sung lines], language, model? }
+// -> { from, same, lines: [one per sung line], about, notes: [{ line, note }] }
+// One translated line per sung line, so the app can show each under its
+// original and keep it timed to the music.
+
+const MAX_TRANSLATE_LINES = 200;
+const MAX_TRANSLATE_LINE = 300;
+const MAX_TRANSLATE_TOKENS = 4096;
+// Translation is where a stronger model earns its cost (about 2 cents a song,
+// once): the fast one took Bikol for Hiligaynon and mistranslated it.
+const TRANSLATE_MODEL = "claude-sonnet-5-5";
+const TRANSLATE_SYSTEM_PROMPT = [
+  "You translate song lyrics and explain them, for the songwriter and the friends they share songs with.",
+  "You get a song's title, its whole lyric sheet for context, its sung lines numbered, and a target language.",
+  "The songwriter writes in English, Tagalog and Bikol (Central Bikol, from the Bicol region of the Philippines). Don't mistake Bikol for Hiligaynon, Cebuano or Waray.",
+  "Translate each numbered line into the target language as a natural line that keeps its meaning and feeling, not word for word. Keep names as they are. A line already in the target language, or an ad-lib like \"oh\", stays as it is.",
+  "Then, writing in the target language, say what the song is about and how it feels in two to four plain sentences, and add up to six short notes on lines where an idiom, slang, a cultural or local reference, or wordplay needs explaining. Leave notes empty when nothing does.",
+  "Reply with JSON only, no prose around it:",
+  "{\"from\": \"the language the song is mostly in, named in English, e.g. Bikol, Tagalog, English\", \"same\": true only if every line is already in the target language, \"lines\": [one string per numbered line, in order, exactly as many as there are numbered lines; [] when same is true], \"about\": \"...\", \"notes\": [{\"line\": the line number, \"note\": \"...\"}]}"
+].join("\n");
+
+async function handleTranslate(request, env) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return jsonResponse({ error: "Worker secret ANTHROPIC_API_KEY is not configured." }, 500, request, env);
+  }
+  const payload = await readJsonBody(request);
+  if (!payload) {
+    return jsonResponse({ error: "Request body must be valid JSON." }, 400, request, env);
+  }
+  const language = cleanString(payload.language).slice(0, 40);
+  const lines = Array.isArray(payload.lines) ? payload.lines.map(function (line) { return cleanString(line).slice(0, MAX_TRANSLATE_LINE); }) : [];
+  if (!language || !lines.length) {
+    return jsonResponse({ error: "Send the sung lines and a language to translate into." }, 400, request, env);
+  }
+  if (lines.length > MAX_TRANSLATE_LINES) {
+    return jsonResponse({ error: "This song has more lines than can be translated at once." }, 400, request, env);
+  }
+  const title = cleanString(payload.title).slice(0, MAX_SONG_TITLE);
+  const sheet = cleanString(payload.lyrics).slice(0, MAX_SONG_LYRICS);
+  const model = cleanString(payload.model) || cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL;
+  const userText = [
+    "Target language: " + language, "",
+    "Title: " + (title || "(untitled)"), "",
+    "Lyric sheet:", sheet || lines.join("\n"), "",
+    "Sung lines (" + lines.length + "):",
+    lines.map(function (line, i) { return (i + 1) + ". " + line; }).join("\n")
+  ].join("\n");
+
+  let response;
+  try {
+    response = await callAnthropic(env, {
+      model: model,
+      max_tokens: MAX_TRANSLATE_TOKENS,
+      // No temperature and no started reply: newer models refuse both.
+      system: TRANSLATE_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userText }]
+    });
+  } catch (err) {
+    return jsonResponse({ error: "Could not reach Anthropic." }, 502, request, env);
+  }
+  const rawText = await response.text();
+  const parsed = safeJsonParse(rawText);
+  if (!response.ok) {
+    const apiError = parsed && parsed.error ? parsed.error : {};
+    const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+    return jsonResponse(
+      { error: "Anthropic API request failed (" + response.status + "): " + reason },
+      response.status === 429 ? 429 : 502,
+      request,
+      env
+    );
+  }
+  let answer;
+  try {
+    answer = extractJsonObject(extractAnthropicText(parsed || {}));
+  } catch (err) {
+    answer = null;
+  }
+  if (!answer) {
+    return jsonResponse({ error: "Claude's translation came back unreadable. Try again." }, 502, request, env);
+  }
+  const same = answer.same === true;
+  let translated = Array.isArray(answer.lines) ? answer.lines.map(function (line) { return cleanString(line).slice(0, MAX_TRANSLATE_LINE * 2); }) : [];
+  if (!same) {
+    // A line or two out is padded or trimmed; more than that means the lines
+    // no longer line up, and a wrong line under each lyric is worse than none.
+    if (Math.abs(translated.length - lines.length) > 2) {
+      return jsonResponse({ error: "Claude's translation didn't line up with the song. Try again." }, 502, request, env);
+    }
+    translated = lines.map(function (_, i) { return translated[i] || ""; });
+  }
+  const notes = (Array.isArray(answer.notes) ? answer.notes : [])
+    .map(function (item) {
+      return { line: Math.round(Number(item && item.line)), note: cleanString(item && item.note).slice(0, 400) };
+    })
+    .filter(function (item) { return item.note && item.line >= 1 && item.line <= lines.length; })
+    .slice(0, 6);
+  return jsonResponse({
+    from: cleanString(answer.from).slice(0, 40),
+    same: same,
+    lines: same ? [] : translated,
+    about: cleanString(answer.about).slice(0, 1200),
+    notes: notes
+  }, 200, request, env);
+}
+
 const EMBED_MODEL = "@cf/baai/bge-m3";
 const MAX_EMBED_TEXTS = 16;
 const MAX_EMBED_CHARS = 4000;
