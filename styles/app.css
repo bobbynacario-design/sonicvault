@@ -3275,11 +3275,12 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
     #05060c;
   opacity:.55;
 }
-.karaoke-backdrop img{position:absolute;inset:-80px;width:calc(100% + 160px);height:calc(100% + 160px);object-fit:cover;filter:blur(70px) saturate(1.25);opacity:.75}
+.karaoke-backdrop img{position:absolute;inset:-80px;width:calc(100% + 160px);height:calc(100% + 160px);object-fit:cover;filter:blur(48px) saturate(1.3);opacity:.95}
 .karaoke-backdrop img[hidden]{display:none}
 /* Moving colours and Music: three glows in the song's colours drifting
    slowly; Music swells them with the song's loudness (--k-level) and holds
    them still while paused. Dark has no backdrop at all. */
+.karaoke[data-bg="cover"] .karaoke-backdrop{opacity:.62}
 .karaoke[data-bg="colours"] .karaoke-backdrop,.karaoke[data-bg="music"] .karaoke-backdrop{opacity:1;background:#05060c}
 .karaoke:not([data-bg="cover"]) .karaoke-backdrop img{display:none}
 .karaoke[data-bg="dark"] .karaoke-backdrop{display:none}
@@ -3301,6 +3302,9 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   position:relative;
   display:grid;
   grid-template-rows:auto 1fr auto auto;
+  /* One column no wider than the screen: a long title or word would
+     otherwise widen it past the edge. */
+  grid-template-columns:minmax(0, 1fr);
   width:100%;
   max-width:1040px;
   height:100%;
@@ -3308,7 +3312,23 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   color:#fff;
 }
 .karaoke-top{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
-.karaoke-song{min-width:0}
+.karaoke-song{display:flex;align-items:center;gap:.85rem;min-width:0}
+.karaoke-song-text{min-width:0}
+/* Cover: the song's cover itself, small by the title on a phone and large
+   beside the lyrics on a wide screen. Other backgrounds leave it out. */
+.karaoke-thumb,.karaoke-cover{display:none}
+.karaoke-thumb .cover-art{width:52px;height:52px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.karaoke[data-bg="cover"] .karaoke-thumb{display:block;flex:none}
+.karaoke-middle{display:flex;align-items:center;gap:clamp(2rem, 5vw, 4.5rem);min-height:0}
+.karaoke-cover .cover-art{width:100%;max-width:none;aspect-ratio:1/1;border-radius:26px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+@media (min-width:900px){
+  .karaoke[data-bg="cover"] .karaoke-stage{max-width:1240px}
+  .karaoke[data-bg="cover"] .karaoke-thumb{display:none}
+  .karaoke[data-bg="cover"] .karaoke-cover{display:block;flex:none;width:min(40vh, 32vw, 420px)}
+  .karaoke[data-bg="cover"] .k-now,.karaoke[data-bg="cover"] .k-wait{font-size:clamp(30px, 3.7vw, 54px)}
+  .karaoke[data-bg="cover"] .k-next{font-size:clamp(20px, 2.3vw, 30px)}
+  .karaoke[data-bg="cover"] .k-past,.karaoke[data-bg="cover"] .k-later{font-size:clamp(18px, 2vw, 26px)}
+}
 .karaoke-title{font-family:var(--display);font-weight:700;font-size:22px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .karaoke-sub{margin-top:.3rem;font-size:13px;color:rgba(255,255,255,.62)}
 .karaoke-tools{flex:none;display:flex;align-items:center;gap:.5rem}
@@ -3318,7 +3338,7 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .karaoke-close{flex:none;display:grid;place-items:center;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;cursor:pointer}
 .karaoke-close:hover{background:rgba(255,255,255,.18)}
 .karaoke-close .ic{width:18px;height:18px}
-.karaoke-lines{display:flex;flex-direction:column;justify-content:center;gap:clamp(.7rem, 2vh, 1.3rem);min-height:0;overflow:hidden}
+.karaoke-lines{flex:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:clamp(.7rem, 2vh, 1.3rem);min-width:0;min-height:0;overflow:hidden}
 .k-line{font-family:var(--sans);font-weight:700;line-height:1.18;letter-spacing:-.01em;overflow-wrap:anywhere}
 .k-past{font-size:clamp(19px, 2.6vw, 30px);color:rgba(255,255,255,.3)}
 .k-now,.k-wait{font-size:clamp(30px, 5.4vw, 66px)}
@@ -3349,6 +3369,8 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .karaoke-status{min-height:1.2em;margin-top:.5rem;font-size:12.5px;color:rgba(255,255,255,.55)}
 @media (max-width:640px){
   .karaoke-stage{padding-left:20px;padding-right:20px}
+  .karaoke-bg-btn{width:44px;padding:0;justify-content:center}
+  .karaoke-bg-btn span{display:none}
   .karaoke-title{font-size:18px}
 }
 .player-check-btn{padding:.3rem .8rem;border:none;border-radius:999px;background:var(--surface-hover);color:var(--muted);font-family:var(--sans);font-size:12.5px;font-weight:600;cursor:pointer;transition:background .16s ease,color .16s ease}
