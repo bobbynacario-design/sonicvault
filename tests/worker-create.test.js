@@ -139,7 +139,7 @@ test("/lyrics returns Claude's sheet and keeps the given title", async () => {
   assert.equal(empty.res.status, 400);
 });
 
-test("/cover draws with FLUX and never quotes the title", async () => {
+test("/cover paints the title as a scene, never as a name to letter", async () => {
   let asked;
   const ai = { run: async (model, input) => { asked = { model, input }; return { image: "/9j/AAAA" }; } };
   const { res, text } = await call("/cover", { title: "Harbour Lights", style: "warm folk" }, { ai });
@@ -148,7 +148,8 @@ test("/cover draws with FLUX and never quotes the title", async () => {
   assert.equal(asked.model, "@cf/black-forest-labs/flux-1-schnell");
   assert.match(asked.input.prompt, /warm folk/);
   assert.match(asked.input.prompt, /No text/);
-  assert.doesNotMatch(asked.input.prompt, /"Harbour Lights"/);
+  assert.match(asked.input.prompt, /a scene of harbour lights/);
+  assert.doesNotMatch(asked.input.prompt, /Harbour Lights|album cover/);
 
   const failing = await call("/cover", { title: "x" }, { ai: { run: async () => { throw new Error("capacity"); } } });
   assert.equal(failing.res.status, 502);

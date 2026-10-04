@@ -542,15 +542,16 @@ async function handleLyrics(request, env) {
   return jsonResponse({ title: title || cleanString(song.title).slice(0, MAX_SONG_TITLE), lyrics: lyrics }, 200, request, env);
 }
 
-// The picture is asked for without its title in quotes: FLUX tends to
-// letter any quoted words onto the image.
+// A painting of the title as a scene, coloured by the music. Asked for an
+// "album cover" with the title named, FLUX lettered it across the picture
+// (misspelt) despite "no text"; as "a scene of harbour lights" in a
+// painting it draws the scene. Measured 2026-10-04.
 function buildCoverPrompt(title, style) {
   return [
-    "Square album cover artwork.",
-    style ? "The music: " + style.slice(0, 600) + "." : "",
-    title ? "Let the imagery suggest the song's title, " + title + "." : "",
-    "One striking image with rich colour and a strong composition.",
-    "No text, no letters, no words, no typography, no logos, no watermark."
+    "A square painting with no text in it" + (title ? ": a scene of " + title.toLowerCase() : "") + ".",
+    style ? "Its mood and colours come from this music: " + style.slice(0, 600) + "." : "",
+    "Cinematic light, rich colour, a strong simple composition.",
+    "No text, no letters, no words, no signs, no typography, no logos, no watermark anywhere in the image."
   ].filter(Boolean).join(" ");
 }
 
