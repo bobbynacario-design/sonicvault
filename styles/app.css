@@ -3077,6 +3077,12 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .describe-error{font-size:13px;line-height:1.55;color:var(--danger)}
 .describe-auto{font-size:13px}
 
+/* Sleep timer and fades (js/features/playback-extras.js): labelled pills
+   under the volume row; .mode-on marks the one that is active. */
+.player-extras-row{display:flex;flex-wrap:wrap;gap:.5rem}
+.player-btn.player-pill{width:auto;min-width:0;height:38px;padding:0 .95rem;gap:.45rem;border-radius:999px;background:var(--surface);font-family:var(--sans);font-size:13px;font-weight:500}
+.player-btn.player-pill .ic{width:16px;height:16px}
+
 /* ── Sign-in ────────────────────────────────────────────────────────────
    PokerHQ's and Enclave's layout -- the story on the left, the access card
    on the right, the card first on a phone -- in the vault's aurora glass.

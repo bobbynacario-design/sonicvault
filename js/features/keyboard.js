@@ -6,8 +6,8 @@
 var _preMuteVolume = null;
 
 function toggleMute() {
-  if (_audio.volume > 0) {
-    _preMuteVolume = _audio.volume;
+  if (_userVolume > 0) {
+    _preMuteVolume = _userVolume;
     setPlayerVolume(0);
     showToast('Muted');
   } else {
@@ -92,9 +92,9 @@ document.addEventListener('keydown', function(e) {
     case 'ArrowRight':
       keyboardSeek(5); e.preventDefault(); break;
     case 'ArrowUp':
-      setPlayerVolume(Math.min(1, _audio.volume + 0.05)); e.preventDefault(); break;
+      setPlayerVolume(Math.min(1, _userVolume + 0.05)); e.preventDefault(); break;
     case 'ArrowDown':
-      setPlayerVolume(Math.max(0, _audio.volume - 0.05)); e.preventDefault(); break;
+      setPlayerVolume(Math.max(0, _userVolume - 0.05)); e.preventDefault(); break;
     case 'n':
     case 'N':
       playNext(); e.preventDefault(); break;

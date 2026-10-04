@@ -40,6 +40,7 @@ var SHELL_ASSETS = [
   './js/features/waveform.js',
   './js/features/media-session.js',
   './js/features/player.js',
+  './js/features/playback-extras.js',
   './js/features/expanded-player.js',
   './js/features/library.js',
   './js/features/home.js',

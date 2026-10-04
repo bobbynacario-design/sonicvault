@@ -13,7 +13,10 @@ var _shuffleMode = _playerPrefs.shuffle === true;
 var _repeatMode = (_playerPrefs.repeat === 'all' || _playerPrefs.repeat === 'one') ? _playerPrefs.repeat : 'off';
 var _playbackRate = PLAYBACK_RATES.indexOf(Number(_playerPrefs.rate)) !== -1 ? Number(_playerPrefs.rate) : 1;
 var _shuffleOrder = [];
-_audio.volume = (typeof _playerPrefs.volume === 'number' && _playerPrefs.volume >= 0 && _playerPrefs.volume <= 1) ? _playerPrefs.volume : 1;
+// The listener's own level. Fades (js/features/playback-extras.js) move
+// _audio.volume and come back to this, so it is what gets saved and shown.
+var _userVolume = (typeof _playerPrefs.volume === 'number' && _playerPrefs.volume >= 0 && _playerPrefs.volume <= 1) ? _playerPrefs.volume : 1;
+_audio.volume = _userVolume;
 _audio.defaultPlaybackRate = _playbackRate;
 _audio.playbackRate = _playbackRate;
 
@@ -97,8 +100,9 @@ function savePlayerPrefs() {
   localStorage.setItem('sv_player_prefs', JSON.stringify({
     shuffle: _shuffleMode,
     repeat: _repeatMode,
-    volume: _audio.volume,
-    rate: _playbackRate
+    volume: _userVolume,
+    rate: _playbackRate,
+    smooth: _playerPrefs.smooth === true
   }));
 }
 
@@ -121,6 +125,8 @@ function cycleRepeat() {
 
 function setPlayerVolume(value) {
   var vol = Math.max(0, Math.min(1, Number(value) || 0));
+  if (typeof cancelVolumeRamp === 'function') cancelVolumeRamp();
+  _userVolume = vol;
   _audio.volume = vol;
   savePlayerPrefs();
   updatePlayerModeUI();
@@ -162,10 +168,11 @@ function updatePlayerModeUI() {
     btn.title = repeatLabel;
     btn.setAttribute('aria-label', repeatLabel);
   });
-  var volPct = Math.round((_audio.volume || 0) * 100);
+  var volPct = Math.round((_userVolume || 0) * 100);
   if (xpVolume && Number(xpVolume.value) !== volPct) xpVolume.value = volPct;
   if (xpVolumePct) xpVolumePct.textContent = volPct + '%';
   if (xpRate) xpRate.textContent = _playbackRate + 'x';
+  if (typeof renderPlaybackExtras === 'function') renderPlaybackExtras();
 }
 
 function applyTrackTint(track) {
@@ -176,7 +183,9 @@ function applyTrackTint(track) {
 }
 
 function rememberPlayback(track) {
-  if (!track) return;
+  // Demo songs live in memory: playing one must not write the vault's
+  // settings (a signed-out visitor's write would sit unsaved in the queue).
+  if (!track || (typeof _coverDemoActive !== 'undefined' && _coverDemoActive)) return;
   appSettings = window.appSettings || {};
   var history = Array.isArray(appSettings.playHistory) ? appSettings.playHistory.slice() : [];
   history = history.filter(function(id) { return id !== track.id; });
@@ -287,6 +296,7 @@ _audio.addEventListener('timeupdate', function() {
   }
   updateMediaSessionPosition();
   maybeSyncLyrics();
+  if (typeof smoothTransitionTick === 'function') smoothTransitionTick();
 });
 
 _audio.addEventListener('loadedmetadata', function() {
@@ -302,6 +312,12 @@ _audio.addEventListener('pause', function() { if (typeof updateMobileNavPulse ==
 
 _audio.addEventListener('ended', function() {
   _isPlaying = false;
+  // The sleep timer set to "end of song" stops here, whatever comes next.
+  if (typeof consumeSleepAtTrackEnd === 'function' && consumeSleepAtTrackEnd()) {
+    updateNowPlaying();
+    renderTracks();
+    return;
+  }
   if (_repeatMode === 'one' && _currentTrack) {
     _audio.currentTime = 0;
     _audio.play().catch(function(e) { console.error('Repeat playback error:', e); });
