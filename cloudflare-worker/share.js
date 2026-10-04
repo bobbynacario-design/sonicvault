@@ -48,7 +48,7 @@ export function decodeFirestoreFields(fields) {
 
 // The public share record, null when there is none (never shared, or the
 // link was revoked). Throws on any other failure.
-async function readShare(env, kind, id) {
+export async function readShare(env, kind, id) {
   const project = env.FIRESTORE_PROJECT || DEFAULT_PROJECT;
   const url = "https://firestore.googleapis.com/v1/projects/" + project
     + "/databases/(default)/documents/" + KINDS[kind] + "/" + encodeURIComponent(id);

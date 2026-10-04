@@ -337,8 +337,10 @@ function renderPublicTrackPage(track) {
     +       '<div class="public-actions">'
     +         publicPlayButton(playLabel, 'startPlayback(' + jsq(track.id) + ', ' + jsv(queueIds) + ', ' + jsq('Shared track') + ')')
     +         '<button class="sec-action" onclick="openShareLinkModal(' + jsq('Share “' + track.title + '”') + ', ' + jsq('Anyone with the link can listen to this track.') + ', ' + jsq(buildShareURL('track', track.id)) + ')">Copy link</button>'
+    +         lovedButtonHTML(track.id)
     +         publicOwnerAction('library')
     +       '</div>'
+    +       '<p class="public-count-note">Plays and \u2665 reach the songwriter as counts. Nothing about you is kept.</p>'
     +     '</div>'
     +   '</section>'
     +   (String(track.songStory || '').trim() ? '<section class="public-section"><h2 class="public-section-title">Behind the song</h2><p class="public-story-text">' + esc(String(track.songStory).trim()) + '</p></section>' : '')

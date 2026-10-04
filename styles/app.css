@@ -3241,6 +3241,25 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   #story-actions .sec-action{flex:1 0 auto}
 }
 
+/* Plays and hearts on share links (js/features/listens.js). */
+.heart-btn .ic{width:16px;height:16px}
+.heart-btn.is-loved .ic{animation:heart-pop .6s ease}
+.heart-btn.is-loved{color:#ff6b8b}
+@keyframes heart-pop{0%{transform:scale(1)}35%{transform:scale(1.45)}70%{transform:scale(.92)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.heart-btn.is-loved .ic{animation:none}}
+.public-count-note{margin:.6rem 0 0;font-size:12px;color:var(--muted2)}
+.karaoke-heart{flex:none;display:grid;place-items:center;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;cursor:pointer}
+.karaoke-heart[hidden]{display:none}
+.karaoke-heart .ic{width:20px;height:20px}
+.listen-list{display:grid;gap:.4rem}
+.listen-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.85rem;align-items:center;padding:.55rem .4rem;border-radius:14px}
+.listen-row:hover{background:var(--surface)}
+.listen-main{min-width:0;display:grid;gap:.15rem}
+.listen-title{font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.listen-facts{font-size:13px;color:var(--muted)}
+.listen-moment{font-size:12.5px;color:var(--accent-dynamic);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.listen-note{margin:0;font-size:13.5px;color:var(--muted)}
+
 /* Compare takes (js/features/compare.js). */
 .compare-modal{max-width:760px}
 .compare-takes{display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:.7rem;margin-top:1.1rem}

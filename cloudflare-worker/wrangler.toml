@@ -11,6 +11,14 @@ enabled = true
 [ai]
 binding = "AI"
 
+# Plays and hearts on share links (POST /listen from share pages, GET-like
+# POST /listens for the owner): one row per event, visitors as a daily-
+# changing hash, never an address.
+[[d1_databases]]
+binding = "LISTENS"
+database_name = "sonicvault-listens"
+database_id = "e91d78d4-94fd-4e3d-9bb8-cd2bb1106d4a"
+
 # Secrets (set with `wrangler secret put <NAME>`, never commit these):
 #   ANTHROPIC_API_KEY        required — Anthropic API key the worker calls Claude with
 #   SONICVAULT_CLIENT_TOKEN  optional — bearer token the web UI must send as Authorization

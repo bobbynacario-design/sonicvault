@@ -31,7 +31,7 @@
 // Those routes are public by design: they read only the share records the
 // app publishes for anyone to see.
 
-import { handleShareRoute } from "./share.js";
+import { handleShareRoute, readShare } from "./share.js";
 
 const MODEL_NAME = "claude-haiku-4-5";
 const WHISPER_MODEL = "@cf/openai/whisper-large-v3-turbo";
@@ -94,11 +94,14 @@ export default {
       return jsonResponse({ error: "Origin not allowed." }, 403, request, env);
     }
 
+    const route = url.pathname.replace(/\/+$/, "");
+    // Share pages report plays and hearts without the owner's token.
+    if (route === "/listen") return handleListen(request, env);
+
     if (!isAuthorized(request, env)) {
       return jsonResponse({ error: "Unauthorized." }, 401, request, env);
     }
 
-    const route = url.pathname.replace(/\/+$/, "");
     if (route === "/transcribe") return handleTranscribe(request, env);
     if (route === "/generate") return handleGenerate(request, env);
     if (route === "/lyrics") return handleLyrics(request, env);
@@ -106,6 +109,7 @@ export default {
     if (route === "/embed") return handleEmbed(request, env);
     if (route === "/translate") return handleTranslate(request, env);
     if (route === "/story") return handleSongStory(request, env);
+    if (route === "/listens") return handleListens(request, env);
 
     let payload;
     try {
@@ -765,6 +769,106 @@ async function handleSongStory(request, env) {
     return jsonResponse({ error: "Claude returned nothing. Try again." }, 502, request, env);
   }
   return jsonResponse({ story: story }, 200, request, env);
+}
+
+// ── Plays and hearts on share links ──────────────────────────────────────
+// POST /listen { id, kind: "play" | "heart", pos } from a share page, no
+// token: counted only for a song that really is shared (its public record
+// exists), with each visitor known only by a hash of the day, their
+// address and browser -- never the address -- so a repeat play within half
+// an hour counts once and hearts stop at 20 a day. POST /listens (owner,
+// token) sums them up per song: plays, hearts, this week, and the moments
+// loved most (in 5-second buckets). Rows live in D1 (binding LISTENS).
+
+const LISTEN_REPEAT_MS = 30 * 60 * 1000;
+const LISTEN_HEARTS_PER_DAY = 20;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const _sharedTracks = new Map();   // track id -> { ok, until }, per isolate
+
+async function isSharedTrack(env, id) {
+  const hit = _sharedTracks.get(id);
+  if (hit && hit.until > Date.now()) return hit.ok;
+  let ok;
+  try {
+    ok = !!(await readShare(env, "track", id));
+  } catch (err) {
+    return false;
+  }
+  _sharedTracks.set(id, { ok: ok, until: Date.now() + 10 * 60 * 1000 });
+  return ok;
+}
+
+async function visitorId(request, env) {
+  const parts = [
+    cleanString(env.LISTEN_SALT) || cleanString(env.SONICVAULT_CLIENT_TOKEN) || "sonicvault",
+    new Date().toISOString().slice(0, 10),
+    request.headers.get("CF-Connecting-IP") || "",
+    request.headers.get("User-Agent") || ""
+  ].join("|");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts));
+  return Array.from(new Uint8Array(digest)).slice(0, 8).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+}
+
+async function handleListen(request, env) {
+  if (!env.LISTENS) return jsonResponse({ error: "Listen counts aren't set up." }, 503, request, env);
+  const payload = await readJsonBody(request);
+  const id = cleanString(payload && payload.id).slice(0, 80);
+  const kind = payload && (payload.kind === "play" || payload.kind === "heart") ? payload.kind : "";
+  if (!id || !kind) {
+    return jsonResponse({ error: "Send a shared song's id, and play or heart." }, 400, request, env);
+  }
+  const pos = Number(payload.pos);
+  if (kind === "heart" && !(isFinite(pos) && pos >= 0 && pos <= 3600)) {
+    return jsonResponse({ error: "A heart needs the moment in the song." }, 400, request, env);
+  }
+  if (!(await isSharedTrack(env, id))) {
+    return jsonResponse({ error: "That song isn't shared." }, 404, request, env);
+  }
+  const visitor = await visitorId(request, env);
+  const now = Date.now();
+  if (kind === "play") {
+    const seen = await env.LISTENS.prepare(
+      "SELECT 1 AS seen FROM events WHERE visitor = ? AND track = ? AND kind = 'play' AND at > ? LIMIT 1"
+    ).bind(visitor, id, now - LISTEN_REPEAT_MS).first();
+    if (seen) return jsonResponse({ ok: true, counted: false }, 200, request, env);
+    await env.LISTENS.prepare(
+      "INSERT INTO events (track, kind, visitor, at, pos) VALUES (?, 'play', ?, ?, NULL)"
+    ).bind(id, visitor, now).run();
+  } else {
+    const today = await env.LISTENS.prepare(
+      "SELECT COUNT(*) AS n FROM events WHERE visitor = ? AND track = ? AND kind = 'heart' AND at > ?"
+    ).bind(visitor, id, now - DAY_MS).first();
+    if (today && today.n >= LISTEN_HEARTS_PER_DAY) return jsonResponse({ ok: true, counted: false }, 200, request, env);
+    await env.LISTENS.prepare(
+      "INSERT INTO events (track, kind, visitor, at, pos) VALUES (?, 'heart', ?, ?, ?)"
+    ).bind(id, visitor, now, Math.round(pos * 10) / 10).run();
+  }
+  return jsonResponse({ ok: true, counted: true }, 200, request, env);
+}
+
+async function handleListens(request, env) {
+  if (!env.LISTENS) return jsonResponse({ tracks: {} }, 200, request, env);
+  const weekAgo = Date.now() - 7 * DAY_MS;
+  const counts = await env.LISTENS.prepare(
+    "SELECT track, kind, COUNT(*) AS total, SUM(CASE WHEN at > ? THEN 1 ELSE 0 END) AS week, MAX(at) AS last FROM events GROUP BY track, kind"
+  ).bind(weekAgo).all();
+  const moments = await env.LISTENS.prepare(
+    "SELECT track, CAST(pos / 5 AS INTEGER) AS bucket, COUNT(*) AS n FROM events WHERE kind = 'heart' GROUP BY track, bucket"
+  ).all();
+  const tracks = {};
+  (counts.results || []).forEach(function (row) {
+    const t = tracks[row.track] = tracks[row.track] || { plays: 0, playsWeek: 0, hearts: 0, heartsWeek: 0, last: 0, moments: [] };
+    if (row.kind === "play") { t.plays = Number(row.total) || 0; t.playsWeek = Number(row.week) || 0; }
+    if (row.kind === "heart") { t.hearts = Number(row.total) || 0; t.heartsWeek = Number(row.week) || 0; }
+    t.last = Math.max(t.last, Number(row.last) || 0);
+  });
+  (moments.results || []).forEach(function (row) {
+    if (tracks[row.track]) tracks[row.track].moments.push({ at: (Number(row.bucket) || 0) * 5, hearts: Number(row.n) || 0 });
+  });
+  Object.keys(tracks).forEach(function (id) {
+    tracks[id].moments = tracks[id].moments.sort(function (a, b) { return b.hearts - a.hearts || a.at - b.at; }).slice(0, 5);
+  });
+  return jsonResponse({ tracks: tracks }, 200, request, env);
 }
 
 const EMBED_MODEL = "@cf/baai/bge-m3";

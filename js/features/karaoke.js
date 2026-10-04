@@ -82,6 +82,8 @@ function prepareKaraokeSong(track) {
   backdrop.style.setProperty('--k-b', palette.b);
   backdrop.style.setProperty('--k-c', palette.accent || palette.a);
   document.getElementById('modal-karaoke').style.setProperty('--k-accent', palette.accent || palette.a);
+  // People listening to a shared song can heart a moment from here too.
+  document.getElementById('karaoke-heart').hidden = !isVisitorListening(_currentTrack);
   // Songs timed before word times were kept get them once.
   var sync = track && getLyricSync(track);
   if (sync && !sync.words && getVaultTrack(track.id) && lyricSyncEndpoint() && !_sungCheckJobs[track.id] && !_sungCheckFailed[track.id]) requestSungCheck(track);
