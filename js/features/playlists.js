@@ -353,6 +353,7 @@ function renderSmartMixes() {
 }
 
 function renderPlaylists() {
+  if (typeof renderSentencePlaylist === 'function') renderSentencePlaylist();
   renderPlaylistHero();
   renderSmartMixes();
   var el = document.getElementById('playlist-grid');

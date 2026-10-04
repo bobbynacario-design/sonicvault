@@ -38,3 +38,19 @@ test("the matches are those within reach of the best, best first", () => {
   assert.deepEqual(g.rankMeaningMatches([]), []);
   assert.equal(g.rankMeaningMatches(Array.from({ length: 40 }, (_, i) => ({ id: "t" + i, score: 0.5 })), 24).length, 24);
 });
+
+test("a playlist from a sentence takes the songs near the best match, within limits", () => {
+  const scored = [0.62, 0.58, 0.5, 0.45, 0.41, 0.3, 0.2].map((score, i) => ({ id: "s" + i, score }));
+  assert.deepEqual(g.pickPlaylistByMeaning(scored, 3, 20), ["s0", "s1", "s2", "s3"]);
+  // Too few close ones: the best few anyway.
+  assert.deepEqual(g.pickPlaylistByMeaning(scored, 6, 20), ["s0", "s1", "s2", "s3", "s4", "s5"]);
+  assert.equal(g.pickPlaylistByMeaning(Array.from({ length: 30 }, (_, i) => ({ id: "t" + i, score: 0.5 })), 6, 20).length, 20);
+  assert.deepEqual(g.pickPlaylistByMeaning([], 6, 20), []);
+});
+
+test("the playlist is named from the sentence", () => {
+  assert.equal(g.playlistNameFromSentence("  songs for a rainy sunday drive. "), "Songs for a rainy sunday drive");
+  assert.equal(g.playlistNameFromSentence(""), "New playlist");
+  const long = g.playlistNameFromSentence("songs about " + "the long road home ".repeat(6));
+  assert.ok(long.length <= 58 && long.endsWith("…"), long);
+});

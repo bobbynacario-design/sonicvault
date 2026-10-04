@@ -3229,6 +3229,16 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   #story-actions .sec-action{flex:1 0 auto}
 }
 
+/* A playlist from a sentence (js/features/meaning.js). */
+.pl-sentence{display:grid;gap:.55rem;margin:.2rem 0 1.4rem;padding:1rem 1.1rem;border-radius:18px;background:var(--surface)}
+.pl-sentence[hidden],.pl-sentence-status[hidden]{display:none}
+.pl-sentence-label{font-size:13px;font-weight:600;color:var(--muted)}
+.pl-sentence-row{display:flex;gap:.6rem}
+.pl-sentence-row input{flex:1;min-width:0;padding:.75rem 1rem;border-radius:999px;border:1px solid var(--rim2);background:var(--bg3);color:var(--text);font-family:var(--sans);font-size:14.5px}
+.pl-sentence-row input:focus{outline:2px solid var(--accent-dynamic);outline-offset:1px}
+.pl-sentence-row .sec-action{flex:none;white-space:nowrap}
+.pl-sentence-status{font-size:13px;color:var(--muted)}
+
 /* Search by meaning (js/features/meaning.js): a toggle inside the search
    box, and a status line under it. */
 .search-mode{

@@ -66,3 +66,25 @@ function rankMeaningMatches(scored, limit) {
   var floor = Math.max(.3, top - .12);
   return sorted.filter(function(item) { return item.score >= floor; }).slice(0, limit || 24);
 }
+
+// A playlist for a description: the songs closest to it, best first. A
+// wider reach than search (a playlist wants more than the one song asked
+// about): those within .2 of the best match, at least `min` when there are
+// that many, at most `max`. scored: [{ id, score }].
+function pickPlaylistByMeaning(scored, min, max) {
+  var sorted = scored.slice().sort(function(a, b) { return b.score - a.score; });
+  if (!sorted.length) return [];
+  var least = min || 6;
+  var floor = Math.max(.25, sorted[0].score - .2);
+  var picked = sorted.filter(function(item) { return item.score >= floor; });
+  if (picked.length < least) picked = sorted.slice(0, least);
+  return picked.slice(0, max || 20).map(function(item) { return item.id; });
+}
+
+// "songs for a rainy sunday drive." -> "Songs for a rainy sunday drive".
+function playlistNameFromSentence(text) {
+  var name = String(text || '').replace(/\s+/g, ' ').trim().replace(/[.!?]+$/, '');
+  if (!name) return 'New playlist';
+  name = name.charAt(0).toUpperCase() + name.slice(1);
+  return name.length > 60 ? name.slice(0, 57).replace(/\s+\S*$/, '') + '…' : name;
+}

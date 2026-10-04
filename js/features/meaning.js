@@ -85,6 +85,7 @@ async function indexSongsForMeaning() {
       _meaningIndexing.done = Math.min(todo.length, i + batch.length);
       saveMeaningIndex();
       renderMeaningStatus();
+      renderSentencePlaylist();
     }
   } catch (e) {
     _meaningIndexError = (e && e.message) || 'Couldn’t read the songs.';
@@ -203,3 +204,72 @@ function renderMeaningStatus() {
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible') scheduleMeaningIndex();
 });
+
+// ── A playlist from a sentence ───────────────────────────────────────────
+// The box on the Playlists page: "songs for a rainy Sunday drive" becomes
+// a playlist of the songs closest to it in meaning (pickPlaylistByMeaning),
+// one take of each, named after the sentence and opened to look over. The
+// songs are read first if they haven't been (the same index as search).
+
+var _sentencePlaylist = { busy:false, status:'' };
+
+function renderSentencePlaylist() {
+  var form = document.getElementById('pl-sentence-form');
+  if (!form) return;
+  form.hidden = !meaningAvailable();
+  var btn = document.getElementById('pl-sentence-btn');
+  if (btn) btn.disabled = _sentencePlaylist.busy;
+  var status = document.getElementById('pl-sentence-status');
+  if (status) {
+    var text = _sentencePlaylist.status
+      || (_meaningIndexing && _sentencePlaylist.busy ? 'Getting to know your songs\u2026 ' + _meaningIndexing.done + ' of ' + _meaningIndexing.total : '');
+    status.textContent = text;
+    status.hidden = !text;
+  }
+}
+
+async function makePlaylistFromSentence() {
+  var input = document.getElementById('pl-sentence');
+  var text = input ? input.value.trim() : '';
+  if (!text || _sentencePlaylist.busy) return;
+  if (!meaningAvailable()) { showToast('Connect the AI worker to make playlists from a sentence.'); return; }
+  _sentencePlaylist = { busy:true, status:'' };
+  renderSentencePlaylist();
+  try {
+    if (songsNeedingMeaning().length) {
+      var reading = indexSongsForMeaning();
+      renderSentencePlaylist();   // "Getting to know your songs... 0 of N"
+      await reading;
+    }
+    _sentencePlaylist.status = 'Finding the songs\u2026';
+    renderSentencePlaylist();
+    var vector = Float32Array.from((await embedTexts([text]))[0]);
+    var songs = collapseVersions(tracks.filter(function(track) { return track.audioURL || track.audioData; }), tracks).list;
+    var scored = songs.map(function(track) {
+      var v = songVector(track.id);
+      return v ? { id:track.id, score:meaningSimilarity(vector, v) } : null;
+    }).filter(Boolean);
+    var ids = pickPlaylistByMeaning(scored, 6, 20);
+    if (!ids.length) throw new Error('None of your songs could be read yet.');
+    var name = playlistNameFromSentence(text);
+    var playlist = {
+      id:'pl-' + Date.now(),
+      name:name,
+      color:PLAYLIST_COLOR_OPTIONS[hashString(text) % PLAYLIST_COLOR_OPTIONS.length].value,
+      desc:'Made from \u201c' + text + '\u201d',
+      trackIds:ids
+    };
+    playlists.push(playlist);
+    persistPlaylists();
+    renderPlaylists();
+    if (input) input.value = '';
+    _sentencePlaylist = { busy:false, status:'' };
+    renderSentencePlaylist();
+    showToast('Made \u201c' + name + '\u201d with ' + ids.length + ' songs');
+    viewPlaylist(playlist.id);
+  } catch (e) {
+    console.warn('Sentence playlist failed:', e);
+    _sentencePlaylist = { busy:false, status:'Couldn\u2019t make it: ' + ((e && e.message) || 'something went wrong') };
+    renderSentencePlaylist();
+  }
+}
