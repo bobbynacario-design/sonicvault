@@ -256,6 +256,8 @@ async function shareTrack(id) {
   if (!track) return;
   track.shared = true;
   persistTracks();
+  // Publishing is a network round trip; say something happened at once.
+  showToast('Creating share link\u2026');
   try {
     if (window.fbPublishShare) await window.fbPublishShare('track', track.id, buildTrackSharePayload(track));
     openShareLinkModal('Share "' + track.title + '"', 'Anyone with the link can jump straight into this track.', buildShareURL('track', track.id));

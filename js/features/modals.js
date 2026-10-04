@@ -98,7 +98,11 @@ document.querySelectorAll('.modal-overlay, .player-modal-overlay').forEach(funct
   });
 });
 
+// The dialog on top. Dialogs stack above the expanded player whatever their
+// order in the document, so one opened from the player is the one Escape
+// closes and Tab stays inside.
 function getOpenOverlay() {
-  var overlays = document.querySelectorAll('.modal-overlay.open:not(.closing), .player-modal-overlay.open:not(.closing)');
-  return overlays.length ? overlays[overlays.length - 1] : null;
+  var dialogs = document.querySelectorAll('.modal-overlay.open:not(.closing)');
+  if (dialogs.length) return dialogs[dialogs.length - 1];
+  return document.querySelector('.player-modal-overlay.open:not(.closing)');
 }
