@@ -15,6 +15,7 @@ window.refreshAll = function() {
   updateNowPlaying();
   updateAuthButton();
   updateAIConfigStatus();
+  scheduleAutoDescribe();
   renderSyncBanner();
   renderBackupPanel();
   renderRouteAwareView(true);

@@ -346,6 +346,19 @@ function hasAIDescription(track) {
   return !!getTrackSummary(track) && !!String(track && track.aiSource || '').trim() && lower(track.aiSource) !== 'local';
 }
 
+// A song Claude should describe: it has a title, and no AI has described it.
+function needsDescription(track) {
+  return !!(track && String(track.title || '').trim()) && !hasAIDescription(track);
+}
+
+// A song that has never been described at all and arrived in the last two
+// weeks: what the watcher imports. These are described without asking.
+var NEW_SONG_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+function isNewUndescribed(track, now) {
+  if (!needsDescription(track) || String(track.aiSource || '').trim() || track.aiGeneratedAt) return false;
+  return (Number(now) || Date.now()) - trackTimestamp(track) < NEW_SONG_WINDOW_MS;
+}
+
 function applyAIMetadataToDraft(item, metadata, forceManualFields) {
   if (!item || !metadata) return;
   // Basic suggestions carry no description, theme or era, and their tags

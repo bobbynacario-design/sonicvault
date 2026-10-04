@@ -3068,6 +3068,15 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
   .queue-reorder button,.playlist-seq-btn{min-height:44px;min-width:44px}
 }
 
+/* Describing the vault with Claude (js/features/describe.js), under the
+   AI worker's status line. */
+.describe-panel{display:grid;gap:.6rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--rim)}
+.describe-panel[hidden]{display:none}
+.describe-line{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;font-size:13.5px;line-height:1.6;color:var(--muted)}
+.describe-line strong{color:var(--text);font-weight:600}
+.describe-error{font-size:13px;line-height:1.55;color:var(--danger)}
+.describe-auto{font-size:13px}
+
 /* ── Sign-in ────────────────────────────────────────────────────────────
    PokerHQ's and Enclave's layout -- the story on the left, the access card
    on the right, the card first on a phone -- in the vault's aurora glass.

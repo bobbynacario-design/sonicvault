@@ -48,6 +48,7 @@ var SHELL_ASSETS = [
   './js/features/share.js',
   './js/features/edit-track.js',
   './js/features/ai-metadata.js',
+  './js/features/describe.js',
   './js/features/upload.js',
   './js/features/create.js',
   './js/features/backup.js',

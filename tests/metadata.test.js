@@ -189,3 +189,21 @@ test("the prompt excerpt falls back from prompt to summary to lyrics to a stock 
   assert.equal(g.getTrackPromptExcerpt({ lyrics: "line one\nline two" }), "line one line two");
   assert.equal(g.getTrackPromptExcerpt({ mood: "Chill", source: "Udio" }), g.promptFallback({ mood: "Chill", source: "Udio" }));
 });
+
+test("songs without an AI description are the ones to describe; new imports go without asking", () => {
+  const now = Date.parse("2026-10-04T12:00:00Z");
+  const watcher = { id: "t-1791000000000", title: "Fresh", genre: "Other", mood: "Energetic", created: "2026-10-03" };
+  const old = { id: "t-1700000000000", title: "Old", created: "2025-01-01" };
+  const fallback = { id: "t-1791000000001", title: "Tagged", created: "2026-10-03", aiSource: "local", aiGeneratedAt: "2026-10-03T00:00:00Z" };
+  const claude = { title: "Done", aiSource: "claude", aiSummary: "A song." };
+  assert.equal(g.needsDescription(watcher), true);
+  assert.equal(g.needsDescription(old), true);
+  assert.equal(g.needsDescription(fallback), true);
+  assert.equal(g.needsDescription(claude), false);
+  assert.equal(g.needsDescription({ title: "  " }), false);
+  // Only never-described songs from the last two weeks are done unasked.
+  assert.equal(g.isNewUndescribed(watcher, now), true);
+  assert.equal(g.isNewUndescribed(old, now), false);
+  assert.equal(g.isNewUndescribed(fallback, now), false);
+  assert.equal(g.isNewUndescribed(claude, now), false);
+});
