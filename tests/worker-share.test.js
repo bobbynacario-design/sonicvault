@@ -123,3 +123,19 @@ test("only the vault's own Cloudinary audio is ever read for a cover", async () 
   assert.equal(share.coverSourceURL("track", { audioURL: AUDIO }), AUDIO);
   assert.equal(share.coverSourceURL("playlist", { tracks: [{ audioURL: "http://res.cloudinary.com/dtw4em0ob/x" }, { audioURL: AUDIO }] }), AUDIO);
 });
+
+test("the share-only worker serves previews, sends the bare domain to the app, and nothing else", async () => {
+  const worker = (await load("cloudflare-worker/share-worker.js")).default;
+  stubFetch();
+  const call = (p, method) => worker.fetch(new Request("https://share.example" + p, { method: method || "GET" }), ENV);
+  const page = await call("/s/track/t-1");
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /og:url" content="https:\/\/share\.example\/s\/track\/t-1"/);
+  const root = await call("/");
+  assert.equal(root.status, 302);
+  assert.equal(root.headers.get("Location"), "https://bobbynacario-design.github.io/sonicvault/");
+  // None of the AI worker's routes exist here.
+  assert.equal((await call("/transcribe", "POST")).status, 404);
+  assert.equal((await call("/", "POST")).status, 404);
+  assert.equal((await call("/anything")).status, 404);
+});

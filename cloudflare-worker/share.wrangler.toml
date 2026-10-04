@@ -1,0 +1,20 @@
+# Share-link previews on SonicVault's own domain (share-worker.js).
+# Separate from the AI worker (wrangler.toml): no AI binding, no secrets.
+#
+# Deploy: npx wrangler deploy -c share.wrangler.toml
+name = "sonicvault-share"
+main = "share-worker.js"
+compatibility_date = "2026-04-02"
+
+# Reachable only on the custom domain below, not on a workers.dev address.
+workers_dev = false
+
+# The domain must be in this Cloudflare account. Set when it is bought:
+# routes = [ { pattern = "example.com", custom_domain = true } ]
+
+[observability]
+enabled = true
+
+[vars]
+SHARE_APP_URL = "https://bobbynacario-design.github.io/sonicvault"
+FIRESTORE_PROJECT = "pokerhq-a67e4"
