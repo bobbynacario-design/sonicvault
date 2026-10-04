@@ -21,8 +21,8 @@
 <meta name="twitter:description" content="Curate tracks, build mixtapes, and stream your AI-generated music from anywhere.">
 <title>SonicVault - Private AI Music Vault</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<script type="module" src="js/app.js?v=20261004p"></script>
-<link rel="stylesheet" href="styles/app.css?v=20261004p">
+<script type="module" src="js/app.js?v=20261004q"></script>
+<link rel="stylesheet" href="styles/app.css?v=20261004q">
 </head>
 <body>
 <!-- Icon sprite. Every glyph in the app is <svg class="ic"><use href="#i-NAME"/></svg>,
@@ -43,6 +43,7 @@
     <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.2 12 3.5l8.5 6.7"/><path d="M5.5 9v10.5a1 1 0 0 0 1 1H10v-5.5h4v5.5h3.5a1 1 0 0 0 1-1V9"/></symbol>
     <symbol id="i-playlists" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h12"/><path d="M3 12h9"/><path d="M3 18h7"/><path d="M20 15V5l-3 1"/><circle cx="17.5" cy="16.5" r="2.5"/></symbol>
     <symbol id="i-import" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3.5"/><path d="m7 8.5 5-5 5 5"/><path d="M20.5 14.5v4a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-4"/></symbol>
+    <symbol id="i-create" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/><path d="M3.5 4v4M1.5 6h4"/></symbol>
     <symbol id="i-insights" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M21 20H3"/></symbol>
     <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.8 6.8 0 0 0 10.7 10.7z"/></symbol>
@@ -78,6 +79,7 @@
       <div class="nav-groups">
         <button class="group-tab active" id="gtab-library" onclick="switchView('library')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-home"/></svg>Home</button>
         <button class="group-tab" id="gtab-playlists" onclick="switchView('playlists')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-playlists"/></svg>Playlists</button>
+        <button class="group-tab" id="gtab-create" onclick="switchView('create')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-create"/></svg>Create</button>
         <button class="group-tab" id="gtab-upload" onclick="switchView('upload')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-import"/></svg>Import</button>
         <button class="group-tab" id="gtab-insights" onclick="switchView('insights')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-insights"/></svg>Insights</button>
       </div>
@@ -182,6 +184,62 @@
   </div>
 </div>
 
+<div class="page" id="page-create">
+  <div class="page-stack">
+    <div class="section-card create-card">
+      <div class="section-inner">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Create</div>
+            <div class="section-sub">Describe a song and Google&rsquo;s Lyria makes it, vocals and all, a couple of minutes long. Each one costs a few cents on your Gemini key.</div>
+          </div>
+        </div>
+
+        <div class="create-setup" id="create-setup" role="status" hidden></div>
+
+        <form class="create-form" id="create-form" onsubmit="event.preventDefault(); generateSong();">
+          <div class="form-group">
+            <label class="form-label" for="create-title">Title <span class="form-label-note">optional</span></label>
+            <input class="form-input" id="create-title" type="text" maxlength="120" autocomplete="off" placeholder="Name it now, or after you hear it" oninput="onCreateInput()">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="create-style">The sound</label>
+            <textarea class="form-input" id="create-style" rows="3" maxlength="1000" placeholder="Genre, mood, instruments, voice, tempo. Say it in your own words; Lyria won't imitate real artists." oninput="onCreateInput()"></textarea>
+            <div class="create-ideas" id="create-ideas" aria-label="Ideas to start from"></div>
+          </div>
+          <div class="form-group create-lyrics-group" id="create-lyrics-group">
+            <div class="create-lyrics-head">
+              <label class="form-label" for="create-lyrics">Lyrics <span class="form-label-note">optional</span></label>
+              <div class="create-lyrics-tools">
+                <label class="create-toggle"><input type="checkbox" id="create-instrumental" onchange="onCreateInput()"> Instrumental</label>
+                <button type="button" class="sec-action" id="create-write-btn" onclick="writeLyricsWithClaude()">Write with Claude</button>
+              </div>
+            </div>
+            <textarea class="form-input create-lyrics" id="create-lyrics" rows="10" maxlength="6000" placeholder="[Verse 1]&#10;&#10;[Chorus]&#10;&#10;Leave this empty and Lyria writes its own." oninput="onCreateInput()"></textarea>
+            <div class="create-hint">Tag sections with [Verse], [Chorus] and [Bridge] to shape the song. About two verses and a chorus fit.</div>
+          </div>
+          <div class="create-actions">
+            <button type="submit" class="sec-action primary create-generate" id="create-generate-btn">Make the song</button>
+            <div class="create-status" id="create-status" role="status" aria-live="polite"></div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="section-card" id="create-takes-card" hidden>
+      <div class="section-inner">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Takes</div>
+            <div class="section-sub">Listen, then keep the ones you like. A take you don&rsquo;t save is gone when you leave this page.</div>
+          </div>
+        </div>
+        <div class="create-takes" id="create-takes"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-upload">
   <div class="page-stack">
     <div class="section-card">
@@ -247,7 +305,7 @@
                   <div class="form-group">
                     <label class="form-label">Batch source</label>
                     <select class="form-input" id="batch-source">
-                      <option>Suno</option><option>Udio</option><option>Original</option><option>Other</option>
+                      <option>Suno</option><option>Lyria</option><option>Udio</option><option>Original</option><option>Other</option>
                     </select>
                   </div>
                 </div>
@@ -491,7 +549,7 @@
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>R</kbd></span><span class="shortcut-desc">Cycle repeat mode</span></div>
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>M</kbd></span><span class="shortcut-desc">Mute / unmute</span></div>
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>/</kbd></span><span class="shortcut-desc">Jump to search</span></div>
-      <div class="shortcut-row"><span class="shortcut-keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></span><span class="shortcut-desc">Home / Playlists / Import / Insights</span></div>
+      <div class="shortcut-row"><span class="shortcut-keys"><kbd>1</kbd>&ndash;<kbd>5</kbd></span><span class="shortcut-desc">Home / Playlists / Create / Import / Insights</span></div>
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>Tab</kbd></span><span class="shortcut-desc">Move between cards, rails, and controls</span></div>
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>Enter</kbd> / <kbd>Space</kbd></span><span class="shortcut-desc">Activate the focused card or button</span></div>
       <div class="shortcut-row"><span class="shortcut-keys"><kbd>?</kbd></span><span class="shortcut-desc">Toggle this help</span></div>
@@ -613,6 +671,7 @@
   <span class="mobile-nav-pulse" id="mobile-nav-pulse" aria-hidden="true"></span>
   <button class="mobile-tab active" id="mob-library" onclick="switchView('library')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-home"/></svg><span>Home</span></button>
   <button class="mobile-tab" id="mob-playlists" onclick="switchView('playlists')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-playlists"/></svg><span>Playlists</span></button>
+  <button class="mobile-tab" id="mob-create" onclick="switchView('create')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-create"/></svg><span>Create</span></button>
   <button class="mobile-tab" id="mob-upload" onclick="switchView('upload')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-import"/></svg><span>Import</span></button>
   <button class="mobile-tab" id="mob-insights" onclick="switchView('insights')"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-insights"/></svg><span>Insights</span></button>
 </div>
@@ -655,37 +714,39 @@
      global scope, which is what lets the inline onclick handlers above reach
      feature functions. On deploy, bump the ?v= token on every local asset
      together; sw.js serves them cache-first. -->
-<script src="js/data/util.js?v=20261004p"></script>
-<script src="js/data/tracks.js?v=20261004p"></script>
-<script src="js/data/covers.js?v=20261004p"></script>
-<script src="js/data/artwork.js?v=20261004p"></script>
-<script src="js/data/lyric-sync.js?v=20261004p"></script>
-<script src="js/data/metadata.js?v=20261004p"></script>
-<script src="js/data/waveform.js?v=20261004p"></script>
-<script src="js/data/routes.js?v=20261004p"></script>
-<script src="js/data/backup-format.js?v=20261004p"></script>
-<script src="js/features/vault.js?v=20261004p"></script>
-<script src="js/features/sync.js?v=20261004p"></script>
-<script src="js/features/shell.js?v=20261004p"></script>
-<script src="js/features/modals.js?v=20261004p"></script>
-<script src="js/features/routes.js?v=20261004p"></script>
-<script src="js/features/covers.js?v=20261004p"></script>
-<script src="js/features/artwork.js?v=20261004p"></script>
-<script src="js/features/lyric-sync.js?v=20261004p"></script>
-<script src="js/features/waveform.js?v=20261004p"></script>
-<script src="js/features/media-session.js?v=20261004p"></script>
-<script src="js/features/player.js?v=20261004p"></script>
-<script src="js/features/expanded-player.js?v=20261004p"></script>
-<script src="js/features/library.js?v=20261004p"></script>
-<script src="js/features/home.js?v=20261004p"></script>
-<script src="js/features/insights.js?v=20261004p"></script>
-<script src="js/features/playlists.js?v=20261004p"></script>
-<script src="js/features/share.js?v=20261004p"></script>
-<script src="js/features/edit-track.js?v=20261004p"></script>
-<script src="js/features/ai-metadata.js?v=20261004p"></script>
-<script src="js/features/upload.js?v=20261004p"></script>
-<script src="js/features/backup.js?v=20261004p"></script>
-<script src="js/features/keyboard.js?v=20261004p"></script>
-<script src="js/boot.js?v=20261004p"></script>
+<script src="js/data/util.js?v=20261004q"></script>
+<script src="js/data/tracks.js?v=20261004q"></script>
+<script src="js/data/covers.js?v=20261004q"></script>
+<script src="js/data/artwork.js?v=20261004q"></script>
+<script src="js/data/lyric-sync.js?v=20261004q"></script>
+<script src="js/data/metadata.js?v=20261004q"></script>
+<script src="js/data/waveform.js?v=20261004q"></script>
+<script src="js/data/routes.js?v=20261004q"></script>
+<script src="js/data/backup-format.js?v=20261004q"></script>
+<script src="js/data/create.js?v=20261004q"></script>
+<script src="js/features/vault.js?v=20261004q"></script>
+<script src="js/features/sync.js?v=20261004q"></script>
+<script src="js/features/shell.js?v=20261004q"></script>
+<script src="js/features/modals.js?v=20261004q"></script>
+<script src="js/features/routes.js?v=20261004q"></script>
+<script src="js/features/covers.js?v=20261004q"></script>
+<script src="js/features/artwork.js?v=20261004q"></script>
+<script src="js/features/lyric-sync.js?v=20261004q"></script>
+<script src="js/features/waveform.js?v=20261004q"></script>
+<script src="js/features/media-session.js?v=20261004q"></script>
+<script src="js/features/player.js?v=20261004q"></script>
+<script src="js/features/expanded-player.js?v=20261004q"></script>
+<script src="js/features/library.js?v=20261004q"></script>
+<script src="js/features/home.js?v=20261004q"></script>
+<script src="js/features/insights.js?v=20261004q"></script>
+<script src="js/features/playlists.js?v=20261004q"></script>
+<script src="js/features/share.js?v=20261004q"></script>
+<script src="js/features/edit-track.js?v=20261004q"></script>
+<script src="js/features/ai-metadata.js?v=20261004q"></script>
+<script src="js/features/upload.js?v=20261004q"></script>
+<script src="js/features/create.js?v=20261004q"></script>
+<script src="js/features/backup.js?v=20261004q"></script>
+<script src="js/features/keyboard.js?v=20261004q"></script>
+<script src="js/boot.js?v=20261004q"></script>
 </body>
 </html>

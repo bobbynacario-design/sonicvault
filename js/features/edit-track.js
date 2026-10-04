@@ -3,7 +3,7 @@
 
 var EDIT_GENRES = ['Synthwave','Lo-fi','Electronic','Ambient','Hip Hop','Rock','Pop','Folk','Jazz','Classical','R&B','Chiptune','Metal','Country','Other'];
 var EDIT_MOODS = ['Energetic','Chill','Intense','Dreamy','Warm','Playful','Melancholic','Uplifting','Dark'];
-var EDIT_SOURCES = ['Suno','Udio','Original','Other'];
+var EDIT_SOURCES = ['Suno','Lyria','Udio','Original','Other'];
 var _editingTrackId = '';
 var _editTrackAI = null;
 

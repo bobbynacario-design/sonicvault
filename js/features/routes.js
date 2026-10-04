@@ -154,6 +154,7 @@ function switchView(view) {
   syncNavState(view, false);
   if (view === 'library') renderTracks();
   if (view === 'playlists') renderPlaylists();
+  if (view === 'create') renderCreate();
   if (view === 'upload') renderPendingPreview();
   if (view === 'insights') renderInsights();
   updatePageChrome(null, _currentTrack || null);

@@ -227,12 +227,19 @@ function fillLyricsFromTag(track, bytes) {
 // Look one track up. A network failure records nothing, so the next sweep
 // tries again; a file read cleanly is remembered, art or not.
 async function probeTrackArt(track) {
-  var index = getArtIndex();
   var bytes = await readAudioHead(track.audioURL);
   var hasLyricSheet = fillLyricsFromTag(track, bytes);
-  var art = findEmbeddedArt(bytes);
+  return rememberTrackArt(track, findEmbeddedArt(bytes), hasLyricSheet);
+}
+
+// Record what a track's file carries -- its picture ({ mime, data }, or
+// null) and whether it has a lyric sheet -- and paint the picture. Used by
+// the sweep, and by the Create page for a song whose cover it already holds,
+// so the cover shows at once instead of after the next sweep.
+async function rememberTrackArt(track, art, hasLyricSheet) {
+  var index = getArtIndex();
   if (!art) {
-    index[track.id] = { src:track.audioURL, art:false, lyrics:hasLyricSheet };
+    index[track.id] = { src:track.audioURL, art:false, lyrics:!!hasLyricSheet };
     saveArtIndex();
     return false;
   }
@@ -241,13 +248,15 @@ async function probeTrackArt(track) {
   try {
     palette = await paletteFromBlob(blob);
   } catch (e) {
-    index[track.id] = { src:track.audioURL, art:false, lyrics:hasLyricSheet };
+    index[track.id] = { src:track.audioURL, art:false, lyrics:!!hasLyricSheet };
     saveArtIndex();
     return false;
   }
-  var cache = await caches.open(ART_CACHE_NAME);
-  await cache.put(artCacheKey(track.id), new Response(blob, { headers:{ 'Content-Type':art.mime } }));
-  index[track.id] = { src:track.audioURL, art:true, palette:palette, lyrics:hasLyricSheet };
+  if ('caches' in window) {
+    var cache = await caches.open(ART_CACHE_NAME);
+    await cache.put(artCacheKey(track.id), new Response(blob, { headers:{ 'Content-Type':art.mime } }));
+  }
+  index[track.id] = { src:track.audioURL, art:true, palette:palette, lyrics:!!hasLyricSheet };
   saveArtIndex();
   setArtBlob(track.id, blob);
   paintArt(track.id);

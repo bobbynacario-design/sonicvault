@@ -3,7 +3,7 @@
 // Pure: no DOM, no app state, nothing outside js/data.
 
 function sourceWeight(source) {
-  var map = { Suno: 12, Udio: 20, Original: 35, Other: 8 };
+  var map = { Suno: 12, Lyria: 26, Udio: 20, Original: 35, Other: 8 };
   return map[source] || 0;
 }
 

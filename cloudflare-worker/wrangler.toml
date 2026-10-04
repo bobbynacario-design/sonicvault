@@ -6,13 +6,16 @@ compatibility_date = "2026-04-02"
 [observability]
 enabled = true
 
-# Workers AI, for POST /transcribe (Whisper word timings for lyric sync).
+# Workers AI, for POST /transcribe (Whisper word timings for lyric sync) and
+# POST /cover (FLUX.1 [schnell] covers for songs made on the Create page).
 [ai]
 binding = "AI"
 
 # Secrets (set with `wrangler secret put <NAME>`, never commit these):
 #   ANTHROPIC_API_KEY        required — Anthropic API key the worker calls Claude with
 #   SONICVAULT_CLIENT_TOKEN  optional — bearer token the web UI must send as Authorization
+#   GEMINI_API_KEY           optional — Google AI Studio key for POST /generate (Lyria songs);
+#                            the key's project needs billing turned on
 #
 # Vars below are non-secret and safe to keep in source control.
 [vars]

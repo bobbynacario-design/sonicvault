@@ -3,6 +3,7 @@
 // Deploy with Wrangler and set these secrets / vars:
 //   wrangler secret put ANTHROPIC_API_KEY        (required)
 //   wrangler secret put SONICVAULT_CLIENT_TOKEN   (optional — bearer token the web UI must send)
+//   wrangler secret put GEMINI_API_KEY            (optional — turns on POST /generate, Lyria songs)
 //   ALLOWED_ORIGIN  (optional, comma-separated list of allowed origins, e.g. "https://bobbynacario.github.io")
 //
 // The web UI posts { title, prompt, lyrics, model, fallback } and expects a raw
@@ -16,6 +17,16 @@
 // { audioURL } for a file in the SonicVault Cloudinary folder -- the worker
 // streams it straight to the model -- or the audio itself as the body.
 //
+// The Create page (js/features/create.js) makes songs through three routes:
+//   POST /generate  { title, style, lyrics, instrumental } -- Google's Lyria
+//                   writes the song. Gemini's answer is passed straight
+//                   through, base64 audio and all, so the worker never parses
+//                   megabytes of JSON. Needs the GEMINI_API_KEY secret.
+//   POST /lyrics    { title, style, draft } -- Claude writes or finishes a
+//                   lyric sheet, returned as { title, lyrics }.
+//   POST /cover     { title, style } -- a square cover from FLUX.1 [schnell]
+//                   on Workers AI, returned as { mime, image } in base64.
+//
 // GET /s/... serves share-link previews to link-preview bots (share.js).
 // Those routes are public by design: they read only the share records the
 // app publishes for anyone to see.
@@ -24,6 +35,14 @@ import { handleShareRoute } from "./share.js";
 
 const MODEL_NAME = "claude-haiku-4-5";
 const WHISPER_MODEL = "@cf/openai/whisper-large-v3-turbo";
+// Lyria 3.5 makes full songs of a couple of minutes, vocals included. The
+// LYRIA_MODEL var can name another (lyria-3-clip-preview makes 30s clips).
+const LYRIA_MODEL = "lyria-3.5";
+const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/";
+const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const MAX_SONG_TITLE = 120;
+const MAX_SONG_STYLE = 1000;
+const MAX_SONG_LYRICS = 6000;
 // Only the vault's own Cloudinary files: the worker must not become a way
 // to run paid transcription on anything on the internet.
 const AUDIO_HOST = "res.cloudinary.com";
@@ -78,9 +97,11 @@ export default {
       return jsonResponse({ error: "Unauthorized." }, 401, request, env);
     }
 
-    if (url.pathname.replace(/\/+$/, "") === "/transcribe") {
-      return handleTranscribe(request, env);
-    }
+    const route = url.pathname.replace(/\/+$/, "");
+    if (route === "/transcribe") return handleTranscribe(request, env);
+    if (route === "/generate") return handleGenerate(request, env);
+    if (route === "/lyrics") return handleLyrics(request, env);
+    if (route === "/cover") return handleCover(request, env);
 
     let payload;
     try {
@@ -310,6 +331,232 @@ async function handleTranscribe(request, env) {
     request,
     env
   );
+}
+
+// ─── Create: songs, lyrics and covers ────────────────────────────────────────
+
+async function readJsonBody(request) {
+  try {
+    const payload = await request.json();
+    return payload && typeof payload === "object" ? payload : {};
+  } catch (err) {
+    return null;
+  }
+}
+
+// What Lyria is asked for: the sound described in the person's own words,
+// then either "instrumental" or the lyric sheet under a "Lyrics:" header,
+// the form Google's prompt guide uses. With no lyrics Lyria writes its own,
+// and the title gives it something to write about.
+function buildSongPrompt(input) {
+  const lines = [];
+  if (input.style) lines.push(input.style);
+  if (input.title) lines.push("Song title: " + input.title);
+  if (input.instrumental) {
+    lines.push("Instrumental only, no vocals.");
+  } else if (input.lyrics) {
+    lines.push("", "Lyrics:", input.lyrics);
+  }
+  return lines.join("\n");
+}
+
+async function handleGenerate(request, env) {
+  // Checked before the body, so an empty request from the app tells it
+  // whether generation is set up without making anything.
+  if (!env.GEMINI_API_KEY) {
+    return jsonResponse(
+      { error: "Song generation is not set up: add the worker secret GEMINI_API_KEY." },
+      501,
+      request,
+      env
+    );
+  }
+  const payload = await readJsonBody(request);
+  if (!payload) {
+    return jsonResponse({ error: "Request body must be valid JSON." }, 400, request, env);
+  }
+  const input = {
+    title: cleanString(payload.title),
+    style: cleanString(payload.style),
+    lyrics: cleanString(payload.lyrics),
+    instrumental: payload.instrumental === true
+  };
+  if (!input.style && !input.lyrics) {
+    return jsonResponse({ error: "Describe the sound you want, or give Lyria some lyrics." }, 400, request, env);
+  }
+  if (input.title.length > MAX_SONG_TITLE || input.style.length > MAX_SONG_STYLE || input.lyrics.length > MAX_SONG_LYRICS) {
+    return jsonResponse(
+      { error: "Keep the title under " + MAX_SONG_TITLE + " characters, the description under " + MAX_SONG_STYLE + " and the lyrics under " + MAX_SONG_LYRICS + "." },
+      400,
+      request,
+      env
+    );
+  }
+
+  const model = cleanString(env.LYRIA_MODEL) || LYRIA_MODEL;
+  let response;
+  try {
+    response = await fetch(GEMINI_API + encodeURIComponent(model) + ":generateContent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: buildSongPrompt(input) }] }],
+        generationConfig: { responseModalities: ["AUDIO", "TEXT"] }
+      })
+    });
+  } catch (err) {
+    return jsonResponse(
+      { error: "Could not reach Google's Gemini API.", details: cleanString(err && err.message) },
+      502,
+      request,
+      env
+    );
+  }
+
+  if (!response.ok) {
+    // Google's own reason -- a bad key, billing not enabled, a model name it
+    // does not know -- so the app can say what to fix.
+    const rawText = await response.text();
+    const parsed = safeJsonParse(rawText);
+    const apiError = parsed && parsed.error ? parsed.error : {};
+    const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+    const kind = cleanString(apiError.status);
+    console.error("Lyria request failed", response.status, kind, reason, "model:", model);
+    return jsonResponse(
+      {
+        error: "Lyria request failed (" + response.status + (kind ? " " + kind : "") + "): " + reason,
+        status: response.status
+      },
+      response.status === 429 ? 429 : 502,
+      request,
+      env
+    );
+  }
+
+  // A song is a few MB of base64. Parsing it here would spend the worker's
+  // CPU on what the browser has to parse anyway, so it streams through.
+  const headers = corsHeaders(request, env);
+  headers.set("Content-Type", "application/json; charset=utf-8");
+  headers.set("Cache-Control", "no-store");
+  headers.set("X-SonicVault-Model", model);
+  headers.set("Access-Control-Expose-Headers", "X-SonicVault-Model");
+  return new Response(response.body, { status: 200, headers });
+}
+
+const LYRICS_SYSTEM_PROMPT = [
+  "You write original song lyrics for SonicVault, a personal vault of AI-generated songs.",
+  "Google's Lyria will sing them in a song of about two and a half minutes.",
+  "Return ONLY a raw JSON object, no markdown or commentary: { \"title\": \"string\", \"lyrics\": \"string\" }",
+  "Rules:",
+  "- Start every section with its tag alone on a line: [Verse 1], [Chorus], [Verse 2], [Bridge], [Outro].",
+  "- Fit about two and a half minutes: two verses of four lines, a four-line chorus after each verse and again at the end, and at most a short bridge.",
+  "- Concrete images over abstractions. Rhyme naturally or not at all; never force it.",
+  "- Match the style and mood described, in the language it is written in.",
+  "- Never quote or adapt the lyrics of existing songs, and never name or imitate real artists.",
+  "- Keep the title you are given. With none, invent a short one.",
+  "- When a draft or notes are given, build on them: keep the lines that work and finish the rest."
+].join("\n");
+
+async function handleLyrics(request, env) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return jsonResponse({ error: "Worker secret ANTHROPIC_API_KEY is not configured." }, 500, request, env);
+  }
+  const payload = await readJsonBody(request);
+  if (!payload) {
+    return jsonResponse({ error: "Request body must be valid JSON." }, 400, request, env);
+  }
+  const title = cleanString(payload.title).slice(0, MAX_SONG_TITLE);
+  const style = cleanString(payload.style).slice(0, MAX_SONG_STYLE);
+  const draft = cleanString(payload.draft).slice(0, MAX_SONG_LYRICS);
+  if (!title && !style && !draft) {
+    return jsonResponse({ error: "Give a title, a description of the sound, or a draft to work from." }, 400, request, env);
+  }
+  const model = cleanString(payload.model) || MODEL_NAME;
+  const userText = [
+    "Title:", title || "(none yet)", "",
+    "The sound:", style || "(not described)", "",
+    "Draft or notes:", draft || "(none)"
+  ].join("\n");
+
+  let response;
+  try {
+    response = await callAnthropic(env, {
+      model: model,
+      max_tokens: MAX_TOKENS,
+      temperature: 0.9,
+      system: LYRICS_SYSTEM_PROMPT,
+      messages: [
+        { role: "user", content: userText },
+        { role: "assistant", content: "{" }
+      ]
+    });
+  } catch (err) {
+    return jsonResponse({ error: "Could not reach Anthropic." }, 502, request, env);
+  }
+  const rawText = await response.text();
+  const parsed = safeJsonParse(rawText);
+  if (!response.ok) {
+    const apiError = parsed && parsed.error ? parsed.error : {};
+    const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+    return jsonResponse(
+      { error: "Anthropic API request failed (" + response.status + "): " + reason },
+      response.status === 429 ? 429 : 502,
+      request,
+      env
+    );
+  }
+  let song;
+  try {
+    song = extractJsonObject("{" + extractAnthropicText(parsed || {}));
+  } catch (err) {
+    song = null;
+  }
+  const lyrics = cleanString(song && song.lyrics);
+  if (!lyrics) {
+    return jsonResponse({ error: "Claude returned no lyrics. Try again." }, 502, request, env);
+  }
+  return jsonResponse({ title: title || cleanString(song.title).slice(0, MAX_SONG_TITLE), lyrics: lyrics }, 200, request, env);
+}
+
+// The picture is asked for without its title in quotes: FLUX tends to
+// letter any quoted words onto the image.
+function buildCoverPrompt(title, style) {
+  return [
+    "Square album cover artwork.",
+    style ? "The music: " + style.slice(0, 600) + "." : "",
+    title ? "Let the imagery suggest the song's title, " + title + "." : "",
+    "One striking image with rich colour and a strong composition.",
+    "No text, no letters, no words, no typography, no logos, no watermark."
+  ].filter(Boolean).join(" ");
+}
+
+async function handleCover(request, env) {
+  if (!env.AI) {
+    return jsonResponse({ error: "Workers AI binding \"AI\" is not configured." }, 500, request, env);
+  }
+  const payload = await readJsonBody(request);
+  if (!payload) {
+    return jsonResponse({ error: "Request body must be valid JSON." }, 400, request, env);
+  }
+  const title = cleanString(payload.title).slice(0, MAX_SONG_TITLE);
+  const style = cleanString(payload.style).slice(0, MAX_SONG_STYLE);
+  if (!title && !style) {
+    return jsonResponse({ error: "Give a title or a description of the sound." }, 400, request, env);
+  }
+  let result;
+  try {
+    result = await env.AI.run(IMAGE_MODEL, { prompt: buildCoverPrompt(title, style), steps: 6 });
+  } catch (err) {
+    return jsonResponse({ error: "Cover generation failed.", details: cleanString(err && err.message) }, 502, request, env);
+  }
+  const image = cleanString(result && result.image);
+  if (!image) {
+    return jsonResponse({ error: "Cover generation returned no image." }, 502, request, env);
+  }
+  return jsonResponse({ model: IMAGE_MODEL, mime: "image/jpeg", image: image }, 200, request, env);
 }
 
 // Overloaded (529), rate-limited (429) and server errors (5xx) are usually

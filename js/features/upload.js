@@ -266,7 +266,7 @@ function renderUploadEditor() {
     +     '<div class="form-group"><label class="form-label">Title</label><input class="form-input" type="text" value="' + attr(item.title) + '" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('title') + ', this.value)"></div>'
     +     '<div class="form-group"><label class="form-label">Genre</label><select class="form-input" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('genre') + ', this.value)">' + buildSelectOptions(['Synthwave','Lo-fi','Electronic','Ambient','Hip Hop','Rock','Pop','Folk','Jazz','Classical','R&B','Chiptune','Metal','Country','Other'], item.genre) + '</select></div>'
     +     '<div class="form-group"><label class="form-label">Mood</label><select class="form-input" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('mood') + ', this.value)">' + buildSelectOptions(['Energetic','Chill','Intense','Dreamy','Warm','Playful','Melancholic','Uplifting','Dark'], item.mood) + '</select></div>'
-    +     '<div class="form-group"><label class="form-label">Source</label><select class="form-input" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('source') + ', this.value)">' + buildSelectOptions(['Suno','Udio','Original','Other'], item.source) + '</select></div>'
+    +     '<div class="form-group"><label class="form-label">Source</label><select class="form-input" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('source') + ', this.value)">' + buildSelectOptions(['Suno','Lyria','Udio','Original','Other'], item.source) + '</select></div>'
     +     '<div class="form-group"><label class="form-label">Cover style</label><select class="form-input" ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('coverStyle') + ', this.value)">' + buildCoverStyleOptions(getCoverStyle(item)) + '</select></div>'
     +   '</div>'
     +   '<div class="form-group"><label class="form-label">Prompt / notes</label><textarea class="form-input" rows="6" placeholder="Optional notes for this specific release..." ' + (_isSavingUploads ? 'disabled' : '') + ' onchange="updateUploadDraftField(' + jsq(item.id) + ', ' + jsq('prompt') + ', this.value)">' + esc(item.prompt || '') + '</textarea></div>'
@@ -405,6 +405,59 @@ function cancelUpload() {
   renderPendingPreview();
 }
 
+// The vault track for a draft whose file is now at audioURL. Also used by
+// the Create page, whose songs are saved as drafts too. `offset` keeps ids
+// apart within one batch.
+function trackFromUploadDraft(item, audioURL, offset) {
+  return {
+    id: 't-' + (Date.now() + (offset || 0)),
+    title: String(item.title || '').trim(),
+    genre: item.genre || 'Other',
+    mood: item.mood || 'Dreamy',
+    source: item.source || 'Suno',
+    coverStyle: getCoverStyle(item),
+    prompt: item.prompt || '',
+    lyrics: getTrackLyrics(item),
+    audioURL: audioURL,
+    duration: item.duration || 0,
+    waveform: [],
+    loudness: Array.isArray(item.loudness) && item.loudness.length ? item.loudness.slice() : [],
+    created: new Date().toISOString().split('T')[0],
+    plays: 0,
+    shared: false,
+    fileSize: item.file.size,
+    fileName: item.file.name,
+    aiTags: sanitizeMetadataArray(item.aiTags, 10),
+    aiSummary: item.aiSummary || '',
+    aiMood: item.aiMood || '',
+    aiGenre: item.aiGenre || '',
+    aiTheme: item.aiTheme || '',
+    aiEnergy: item.aiEnergy || '',
+    aiVocalStyle: item.aiVocalStyle || '',
+    aiEra: item.aiEra || '',
+    aiInstruments: sanitizeMetadataArray(item.aiInstruments, 6),
+    aiExplicit: !!item.aiExplicit,
+    aiSource: item.aiSource || '',
+    aiMetadataVersion: Number(item.aiMetadataVersion || 0),
+    aiGeneratedAt: item.aiGeneratedAt || ''
+  };
+}
+
+// New tracks go to the top of the vault, their waveforms (read from the
+// file before upload) straight into the cache.
+function addTracksToVault(createdTracks) {
+  var wfCache = getWaveformCache();
+  createdTracks.forEach(function(t) {
+    if (Array.isArray(t.loudness) && t.loudness.length) {
+      wfCache[t.id] = t.loudness.slice();
+      invalidateVisualWaveform(t.id);
+    }
+  });
+  saveWaveformCache();
+  tracks = createdTracks.concat(tracks);
+  persistTracks();
+}
+
 async function saveAllUploads() {
   var pending = _pendingUploads.filter(function(item) {
     return item.status === 'pending' || item.status === 'error';
@@ -453,38 +506,7 @@ async function saveAllUploads() {
 
       item.progress = 100;
       item.status = 'done';
-      createdTracks.push({
-        id: 't-' + (Date.now() + i),
-        title: String(item.title || '').trim(),
-        genre: item.genre || 'Other',
-        mood: item.mood || 'Dreamy',
-        source: item.source || 'Suno',
-        coverStyle: getCoverStyle(item),
-        prompt: item.prompt || '',
-        lyrics: getTrackLyrics(item),
-        audioURL: audioURL,
-        duration: item.duration || 0,
-        waveform: [],
-        loudness: Array.isArray(item.loudness) && item.loudness.length ? item.loudness.slice() : [],
-        created: new Date().toISOString().split('T')[0],
-        plays: 0,
-        shared: false,
-        fileSize: item.file.size,
-        fileName: item.file.name,
-        aiTags: sanitizeMetadataArray(item.aiTags, 10),
-        aiSummary: item.aiSummary || '',
-        aiMood: item.aiMood || '',
-        aiGenre: item.aiGenre || '',
-        aiTheme: item.aiTheme || '',
-        aiEnergy: item.aiEnergy || '',
-        aiVocalStyle: item.aiVocalStyle || '',
-        aiEra: item.aiEra || '',
-        aiInstruments: sanitizeMetadataArray(item.aiInstruments, 6),
-        aiExplicit: !!item.aiExplicit,
-        aiSource: item.aiSource || '',
-        aiMetadataVersion: Number(item.aiMetadataVersion || 0),
-        aiGeneratedAt: item.aiGeneratedAt || ''
-      });
+      createdTracks.push(trackFromUploadDraft(item, audioURL, i));
       renderPendingPreview();
     } catch (e) {
       console.error('Upload failed:', e);
@@ -495,18 +517,7 @@ async function saveAllUploads() {
     }
   }
 
-  if (createdTracks.length) {
-    var wfCache = getWaveformCache();
-    createdTracks.forEach(function(t) {
-      if (Array.isArray(t.loudness) && t.loudness.length) {
-        wfCache[t.id] = t.loudness.slice();
-        invalidateVisualWaveform(t.id);
-      }
-    });
-    saveWaveformCache();
-    tracks = createdTracks.concat(tracks);
-    persistTracks();
-  }
+  if (createdTracks.length) addTracksToVault(createdTracks);
 
   var failedCount = _pendingUploads.filter(function(item) { return item.status === 'error'; }).length;
   var completedIds = {};

@@ -118,8 +118,10 @@ document.addEventListener('keydown', function(e) {
     case '2':
       switchView('playlists'); e.preventDefault(); break;
     case '3':
-      switchView('upload'); e.preventDefault(); break;
+      switchView('create'); e.preventDefault(); break;
     case '4':
+      switchView('upload'); e.preventDefault(); break;
+    case '5':
       switchView('insights'); e.preventDefault(); break;
     case '?':
       openModal('modal-shortcuts'); e.preventDefault(); break;
