@@ -1458,6 +1458,20 @@ body.light .expand-item{background:none}
 .cover-art.cover-live{animation:coverBreathe 6s ease-in-out infinite, coverLiveGlow 4.5s ease-in-out infinite}
 .cover-art.cover-live .cover-ring{animation:coverDrift 24s linear infinite;transform-origin:center}
 @media (prefers-reduced-motion:reduce){.cover-art.cover-live,.cover-art.cover-live .cover-ring{animation:none}}
+/* The living cover in the expanded player (updateLivingCover): a glow in the
+   cover's colour that swells with the song's loudness (--xp-level, 0-1) in
+   place of the timed breathing, once the song has been measured. */
+.xp-cover-stage{position:relative;width:min(100%, 44vh)}
+.xp-cover-stage #xp-cover{position:relative;z-index:1}
+.xp-aura{position:absolute;inset:-18%;z-index:0;border-radius:50%;background:radial-gradient(closest-side, var(--accent-dynamic), transparent 75%);opacity:0;filter:blur(22px);pointer-events:none;transition:opacity .45s linear, transform .45s linear}
+.xp-cover-stage.is-live .xp-aura{opacity:.22}
+.xp-cover-stage.is-live.has-level .xp-aura{opacity:calc(.15 + var(--xp-level, .4) * .8);transform:scale(calc(.8 + var(--xp-level, .4) * .36))}
+.xp-cover-stage.is-live.has-level .cover-art.cover-live{animation:none;transform:scale(calc(1 + var(--xp-level, .4) * .022));transition:transform .45s linear}
+@media (prefers-reduced-motion:reduce){
+  .xp-aura{transition:none}
+  .xp-cover-stage.is-live.has-level .xp-aura{transform:none}
+  .xp-cover-stage.is-live.has-level .cover-art.cover-live{transform:none}
+}
 /* Real artwork (js/features/artwork.js). Placed after every cover style so
    it wins on source order: no style pattern, mono filter or label sits on a
    real picture. Until the image is read back, the tile shows the art's own

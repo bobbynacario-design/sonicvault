@@ -164,3 +164,18 @@ function levelGain(lufs, target) {
   if (!isMeasuredLoudness(lufs) || !isMeasuredLoudness(target)) return 1;
   return Math.min(1, Math.pow(10, (target - lufs) / 20));
 }
+
+// How loud a song is at t seconds, from its measured levels (one per
+// stretch of the song), stretched over its own quiet-to-loud range: 0 at
+// its quietest, 1 at its loudest. null without levels to go on. For the
+// living cover and karaoke's Music background.
+function levelAt(levels, t, duration) {
+  if (!Array.isArray(levels) || levels.length < 2 || !(Number(duration) > 0)) return null;
+  var at = Math.max(0, Math.min(1, Number(t) / Number(duration))) * (levels.length - 1);
+  var i = Math.floor(at);
+  var next = levels[Math.min(levels.length - 1, i + 1)];
+  var raw = levels[i] + (next - levels[i]) * (at - i);
+  var low = Math.min.apply(null, levels);
+  var high = Math.max.apply(null, levels);
+  return high > low ? (raw - low) / (high - low) : .5;
+}

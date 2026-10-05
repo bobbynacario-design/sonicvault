@@ -48,3 +48,14 @@ test("loud songs come down to the quieter end of the library", () => {
   assert.equal(g.levelGain(null, -14), 1);
   assert.equal(g.levelGain(-8, null), 1);
 });
+
+test("how loud a song is at a moment, on its own quiet-to-loud scale", () => {
+  const levels = [0.2, 0.6, 1.0, 0.2];
+  assert.equal(g.levelAt(levels, 0, 30), 0);
+  assert.equal(g.levelAt(levels, 20, 30), 1);
+  near(g.levelAt(levels, 5, 30), 0.25, 1e-9, "halfway between the first two");
+  assert.equal(g.levelAt(levels, 99, 30), 0, "past the end reads the last level");
+  assert.equal(g.levelAt([0.5, 0.5], 3, 10), 0.5, "a flat song sits in the middle");
+  assert.equal(g.levelAt([], 3, 10), null);
+  assert.equal(g.levelAt(levels, 3, 0), null);
+});

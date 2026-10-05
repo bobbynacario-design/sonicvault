@@ -230,17 +230,8 @@ function applyKaraokeBackground() {
 // the song, js/features/waveform.js), stretched over its own quiet-to-loud
 // range, as --k-level from 0 to 1. A song not measured yet sits at the middle.
 function paintKaraokeLevel(track, t) {
-  var levels = track ? getRealPeaksForTrack(track) : [];
-  var level = .5;
-  var duration = _audio.duration || (track && track.duration) || 0;
-  if (levels.length > 1 && duration) {
-    var at = Math.max(0, Math.min(1, t / duration)) * (levels.length - 1);
-    var i = Math.floor(at);
-    var raw = levels[i] + ((levels[Math.min(levels.length - 1, i + 1)] || levels[i]) - levels[i]) * (at - i);
-    var low = Math.min.apply(null, levels);
-    var high = Math.max.apply(null, levels);
-    level = high > low ? (raw - low) / (high - low) : .5;
-  }
+  var level = levelAt(track ? getRealPeaksForTrack(track) : [], t, _audio.duration || (track && track.duration) || 0);
+  if (level === null) level = .5;
   if (Math.abs(level - _karaoke.level) < .01) return;
   _karaoke.level = level;
   document.getElementById('karaoke-backdrop').style.setProperty('--k-level', level.toFixed(3));

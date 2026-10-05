@@ -85,6 +85,8 @@ function syncPlayerLiveState() {
   if (wave) wave.classList.toggle('playing', !!_isPlaying);
   var coverEl = document.querySelector('#xp-cover .cover-art');
   if (coverEl) coverEl.classList.toggle('cover-live', !!_isPlaying);
+  var stage = document.getElementById('xp-cover-stage');
+  if (stage) stage.classList.toggle('is-live', !!_isPlaying);
 }
 
 // Lyric scroll-along, from the track's lyric timings (lyric-sync.js) or an
@@ -301,3 +303,24 @@ function updateExpandedPlayer() {
     return '<div class="related-card" role="button" tabindex="0" aria-label="' + attr('Play ' + (track.title || 'track') + ' from Similar vibe') + '" onclick="startPlayback(' + jsq(track.id) + ', ' + jsv(related.map(function(item) { return item.id; })) + ', ' + jsq('Similar vibe') + ')">' + buildCoverArt(track, 'sm', false) + '<div><div class="related-title">' + esc(track.title) + '</div><div class="related-sub">' + esc(track.genre || 'Other') + ' / ' + esc(track.mood || 'Mood') + ' / ' + trimText(getTrackPromptExcerpt(track, 72), 72) + '</div></div></div>';
   }).join('') : '<div class="empty-state" style="padding:1rem"><strong style="font-size:24px;margin-bottom:.3rem">Need more context</strong>Add more tracks to surface a stronger related row.</div>';
 }
+
+// The living cover: a glow in the cover's colour behind it, swelling in
+// the song's loud parts and settling in its quiet ones (levelAt over the
+// measured levels), with the cover itself rising very slightly. Driven by
+// timeupdate, four times a second, and smoothed by CSS transitions. A song
+// not measured yet keeps the timed breathing.
+var _livingLevel = -1;
+function updateLivingCover() {
+  var stage = document.getElementById('xp-cover-stage');
+  var overlay = document.getElementById('modal-now-playing');
+  if (!stage || !overlay || !overlay.classList.contains('open') || !_currentTrack) return;
+  var track = getVaultTrack(_currentTrack.id) || _currentTrack;
+  var level = levelAt(getRealPeaksForTrack(track), _audio.currentTime || 0, _audio.duration || track.duration || 0);
+  stage.classList.toggle('has-level', level !== null);
+  if (level === null || Math.abs(level - _livingLevel) < .02) return;
+  _livingLevel = level;
+  stage.style.setProperty('--xp-level', level.toFixed(3));
+}
+
+_audio.addEventListener('timeupdate', updateLivingCover);
+_audio.addEventListener('seeked', updateLivingCover);
