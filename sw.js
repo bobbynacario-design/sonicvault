@@ -42,6 +42,7 @@ var SHELL_ASSETS = [
   './js/data/lrc.js',
   './js/data/translations.js',
   './js/data/moments.js',
+  './js/data/stems.js',
   './js/features/store.js',
   './js/features/vault.js',
   './js/features/sync.js',

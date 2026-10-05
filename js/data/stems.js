@@ -1,0 +1,69 @@
+// Suno's stems, made into a karaoke track (js/features/singer.js). Suno Pro
+// gives a song as a zip of parts -- "0 Lead Vocals.mp3", "1 Backing
+// Vocals.mp3", "2 Drums.mp3"... -- and the instrumental is every part but
+// the voices, added together. This file reads the zip and sorts the parts;
+// the feature decodes, mixes, encodes and uploads.
+
+// The files in a zip: [{ name, size, read() -> Promise<Blob> }]. Handles the
+// two ways zips store files (as they are, and deflated), which is all a
+// browser download produces; folders are left out.
+async function readZipEntries(blob) {
+  var bytes = new Uint8Array(await blob.arrayBuffer());
+  var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  var end = -1;
+  for (var i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { end = i; break; }
+  }
+  if (end < 0) throw new Error('That isn’t a zip file.');
+  var count = view.getUint16(end + 10, true);
+  var at = view.getUint32(end + 16, true);
+  var decoder = new TextDecoder();
+  var entries = [];
+  for (var n = 0; n < count; n++) {
+    if (view.getUint32(at, true) !== 0x02014b50) break;
+    var method = view.getUint16(at + 10, true);
+    var compressed = view.getUint32(at + 20, true);
+    var size = view.getUint32(at + 24, true);
+    var nameLength = view.getUint16(at + 28, true);
+    var extraLength = view.getUint16(at + 30, true);
+    var commentLength = view.getUint16(at + 32, true);
+    var local = view.getUint32(at + 42, true);
+    var name = decoder.decode(bytes.subarray(at + 46, at + 46 + nameLength));
+    at += 46 + nameLength + extraLength + commentLength;
+    if (/\/$/.test(name)) continue;
+    entries.push(zipEntry(bytes, view, name, method, local, compressed, size));
+  }
+  return entries;
+}
+
+function zipEntry(bytes, view, name, method, local, compressed, size) {
+  return {
+    name:name.split('/').pop(),
+    size:size,
+    read:function() {
+      var start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+      var data = bytes.slice(start, start + compressed);
+      if (method === 0) return Promise.resolve(new Blob([data]));
+      if (method === 8) return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+      return Promise.reject(new Error(name + ' is packed in a way the browser can’t open.'));
+    }
+  };
+}
+
+// What a part is, from its file name: { label, voice: 'lead' | 'backing' | '' }.
+function classifyStem(fileName) {
+  var label = String(fileName || '').replace(/\.[a-z0-9]+$/i, '').replace(/^\s*\d+\s*[-_.]?\s*/, '').trim() || String(fileName || '');
+  var lower = label.toLowerCase();
+  var voice = '';
+  if (/vocal|voice|vox|acapella|a cappella/.test(lower)) voice = /back|bgv|harmon|choir|ad.?lib/.test(lower) ? 'backing' : 'lead';
+  return { label:label, voice:voice };
+}
+
+function isAudioFileName(name) {
+  return /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|webm)$/i.test(String(name || ''));
+}
+
+// The parts ticked to begin with: everything that isn't a voice.
+function defaultStemPick(names) {
+  return names.map(function(name) { return !classifyStem(name).voice; });
+}

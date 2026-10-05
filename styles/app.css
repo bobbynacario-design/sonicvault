@@ -3458,6 +3458,16 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .karaoke-singer-note{margin-top:.35rem;font-size:13px;line-height:1.5;color:rgba(255,255,255,.72)}
 .karaoke-singer-note[hidden]{display:none}
 .karaoke-link{padding:0;border:none;background:none;color:#fff;font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+/* Stems into a karaoke track: the dialog sits above karaoke (105). */
+.modal-overlay.stems-overlay{z-index:110}
+.stems-modal{max-width:520px}
+.stems-list{display:grid;gap:.35rem;margin-top:1rem}
+.stem-row{display:flex;align-items:center;gap:.7rem;padding:.6rem .75rem;border-radius:12px;background:var(--surface);cursor:pointer}
+.stem-row input{width:18px;height:18px;accent-color:var(--accent-dynamic)}
+.stem-row:not(.is-kept) .stem-name{color:var(--muted2);text-decoration:line-through}
+.stem-name{flex:1;font-size:14.5px;font-weight:600}
+.stem-voice{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-dynamic)}
+.stems-note{margin:.9rem 0 0;font-size:13px;line-height:1.5;color:var(--muted)}
 .karaoke-close{flex:none;display:grid;place-items:center;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;cursor:pointer}
 .karaoke-close:hover{background:rgba(255,255,255,.18)}
 .karaoke-close .ic{width:18px;height:18px}

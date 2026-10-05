@@ -11,16 +11,17 @@
 var _singer = { off:false, mode:'', audio:null, ctx:null, source:null, reducer:null, direct:null, trackId:'', uploading:false };
 
 // The voice usually sits in the middle of a stereo mix, and so do the bass
-// and kick. Everything in the middle (L + R) except the bass is taken out;
-// the sides (L - R) -- guitars, keys, reverb panned wide -- stay, a little
-// louder to make up for it. A faint voice remains wherever the mix put
-// echo or doubling on the sides.
+// and kick. The middle (L + R) is turned well down except the bass, and the
+// sides (L - R) -- guitars, keys, reverb panned wide -- stay, a little
+// louder to make up for it. The middle is kept at 30% rather than taken
+// out: Suno puts instruments there too, and taking it all out left the
+// music hollow. So the voice is quieter, not gone; stems do it properly.
 function buildVocalReducer(ctx, input, output) {
   var splitter = ctx.createChannelSplitter(2);
   var merger = ctx.createChannelMerger(2);
   var gain = function(v) { var g = ctx.createGain(); g.gain.value = v; return g; };
   var lMid = gain(.5), rMid = gain(.5), lSide = gain(.5), rSide = gain(-.5);
-  var mid = gain(1), side = gain(1.4), invert = gain(-1);
+  var mid = gain(1), midKeep = gain(.3), bassRest = gain(.7), side = gain(1.4), invert = gain(-1);
   var bass = ctx.createBiquadFilter();
   bass.type = 'lowpass';
   bass.frequency.value = 160;
@@ -34,9 +35,14 @@ function buildVocalReducer(ctx, input, output) {
   rMid.connect(mid);
   lSide.connect(side);
   rSide.connect(side);
+  // The bass gets the rest of the middle, so with the 30% it's whole again.
   mid.connect(bass);
-  bass.connect(merger, 0, 0);
-  bass.connect(merger, 0, 1);
+  bass.connect(bassRest);
+  bassRest.connect(merger, 0, 0);
+  bassRest.connect(merger, 0, 1);
+  mid.connect(midKeep);
+  midKeep.connect(merger, 0, 0);
+  midKeep.connect(merger, 0, 1);
   side.connect(merger, 0, 0);
   side.connect(invert);
   invert.connect(merger, 0, 1);
@@ -184,12 +190,12 @@ function attachInstrumental() {
   var input = document.getElementById('karaoke-instrumental-file');
   input.value = '';
   input.onchange = function() {
-    if (input.files && input.files[0]) uploadInstrumental(track.id, input.files[0]);
+    if (input.files && input.files.length) handleInstrumentalFiles(track.id, input.files);
   };
   input.click();
 }
 
-async function uploadInstrumental(id, file) {
+async function uploadInstrumental(id, file, label) {
   var track = getVaultTrack(id);
   if (!track || _singer.uploading) return;
   _singer.uploading = true;
@@ -197,7 +203,7 @@ async function uploadInstrumental(id, file) {
   try {
     var url = await uploadToCloudinary(file, function(pct) { renderSingerControls('Uploading the instrumental… ' + Math.round(pct) + '%'); });
     track.instrumentalURL = url;
-    track.instrumentalName = file.name;
+    track.instrumentalName = label || file.name;
     persistTracks();
     showToast('Instrumental attached. Singer off now plays it.');
     // Already singing along with the voice turned down: switch to the clean one, same moment.
@@ -261,11 +267,194 @@ function renderSingerControls(progress) {
     html = 'Singer off: the instrumental' + (track.instrumentalName ? ' (' + esc(track.instrumentalName) + ')' : '') + '.'
       + (mine ? ' <button type="button" class="karaoke-link" onclick="removeInstrumental()">Remove it</button>' : '');
   } else if (_singer.off) {
-    html = 'Singer turned down in the browser; a little of the voice stays.'
-      + (mine ? ' For a clean one, get the instrumental from Suno (⋯ → Get Stems) and <button type="button" class="karaoke-link" onclick="attachInstrumental()">attach it</button>.' : '');
+    html = 'Singer turned down in the browser, not gone.'
+      + (mine ? ' For a clean one, download the stems from Suno (⋯ → Get Stems) and <button type="button" class="karaoke-link" onclick="attachInstrumental()">attach the zip</button>.' : '');
   } else if (mine && track && track.instrumentalURL) {
     html = 'Instrumental attached for Singer off.';
   }
   note.innerHTML = html;
   note.hidden = !html;
+}
+
+// ── A karaoke track from Suno's stems ────────────────────────────────────
+// "attach it" takes one instrumental, or Suno's stems zip (or several
+// parts): the parts are listed with every voice unticked, and the ticked
+// ones are decoded, added together, made into an MP3 (lamejs, loaded on
+// demand from cdnjs with its integrity hash) and attached like any
+// instrumental. Done in the browser, a part at a time, so only the mix and
+// one part are in memory at once.
+
+var LAME_URL = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
+var LAME_SRI = 'sha512-xT0S/xXvkrfkRXGBPlzZPCAncnMK5c1N7slRkToUbv8Z901aUEuKO84tLy8dWU+3ew4InFEN7TebPaVMy2npZw==';
+var _lamePromise = null;
+var _stems = null;   // { trackId, parts: [{ name, label, voice, keep, read }], busy, note }
+
+function loadLame() {
+  if (window.lamejs && window.lamejs.Mp3Encoder) return Promise.resolve(window.lamejs);
+  if (!_lamePromise) {
+    _lamePromise = new Promise(function(resolve, reject) {
+      var script = document.createElement('script');
+      script.src = LAME_URL;
+      script.integrity = LAME_SRI;
+      script.crossOrigin = 'anonymous';
+      script.onload = function() {
+        if (window.lamejs && window.lamejs.Mp3Encoder) resolve(window.lamejs);
+        else reject(new Error('The MP3 encoder didn’t start.'));
+      };
+      script.onerror = function() {
+        _lamePromise = null;
+        reject(new Error('Couldn’t load the MP3 encoder. Check the connection and try again.'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return _lamePromise;
+}
+
+function isZipFile(file) {
+  return /\.zip$/i.test(file.name) || /zip/.test(file.type || '');
+}
+
+// What was picked: one plain audio file is the instrumental itself;
+// anything else is parts to choose from.
+async function handleInstrumentalFiles(trackId, files) {
+  var list = Array.prototype.slice.call(files || []);
+  if (list.length === 1 && !isZipFile(list[0])) { uploadInstrumental(trackId, list[0]); return; }
+  var parts = [];
+  try {
+    for (var i = 0; i < list.length; i++) {
+      var file = list[i];
+      if (isZipFile(file)) {
+        (await readZipEntries(file)).filter(function(entry) { return isAudioFileName(entry.name); }).forEach(function(entry) {
+          parts.push({ name:entry.name, read:entry.read });
+        });
+      } else if (isAudioFileName(file.name) || /^audio\//.test(file.type)) {
+        parts.push({ name:file.name, read:(function(f) { return function() { return Promise.resolve(f); }; })(file) });
+      }
+    }
+  } catch (e) {
+    showToast((e && e.message) || 'Couldn’t open that file.');
+    return;
+  }
+  if (!parts.length) { showToast('No audio files in there.'); return; }
+  if (parts.length === 1) {
+    var only = await parts[0].read();
+    uploadInstrumental(trackId, new File([only], parts[0].name, { type:'audio/mpeg' }));
+    return;
+  }
+  parts.sort(function(a, b) { return a.name.localeCompare(b.name, undefined, { numeric:true }); });
+  var keep = defaultStemPick(parts.map(function(part) { return part.name; }));
+  _stems = {
+    trackId:trackId,
+    parts:parts.map(function(part, i) { var kind = classifyStem(part.name); return { name:part.name, label:kind.label, voice:kind.voice, keep:keep[i], read:part.read }; }),
+    busy:false,
+    note:''
+  };
+  openModal('modal-stems');
+  renderStems();
+}
+
+function toggleStem(index, keep) {
+  if (!_stems || _stems.busy || !_stems.parts[index]) return;
+  _stems.parts[index].keep = !!keep;
+  renderStems();
+}
+
+function renderStems() {
+  if (!_stems) return;
+  var track = getVaultTrack(_stems.trackId);
+  document.getElementById('stems-sub').textContent = track ? track.title || 'Untitled' : '';
+  var kept = _stems.parts.filter(function(part) { return part.keep; }).length;
+  document.getElementById('stems-list').innerHTML = _stems.parts.map(function(part, i) {
+    return '<label class="stem-row' + (part.keep ? ' is-kept' : '') + '">'
+      + '<input type="checkbox"' + (part.keep ? ' checked' : '') + (_stems.busy ? ' disabled' : '') + ' onchange="toggleStem(' + i + ', this.checked)">'
+      + '<span class="stem-name">' + esc(part.label) + '</span>'
+      + (part.voice ? '<span class="stem-voice">' + (part.voice === 'lead' ? 'Lead voice' : 'Backing voice') + '</span>' : '')
+      + '</label>';
+  }).join('');
+  document.getElementById('stems-note').textContent = _stems.note
+    || 'The ticked parts are mixed into the karaoke track. Voices start unticked; tick Backing Vocals to keep the harmonies.';
+  document.getElementById('stems-actions').innerHTML =
+    '<button class="sec-action" onclick="closeModal(\'modal-stems\')"' + (_stems.busy ? ' disabled' : '') + '>Cancel</button>'
+    + '<button class="sec-action primary" onclick="makeKaraokeTrack()"' + (_stems.busy || !kept ? ' disabled' : '') + '>'
+    + (_stems.busy ? 'Working…' : 'Make it') + '</button>';
+}
+
+function stemsProgress(text) {
+  if (!_stems) return;
+  _stems.note = text;
+  var note = document.getElementById('stems-note');
+  if (note) note.textContent = text;
+}
+
+function decodeAudioBlob(ctx, blob) {
+  return blob.arrayBuffer().then(function(data) {
+    return new Promise(function(resolve, reject) {
+      var pending = ctx.decodeAudioData(data, resolve, reject);
+      if (pending && pending.then) pending.then(resolve, reject);
+    });
+  });
+}
+
+async function makeKaraokeTrack() {
+  if (!_stems || _stems.busy) return;
+  var job = _stems;
+  var kept = job.parts.filter(function(part) { return part.keep; });
+  if (!kept.length) return;
+  job.busy = true;
+  renderStems();
+  try {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!_audioContext) _audioContext = new Ctx();
+    var ctx = _audioContext;
+    var left = null, right = null, length = 0, rate = ctx.sampleRate;
+    for (var i = 0; i < kept.length; i++) {
+      stemsProgress('Reading the parts… ' + (i + 1) + ' of ' + kept.length + ' (' + kept[i].label + ')');
+      var buffer = await decodeAudioBlob(ctx, await kept[i].read());
+      if (buffer.length > length) {
+        var grownL = new Float32Array(buffer.length);
+        var grownR = new Float32Array(buffer.length);
+        if (left) { grownL.set(left); grownR.set(right); }
+        left = grownL; right = grownR; length = buffer.length;
+      }
+      var a = buffer.getChannelData(0);
+      var b = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : a;
+      for (var s = 0; s < buffer.length; s++) { left[s] += a[s]; right[s] += b[s]; }
+    }
+    // Parts added together can run past full scale; bring the peak just under it.
+    var peak = 0;
+    for (s = 0; s < length; s++) peak = Math.max(peak, Math.abs(left[s]), Math.abs(right[s]));
+    var scale = peak > .98 ? .98 / peak : 1;
+    stemsProgress('Making the MP3… 0%');
+    var lame = await loadLame();
+    var encoder = new lame.Mp3Encoder(2, rate, 192);
+    var chunks = [];
+    var block = 1152 * 40;
+    var l16 = new Int16Array(block), r16 = new Int16Array(block);
+    for (var at = 0; at < length; at += block) {
+      var n = Math.min(block, length - at);
+      for (s = 0; s < n; s++) {
+        l16[s] = Math.max(-32768, Math.min(32767, Math.round(left[at + s] * scale * 32767)));
+        r16[s] = Math.max(-32768, Math.min(32767, Math.round(right[at + s] * scale * 32767)));
+      }
+      var out = encoder.encodeBuffer(n === block ? l16 : l16.subarray(0, n), n === block ? r16 : r16.subarray(0, n));
+      if (out.length) chunks.push(new Uint8Array(out));
+      stemsProgress('Making the MP3… ' + Math.round(Math.min(1, (at + n) / length) * 100) + '%');
+      await new Promise(function(resolve) { setTimeout(resolve, 0); });
+    }
+    var tail = encoder.flush();
+    if (tail.length) chunks.push(new Uint8Array(tail));
+    var track = getVaultTrack(job.trackId);
+    var base = (track && track.title || 'Song').replace(/[\\/:*?"<>|]+/g, '').trim() || 'Song';
+    var file = new File(chunks, base + ' (karaoke).mp3', { type:'audio/mpeg' });
+    job.busy = false;
+    _stems = null;
+    closeModal('modal-stems');
+    uploadInstrumental(job.trackId, file, 'Made from ' + kept.length + ' stems (' + kept.map(function(part) { return part.label; }).join(', ') + ')');
+  } catch (e) {
+    console.warn('Karaoke track failed:', e);
+    job.busy = false;
+    stemsProgress('Couldn’t make it: ' + ((e && e.message) || 'try again.'));
+    renderStems();
+  }
 }
