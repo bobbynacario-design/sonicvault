@@ -5,7 +5,7 @@
 
 var DESCRIBE_GAP_MS = 600;
 var AUTO_DESCRIBE_DELAY_MS = 15000;
-var _describeRun = null;          // { ids, index, done, failed, stopped, auto, error }
+var _describeRun = null;          // { ids, index, done, failed, stopped, auto, error, limited }
 var _describeFailed = {};         // track id -> true, not retried automatically this session
 var _autoDescribeTimer = null;
 var _describeLastError = '';      // why the last run described nothing
@@ -71,7 +71,8 @@ async function runDescribe(ids, auto) {
       _describeRun.failed++;
       _describeRun.error = (e && e.message) || 'The worker refused the request.';
       // The same answer would come back for every song (no credit, a bad
-      // token): stop rather than spend the list on it.
+      // token, the day's limit reached): stop rather than spend the list on it.
+      if (e && e.dailyLimit) { _describeRun.limited = true; break; }
       if (_describeRun.failed >= 2 && !_describeRun.done) break;
     }
     await new Promise(function(resolve) { setTimeout(resolve, DESCRIBE_GAP_MS); });
@@ -81,7 +82,7 @@ async function runDescribe(ids, auto) {
   window.refreshAll();
   if (run.done) showToast((run.auto ? 'Claude described ' : 'Described ') + run.done + ' song' + (run.done === 1 ? '' : 's'));
   else if (run.failed && !run.auto) showToast('Couldn’t describe the songs. See the AI worker card.');
-  _describeLastError = run.failed && !run.done ? run.error : '';
+  _describeLastError = run.failed && (!run.done || run.limited) ? run.error : '';
   renderDescribePanel();
 }
 

@@ -157,7 +157,12 @@ async function requestRemoteAIMetadata(input, fallback) {
     text = await response.text();
     body = parseJSONFromText(text);
   }
-  if (!response.ok) throw new Error((body && body.error) || text || ('AI endpoint failed with ' + response.status));
+  if (!response.ok) {
+    var failure = new Error((body && body.error) || text || ('AI endpoint failed with ' + response.status));
+    // The worker's daily spend cap: nothing more gets through until tomorrow.
+    failure.dailyLimit = !!(body && body.dailyLimit);
+    throw failure;
+  }
   var payload = extractAIMetadataPayload(body);
   if (!payload) throw new Error('AI endpoint returned no metadata payload');
   return normalizeAIMetadata(payload, input);

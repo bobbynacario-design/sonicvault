@@ -29,7 +29,13 @@ database_id = "e91d78d4-94fd-4e3d-9bb8-cd2bb1106d4a"
 
 # Secrets (set with `wrangler secret put <NAME>`, never commit these):
 #   ANTHROPIC_API_KEY        required — Anthropic API key the worker calls Claude with
-#   SONICVAULT_CLIENT_TOKEN  optional — bearer token the web UI must send as Authorization
+#   SONICVAULT_CLIENT_TOKEN  required — bearer token the web UI must send as Authorization;
+#                            without it every token route answers 401
+#
+# Daily spend cap (table ai_usage in LISTENS, made by the worker): Claude
+# calls weigh 1 for Haiku and 10 for larger models against CLAUDE_DAILY_LIMIT
+# (default 1000), Lyria songs against LYRIA_DAILY_LIMIT (default 20). Set
+# either as a var to change it.
 #   GEMINI_API_KEY           optional — Google AI Studio key for POST /generate (Lyria songs);
 #                            the key's project needs billing turned on
 #   VAPID_PRIVATE_KEY        optional — the private VAPID key (base64url) that signs follower notices

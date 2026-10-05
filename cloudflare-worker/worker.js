@@ -180,6 +180,8 @@ export default {
       ]
     };
 
+    if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
+
     let anthropicResponse;
     try {
       anthropicResponse = await callAnthropic(env, anthropicBody);
@@ -412,6 +414,7 @@ async function handleGenerate(request, env) {
     contents: [{ role: "user", parts: [{ text: buildSongPrompt(input) }] }],
     generationConfig: { responseModalities: ["AUDIO", "TEXT"] }
   });
+  if (await overDailyLimit(env, "lyria", 1)) return dailyLimitResponse("lyria", request, env);
   let response;
   try {
     // "Unavailable" comes back at once and is not billed, so it is worth
@@ -514,6 +517,8 @@ async function handleLyrics(request, env) {
     "The sound:", style || "(not described)", "",
     "Draft or notes:", draft || "(none)"
   ].join("\n");
+
+  if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
 
   let response;
   try {
@@ -650,6 +655,8 @@ async function handleTranslate(request, env) {
     lines.map(function (line, i) { return (i + 1) + ". " + line; }).join("\n")
   ].join("\n");
 
+  if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
+
   let response;
   try {
     response = await callAnthropic(env, {
@@ -747,10 +754,13 @@ async function handleSongStory(request, env) {
     "Lyrics:", lyrics || "(instrumental)"
   ].join("\n");
 
+  const model = cleanString(payload.model) || cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL;
+  if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
+
   let response;
   try {
     response = await callAnthropic(env, {
-      model: cleanString(payload.model) || cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL,
+      model: model,
       max_tokens: 400,
       system: STORY_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userText }]
@@ -1037,6 +1047,54 @@ async function callAnthropic(env, body) {
   }
 }
 
+// ── The daily spend cap ─────────────────────────────────────────────────
+// A leaked token would otherwise mean unmetered spend on the owner's keys.
+// Every paid call is counted in D1 (table ai_usage, made here on first use)
+// before it goes out, and once the day's budget is spent the worker says
+// no (429) until the next day. Claude calls are weighed by cost -- Haiku 1,
+// anything larger 10 -- so naming an expensive model doesn't get round it.
+// Days are UTC: they turn over at 8am in the Philippines. CLAUDE_DAILY_LIMIT
+// and LYRIA_DAILY_LIMIT vars override the budgets. If the count itself
+// fails, the call goes ahead: the cap is a safety net, not a gate.
+const DAILY_LIMITS = { claude: 1000, lyria: 20 };
+let usageTableMade = false;
+
+function claudeWeight(model) {
+  return /haiku/i.test(model) ? 1 : 10;
+}
+
+// The day's budget if this call is over it, otherwise 0.
+async function overDailyLimit(env, kind, weight) {
+  if (!env.LISTENS) return 0;
+  const limit = Number(env[kind.toUpperCase() + "_DAILY_LIMIT"]) || DAILY_LIMITS[kind];
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    if (!usageTableMade) {
+      await env.LISTENS.prepare(
+        "CREATE TABLE IF NOT EXISTS ai_usage (day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (day, kind))"
+      ).run();
+      usageTableMade = true;
+    }
+    const row = await env.LISTENS.prepare(
+      "INSERT INTO ai_usage (day, kind, n) VALUES (?1, ?2, ?3) ON CONFLICT (day, kind) DO UPDATE SET n = n + ?3 RETURNING n"
+    ).bind(day, kind, weight).first();
+    return row && row.n > limit ? limit : 0;
+  } catch (err) {
+    console.error("Daily usage count failed:", kind, cleanString(err && err.message));
+    return 0;
+  }
+}
+
+function dailyLimitResponse(kind, request, env) {
+  const what = kind === "lyria" ? "song-making" : "Claude";
+  return jsonResponse(
+    { error: "Today's " + what + " limit is used up. It starts again at 8am Philippine time (midnight UTC).", dailyLimit: true },
+    429,
+    request,
+    env
+  );
+}
+
 function handleOptions(request, env) {
   return new Response(null, {
     status: 204,
@@ -1081,8 +1139,10 @@ function getAllowedOriginForRequest(origin, env) {
 }
 
 function isAuthorized(request, env) {
+  // No token set means nobody gets in, rather than everybody: a missing
+  // secret would otherwise open the paid routes to anyone.
   const expectedToken = cleanString(env.SONICVAULT_CLIENT_TOKEN);
-  if (!expectedToken) return true;
+  if (!expectedToken) return false;
   const auth = cleanString(request.headers.get("Authorization"));
   return auth === "Bearer " + expectedToken;
 }
