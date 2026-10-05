@@ -151,8 +151,9 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // SonicVault — private vault locked to owner; public share
-    // catalogs are world-readable but owner-writable only.
+    // SonicVault — private vault locked to owner; a public share can
+    // be opened by anyone holding its link, but only the owner can
+    // list the shares or write them.
     // The watcher uses the Admin SDK and bypasses these rules.
     // ─────────────────────────────────────────────────────────────
     match /sonicvault-bob/{docId} {
@@ -164,12 +165,18 @@ service cloud.firestore {
     match /sonicvault-bob-tracks/{trackId} {
       allow read, write, delete: if isSonicVaultOwner();
     }
+    // Shares: `get` (one by its id, which is what a link carries) is
+    // open; `list` is the owner's, so nobody can pull the whole shared
+    // catalog -- every prompt, lyric and audio link -- from a link.
+    // Nothing outside the owner's app lists them.
     match /sonicvault-public-tracks/{docId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isSonicVaultOwner();
       allow create, update, delete: if isSonicVaultOwner();
     }
     match /sonicvault-public-playlists/{docId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isSonicVaultOwner();
       allow create, update, delete: if isSonicVaultOwner();
     }
 

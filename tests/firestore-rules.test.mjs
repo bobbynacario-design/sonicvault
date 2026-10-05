@@ -33,8 +33,11 @@ const toFields = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) =>
   [k, typeof v === 'boolean' ? { booleanValue: v } : typeof v === 'number' ? { integerValue: String(v) } : { stringValue: String(v) }]));
 
 async function call(method, path, who, body, query) {
+  // 'anon' is a visitor who isn't signed in: no token at all.
+  const headers = { 'content-type': 'application/json' };
+  if (who !== 'anon') headers.authorization = 'Bearer ' + (who === 'admin' ? 'owner' : USERS[who]);
   const res = await fetch(BASE + '/' + path + (query ? '?' + query : ''), {
-    method, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + (who === 'admin' ? 'owner' : USERS[who]) },
+    method, headers,
     body: body ? JSON.stringify({ fields: toFields(body) }) : undefined,
   });
   return res.status;
@@ -129,6 +132,20 @@ async function main() {
   await expect('PokerHQ: others cannot', read('eve', 'pokerhq-bob/state'), false);
   await expect('SonicVault: Bob reads', read('bob', 'sonicvault-bob/vault'), true);
   await expect('SonicVault: an unverified account using Bob\'s email cannot', read('bobUnverified', 'sonicvault-bob/vault'), false);
+
+  // SonicVault shares: a link opens its own share; only Bob can list them.
+  await create('admin', 'sonicvault-public-tracks/t-1', { title: 'Still In' });
+  await create('admin', 'sonicvault-public-playlists/pl-1', { name: 'Late Night Drives' });
+  await create('admin', 'sonicvault-bob-tracks/t-1', { title: 'Still In' });
+  await expect('SonicVault: a visitor opens a shared song from its link', read('anon', 'sonicvault-public-tracks/t-1'), true);
+  await expect('SonicVault: a visitor opens a shared playlist from its link', read('anon', 'sonicvault-public-playlists/pl-1'), true);
+  await expect('SonicVault: a visitor cannot list the shared songs', read('anon', 'sonicvault-public-tracks'), false);
+  await expect('SonicVault: a visitor cannot list the shared playlists', read('anon', 'sonicvault-public-playlists'), false);
+  await expect('SonicVault: a signed-in stranger cannot list them either', read('eve', 'sonicvault-public-tracks'), false);
+  await expect('SonicVault: Bob lists his shared songs', read('bob', 'sonicvault-public-tracks'), true);
+  await expect('SonicVault: a visitor cannot change a share', update('anon', 'sonicvault-public-tracks/t-1', { title: 'mine now' }), false);
+  await expect('SonicVault: Bob updates a share', update('bob', 'sonicvault-public-tracks/t-1', { title: 'Still In (2)' }), true);
+  await expect('SonicVault: a visitor cannot open the private tracks', read('anon', 'sonicvault-bob-tracks/t-1'), false);
 
   console.log(passes + ' passed, ' + failures + ' failed');
   if (failures) process.exit(1);
