@@ -63,6 +63,7 @@ function lovedButtonHTML(id, className) {
 
 async function loadShareListens() {
   if (_shareListens.loading || !_aiConfig || !_aiConfig.endpoint) return;
+  if (typeof loadFollowerCount === 'function') loadFollowerCount();
   _shareListens.loading = true;
   _shareListens.error = '';
   renderShareListens();
@@ -129,7 +130,9 @@ function renderShareListens() {
   }
   el.innerHTML = '<div class="section-card"><div class="section-inner">'
     + '<div class="section-head"><div><div class="section-title">Your share links</div>'
-    + '<div class="section-sub">Plays (ten seconds or more) and ♥ from people you’ve sent links to, counted anonymously. Your own plays don’t count.</div></div>'
+    + '<div class="section-sub">Plays (ten seconds or more) and ♥ from people you’ve sent links to, counted anonymously. Your own plays don’t count.'
+    +   (typeof _followers !== 'undefined' && _followers.count !== null ? ' <strong class="listen-followers">' + _followers.count + (_followers.count === 1 ? ' person follows' : ' people follow') + ' your songs.</strong>' : '')
+    + '</div></div>'
     + (_aiConfig && _aiConfig.endpoint ? '<div class="section-action-row"><button class="sec-action" onclick="loadShareListens()"' + (_shareListens.loading ? ' disabled' : '') + '>Refresh</button></div>' : '')
     + '</div>' + body + '</div></div>';
 }

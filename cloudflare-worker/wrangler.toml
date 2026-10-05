@@ -24,6 +24,7 @@ database_id = "e91d78d4-94fd-4e3d-9bb8-cd2bb1106d4a"
 #   SONICVAULT_CLIENT_TOKEN  optional — bearer token the web UI must send as Authorization
 #   GEMINI_API_KEY           optional — Google AI Studio key for POST /generate (Lyria songs);
 #                            the key's project needs billing turned on
+#   VAPID_PRIVATE_KEY        optional — the private VAPID key (base64url) that signs follower notices
 #
 # Vars below are non-secret and safe to keep in source control.
 [vars]
@@ -33,3 +34,8 @@ ALLOWED_ORIGIN = "https://bobbynacario-design.github.io,http://localhost:8487,ht
 # Firestore project whose public share records the previews read.
 SHARE_APP_URL = "https://bobbynacario-design.github.io/sonicvault"
 FIRESTORE_PROJECT = "pokerhq-a67e4"
+# Web Push for followers (POST /follow, /notify): the public half of the VAPID
+# key the worker signs notices with (the private half is the secret
+# VAPID_PRIVATE_KEY), and who the push services see as the sender.
+VAPID_PUBLIC_KEY = "BFPpQ0izrCr3rZarBA-qK4cQSnweV990bbhV6NEAr23Ff84fl1KQj2sqTZaTc61SYDryT_I0AHB4CaYzGO_mGIA"
+VAPID_SUBJECT = "https://bobbynacario-design.github.io/sonicvault"

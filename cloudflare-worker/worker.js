@@ -32,6 +32,7 @@
 // app publishes for anyone to see.
 
 import { handleShareRoute, readShare } from "./share.js";
+import { sendPush, isPushEndpoint, b64urlToBytes, bytesToB64url } from "./push.js";
 
 const MODEL_NAME = "claude-haiku-4-5";
 const WHISPER_MODEL = "@cf/openai/whisper-large-v3-turbo";
@@ -95,8 +96,11 @@ export default {
     }
 
     const route = url.pathname.replace(/\/+$/, "");
-    // Share pages report plays and hearts without the owner's token.
+    // Share pages report plays and hearts, and follow or unfollow, without
+    // the owner's token.
     if (route === "/listen") return handleListen(request, env);
+    if (route === "/follow") return handleFollow(request, env);
+    if (route === "/unfollow") return handleUnfollow(request, env);
 
     if (!isAuthorized(request, env)) {
       return jsonResponse({ error: "Unauthorized." }, 401, request, env);
@@ -110,6 +114,8 @@ export default {
     if (route === "/translate") return handleTranslate(request, env);
     if (route === "/story") return handleSongStory(request, env);
     if (route === "/listens") return handleListens(request, env);
+    if (route === "/followers") return handleFollowers(request, env);
+    if (route === "/notify") return handleNotify(request, env);
 
     let payload;
     try {
@@ -869,6 +875,105 @@ async function handleListens(request, env) {
     tracks[id].moments = tracks[id].moments.sort(function (a, b) { return b.hearts - a.hearts || a.at - b.at; }).slice(0, 5);
   });
   return jsonResponse({ tracks: tracks }, 200, request, env);
+}
+
+// ── Followers: a notice when there's a new song ──────────────────────────
+// POST /follow { subscription } from a share page, no token: a browser's
+// push subscription, kept only if it points at a real push service (see
+// push.js), at most MAX_FOLLOWERS of them. POST /unfollow { endpoint }
+// drops one. The owner (token) asks POST /followers for the count and
+// POST /notify { id, title, body, url, after } to tell them about a shared
+// song: MAX_NOTIFY_BATCH at a time, since a worker may make only so many
+// requests per call -- the app repeats with `after` until `next` is null.
+// A browser the push service says is gone (404, 410) is dropped.
+
+const MAX_FOLLOWERS = 5000;
+const MAX_NOTIFY_BATCH = 40;
+
+// The VAPID key: the private scalar as base64url (the secret
+// VAPID_PRIVATE_KEY, the form web-push tools use) and the public point (the
+// var VAPID_PUBLIC_KEY, 65 bytes: 0x04, x, y), put together as a JWK.
+function vapidFrom(env) {
+  const d = cleanString(env.VAPID_PRIVATE_KEY);
+  const publicKey = cleanString(env.VAPID_PUBLIC_KEY);
+  if (!d || !publicKey) return null;
+  let point;
+  try { point = b64urlToBytes(publicKey); } catch (err) { return null; }
+  if (point.length !== 65 || point[0] !== 4) return null;
+  const privateJwk = { kty: "EC", crv: "P-256", x: bytesToB64url(point.slice(1, 33)), y: bytesToB64url(point.slice(33)), d: d };
+  return { privateJwk, publicKey, subject: cleanString(env.VAPID_SUBJECT) || cleanString(env.SHARE_APP_URL) || "https://sonicvault.app" };
+}
+
+async function handleFollow(request, env) {
+  if (!env.LISTENS) return jsonResponse({ error: "Following isn't set up." }, 503, request, env);
+  const payload = await readJsonBody(request);
+  const sub = payload && payload.subscription;
+  const endpoint = cleanString(sub && sub.endpoint).slice(0, 1000);
+  const p256dh = cleanString(sub && sub.keys && sub.keys.p256dh);
+  const auth = cleanString(sub && sub.keys && sub.keys.auth);
+  let keysOk = false;
+  try { keysOk = b64urlToBytes(p256dh).length === 65 && b64urlToBytes(auth).length === 16; } catch (err) { keysOk = false; }
+  if (!isPushEndpoint(endpoint) || !keysOk) {
+    return jsonResponse({ error: "That isn't a browser push subscription." }, 400, request, env);
+  }
+  const count = await env.LISTENS.prepare("SELECT COUNT(*) AS n FROM followers").first();
+  const known = await env.LISTENS.prepare("SELECT 1 AS known FROM followers WHERE endpoint = ?").bind(endpoint).first();
+  if (!known && count && count.n >= MAX_FOLLOWERS) {
+    return jsonResponse({ error: "This songwriter can't take more followers right now." }, 429, request, env);
+  }
+  await env.LISTENS.prepare(
+    "INSERT INTO followers (endpoint, p256dh, auth, at) VALUES (?, ?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth, at = excluded.at"
+  ).bind(endpoint, p256dh, auth, Date.now()).run();
+  return jsonResponse({ ok: true }, 200, request, env);
+}
+
+async function handleUnfollow(request, env) {
+  if (!env.LISTENS) return jsonResponse({ ok: true }, 200, request, env);
+  const payload = await readJsonBody(request);
+  const endpoint = cleanString(payload && payload.endpoint).slice(0, 1000);
+  if (endpoint) await env.LISTENS.prepare("DELETE FROM followers WHERE endpoint = ?").bind(endpoint).run();
+  return jsonResponse({ ok: true }, 200, request, env);
+}
+
+async function handleFollowers(request, env) {
+  if (!env.LISTENS) return jsonResponse({ count: 0, ready: false }, 200, request, env);
+  const row = await env.LISTENS.prepare("SELECT COUNT(*) AS n FROM followers").first();
+  return jsonResponse({ count: Number(row && row.n) || 0, ready: !!vapidFrom(env) }, 200, request, env);
+}
+
+async function handleNotify(request, env) {
+  const vapid = vapidFrom(env);
+  if (!env.LISTENS || !vapid) return jsonResponse({ error: "Notices aren't set up on the worker." }, 503, request, env);
+  const payload = await readJsonBody(request);
+  const id = cleanString(payload && payload.id).slice(0, 80);
+  if (!id || !(await isSharedTrack(env, id))) {
+    return jsonResponse({ error: "Share the song first, then tell your followers." }, 400, request, env);
+  }
+  const message = JSON.stringify({
+    title: cleanString(payload.title).slice(0, 80) || "A new song",
+    body: cleanString(payload.body).slice(0, 160) || "Tap to listen.",
+    url: cleanString(payload.url).slice(0, 500),
+    tag: "song-" + id
+  });
+  const after = Math.max(0, Number(payload.after) || 0);
+  const rows = await env.LISTENS.prepare(
+    "SELECT id, endpoint, p256dh, auth FROM followers WHERE id > ? ORDER BY id LIMIT ?"
+  ).bind(after, MAX_NOTIFY_BATCH).all();
+  const list = rows.results || [];
+  let sent = 0;
+  let removed = 0;
+  let failed = 0;
+  await Promise.all(list.map(async function (row) {
+    let status = 0;
+    try { status = await sendPush(row, message, vapid); } catch (err) { status = 0; }
+    if (status >= 200 && status < 300) sent++;
+    else if (status === 404 || status === 410) {
+      removed++;
+      await env.LISTENS.prepare("DELETE FROM followers WHERE id = ?").bind(row.id).run();
+    } else failed++;
+  }));
+  const next = list.length === MAX_NOTIFY_BATCH ? list[list.length - 1].id : null;
+  return jsonResponse({ sent: sent, removed: removed, failed: failed, next: next }, 200, request, env);
 }
 
 const EMBED_MODEL = "@cf/baai/bge-m3";

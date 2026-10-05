@@ -66,6 +66,7 @@ var SHELL_ASSETS = [
   './js/features/song-story.js',
   './js/features/compare.js',
   './js/features/listens.js',
+  './js/features/follow.js',
   './js/features/home.js',
   './js/features/insights.js',
   './js/features/playlists.js',
@@ -318,4 +319,24 @@ self.addEventListener('fetch', function(event) {
     return;
   }
   // Everything else (Firestore, Cloudinary uploads, auth) passes through.
+});
+
+// Notices from the songwriter (js/features/follow.js): the AI worker's
+// /notify sends one per follower; show it, and open the song when tapped.
+self.addEventListener('push', function(event) {
+  var data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'A new song', {
+    body: data.body || 'Tap to listen.',
+    icon: 'assets/icons/icon-192.png',
+    badge: 'assets/icons/favicon-32.png',
+    tag: data.tag || 'sonicvault',
+    data: { url: data.url || './' }
+  }));
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  var url = (event.notification.data && event.notification.data.url) || './';
+  event.waitUntil(self.clients.openWindow(url));
 });

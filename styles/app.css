@@ -2175,7 +2175,8 @@ body.light .playlist-modal-item{background:rgba(0,0,0,.03)}
 }
 @media (max-width:640px){
   .public-cover{max-width:none}
-  .public-actions .sec-action{flex:1;justify-content:center}
+  /* Full labels, two to a row, rather than four squeezed into one. */
+  .public-actions .sec-action{flex:1 0 auto;justify-content:center;white-space:nowrap}
   .public-related-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .public-track-row{grid-template-columns:22px 42px minmax(0,1fr) auto;gap:.6rem}
 }
@@ -3290,6 +3291,15 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .listen-facts{font-size:13px;color:var(--muted)}
 .listen-moment{font-size:12.5px;color:var(--accent-dynamic);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .listen-note{margin:0;font-size:13.5px;color:var(--muted)}
+
+/* Following (js/features/follow.js). */
+.follow-btn .ic{width:16px;height:16px}
+.follow-btn.is-following{background:var(--accent-dynamic-soft);color:var(--accent-dynamic)}
+.share-notify{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem;margin-top:1rem;padding:.8rem .95rem;border-radius:14px;background:var(--surface)}
+.share-notify[hidden]{display:none}
+.share-notify-text{display:inline-flex;align-items:center;gap:.5rem;font-size:13.5px;color:var(--muted)}
+.share-notify-text .ic{width:16px;height:16px;flex:none}
+.listen-followers{color:var(--text);font-weight:600}
 
 /* Compare takes (js/features/compare.js). */
 .compare-modal{max-width:760px}

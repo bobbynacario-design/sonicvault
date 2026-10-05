@@ -139,6 +139,7 @@ function openShareLinkModal(title, subtitle, url) {
   _shareSubject = String(title || '').replace(/^Share\s+/, '').replace(/^["\u201c]|["\u201d]$/g, '');
   var native = document.getElementById('share-native-btn');
   if (native) native.hidden = !navigator.share;
+  if (typeof renderShareNotify === 'function') renderShareNotify('');
   openModal('modal-share');
 }
 
@@ -338,6 +339,7 @@ function renderPublicTrackPage(track) {
     +         publicPlayButton(playLabel, 'startPlayback(' + jsq(track.id) + ', ' + jsv(queueIds) + ', ' + jsq('Shared track') + ')')
     +         '<button class="sec-action" onclick="openShareLinkModal(' + jsq('Share “' + track.title + '”') + ', ' + jsq('Anyone with the link can listen to this track.') + ', ' + jsq(buildShareURL('track', track.id)) + ')">Copy link</button>'
     +         lovedButtonHTML(track.id)
+    +         followButtonHTML()
     +         publicOwnerAction('library')
     +       '</div>'
     +       '<p class="public-count-note">Plays and \u2665 reach the songwriter as counts. Nothing about you is kept.</p>'
@@ -353,6 +355,7 @@ function renderPublicTrackPage(track) {
     + '</div>';
 
   updatePageChrome(track.title + ' | SonicVault', track);
+  renderFollowButtons();
   _publicLyricIdx = -2;
   updatePublicLyricHighlight(true);
 }
@@ -391,6 +394,7 @@ function renderPublicPlaylistPage(pl) {
     +       (pl.desc ? '<p class="public-sub">' + esc(pl.desc) + '</p>' : '')
     +       '<div class="public-actions">'
     +         publicPlayButton(playing ? 'Pause' : 'Play', 'playPlaylist(' + jsq(pl.id) + ')')
+    +         followButtonHTML()
     +         '<button class="sec-action" onclick="openShareLinkModal(' + jsq('Share “' + pl.name + '”') + ', ' + jsq('Anyone with the link can listen to this playlist.') + ', ' + jsq(buildShareURL('playlist', pl.id)) + ')">Copy link</button>'
     +         publicOwnerAction('playlists')
     +       '</div>'
@@ -463,6 +467,8 @@ async function shareTrack(id) {
     if (window.fbPublishShare) await window.fbPublishShare('track', track.id, buildTrackSharePayload(track));
     rememberShareSignature(track);
     openShareLinkModal('Share "' + track.title + '"', 'Anyone with the link can jump straight into this track.', buildShareURL('track', track.id));
+    // Followers can be told about it from here (js/features/follow.js).
+    renderShareNotify(track.id);
   } catch (e) {
     console.error('Track share publish failed:', e);
     showToast('Could not publish track share');
