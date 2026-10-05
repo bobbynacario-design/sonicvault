@@ -85,6 +85,41 @@ function getSimilarTracks(track, limit) {
 // Render a rail once: the id list is derived a single time instead of being
 // rebuilt inside the per-item map (which also re-sorted the whole library on
 // every iteration when the list came from getNewestTracks/getMostPlayed).
+// "On this day" and the mix for the time of day (js/data/moments.js),
+// between the resume strip and the rails. Either may be missing.
+function buildMomentCards() {
+  if (_coverDemoActive) return '';
+  var now = new Date();
+  var cards = [];
+  var day = onThisDay(tracks, now);
+  if (day) {
+    var songs = collapseVersions(day.tracks, tracks).list;
+    var names = songs.slice(0, 3).map(function(track) { return track.title || 'Untitled'; }).join(', ')
+      + (songs.length > 3 ? ' and ' + (songs.length - 3) + ' more' : '');
+    cards.push(momentCard(day.label + ', you made', songs.length === 1 ? (songs[0].title || 'Untitled') : songs.length + ' songs',
+      songs.length === 1 ? (getTrackSummary(songs[0]) || [songs[0].genre, songs[0].mood].filter(Boolean).join(' · ')) : names, songs, day.label));
+  }
+  var mix = timeOfDayMix(tracks, now, 12);
+  if (mix) {
+    var mixTracks = mix.ids.map(function(id) { return getTrackById(id); }).filter(Boolean);
+    cards.push(momentCard('Right now', mix.name, mix.desc + ' ' + mixTracks.length + ' songs.', mixTracks, mix.name));
+  }
+  return cards.length ? '<div class="moment-grid">' + cards.join('') + '</div>' : '';
+}
+
+function momentCard(kicker, title, sub, list, queueLabel) {
+  var ids = list.map(function(track) { return track.id; });
+  return '<div class="moment-card">'
+    + '<div class="moment-covers' + (list.length === 1 ? ' is-one' : '') + '" aria-hidden="true">'
+    +   list.slice(0, list.length === 1 ? 1 : 4).map(function(track) { return buildCoverArt(track, 'xs', false); }).join('')
+    + '</div>'
+    + '<div class="moment-copy"><div class="moment-kicker">' + esc(kicker) + '</div>'
+    +   '<div class="moment-title">' + esc(title) + '</div>'
+    +   '<div class="moment-sub">' + esc(sub) + '</div></div>'
+    + '<button class="sec-action primary has-icon moment-play" aria-label="' + attr('Play ' + title) + '" onclick="startPlayback(' + jsq(ids[0]) + ', ' + jsv(ids) + ', ' + jsq(queueLabel) + ')">' + icon('play') + '<span>Play</span></button>'
+    + '</div>';
+}
+
 function buildMiniRail(list, label, emptyHTML) {
   if (!list.length) return emptyHTML || '';
   var ids = list.map(function(item) { return item.id; });
@@ -182,6 +217,7 @@ function renderLibraryHome() {
     +       '<button class="sec-action" onclick="switchView(\'upload\')">Import</button>'
     +     '</div>'
     +   '</div>'
+    +   buildMomentCards()
     +   '<div class="rail-grid">'
     +     '<div class="rail-card"><div class="rail-title">Recently added</div><div class="mini-track-list">' + buildMiniRail(recentTracks, 'Recently added') + '</div></div>'
     +     (recentlyPlayed.length

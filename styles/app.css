@@ -618,6 +618,23 @@ body.light .side-item{background:rgba(0,0,0,.03)}
 .snapshot-sub{font-size:12px;color:var(--muted2);margin-top:.35rem}
 
 .library-home-stack{display:grid;gap:2.4rem}
+/* Home's moments (buildMomentCards): on this day, and the mix for now. */
+.moment-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:1rem;margin-top:-1rem}
+.moment-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:1rem;align-items:center;padding:1rem 1.1rem;border-radius:22px;background:var(--surface)}
+.moment-covers{display:grid;grid-template-columns:repeat(2, 30px);gap:4px}
+.moment-covers .cover-art{width:30px;height:30px;border-radius:8px}
+.moment-covers.is-one{grid-template-columns:64px}
+.moment-covers.is-one .cover-art{width:64px;height:64px;border-radius:14px}
+.moment-copy{min-width:0}
+.moment-kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-dynamic)}
+.moment-title{margin-top:.25rem;font-family:var(--display);font-weight:700;font-size:18px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.moment-sub{margin-top:.2rem;font-size:13px;line-height:1.45;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+@media (max-width:640px){
+  .moment-grid{grid-template-columns:1fr}
+  .moment-card{gap:.85rem;padding:.9rem}
+  .moment-play{width:46px;height:46px;padding:0;justify-content:center;border-radius:50%}
+  .moment-play span{display:none}
+}
 .rail-grid{
   display:grid;
   /* auto-fit rather than a fixed count: the Recently played rail only exists
