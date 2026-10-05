@@ -42,3 +42,17 @@ test("getCollectionDuration adds up durations, treating missing as zero", () => 
   assert.equal(g.getCollectionDuration([{ duration: 120 }, { duration: "30" }, {}]), 150);
   assert.equal(g.getCollectionDuration([]), 0);
 });
+
+test("a file already in the vault is found by its name and size", () => {
+  const vault = [
+    { id: "a", title: "Still In", fileName: "Still In.mp3", fileSize: 4484726 },
+    { id: "b", title: "Imported", fileName: "Late Night.mp3", fileSize: "3100000" }
+  ];
+  assert.equal(g.findVaultCopy(vault, "Still In.mp3", 4484726).id, "a");
+  assert.equal(g.findVaultCopy(vault, "Late Night.mp3", 3100000).id, "b");
+  // A new take with the same name is a different file.
+  assert.equal(g.findVaultCopy(vault, "Still In.mp3", 4484727), null);
+  assert.equal(g.findVaultCopy(vault, "Other.mp3", 4484726), null);
+  assert.equal(g.findVaultCopy(vault, "", 0), null);
+  assert.equal(g.findVaultCopy(undefined, "Still In.mp3", 4484726), null);
+});

@@ -354,11 +354,17 @@ function handleFileUpload(files) {
   var skippedAudio = 0;
   var skippedSize = 0;
   var skippedDup = 0;
+  var inVault = [];
 
   list.forEach(function(file) {
     var key = file.name + '|' + file.size + '|' + file.lastModified;
     if (existing[key]) {
       skippedDup++;
+      return;
+    }
+    var copy = findVaultCopy(tracks, file.name, file.size);
+    if (copy) {
+      inVault.push(copy.title || file.name);
       return;
     }
     if (!String(file.type || '').startsWith('audio/')) {
@@ -387,6 +393,7 @@ function handleFileUpload(files) {
   if (skippedAudio) notes.push(skippedAudio + ' not audio');
   if (skippedSize) notes.push(skippedSize + ' over 100MB');
   if (skippedDup) notes.push(skippedDup + ' duplicate');
+  if (inVault.length) notes.push(inVault.length === 1 ? '“' + inVault[0] + '” is already in your vault' : inVault.length + ' already in your vault');
   if (notes.length) showToast(notes.join(' / '));
 
   var picker = document.getElementById('file-picker');

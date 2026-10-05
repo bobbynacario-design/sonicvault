@@ -90,3 +90,14 @@ function queueWithSong(ids, currentId, id, where) {
   }
   return list;
 }
+
+// The song in the vault that a dropped file already is, if any: the same
+// file name and the same size in bytes, as both the uploader and the watcher
+// record them. Re-dropping a file would otherwise upload a second copy to
+// Cloudinary and add the song twice.
+function findVaultCopy(list, fileName, fileSize) {
+  if (!fileName || !fileSize) return null;
+  return (list || []).find(function(track) {
+    return track && track.fileName === fileName && Number(track.fileSize) === Number(fileSize);
+  }) || null;
+}
