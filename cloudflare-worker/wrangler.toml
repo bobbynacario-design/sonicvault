@@ -6,6 +6,14 @@ compatibility_date = "2026-04-02"
 [observability]
 enabled = true
 
+# Run in the US, not the data centre nearest the visitor. Cloudflare sends
+# traffic from the Philippines to Hong Kong, and Anthropic (and Gemini)
+# refuse calls from there: 403 "Request not allowed". A region rather than
+# host = "api.anthropic.com" because that host is anycast, so it would
+# measure nearest from Hong Kong too.
+[placement]
+region = "aws:us-east-1"
+
 # Workers AI, for POST /transcribe (Whisper word timings for lyric sync) and
 # POST /cover (FLUX.1 [schnell] covers for songs made on the Create page).
 [ai]

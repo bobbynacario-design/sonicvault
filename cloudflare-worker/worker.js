@@ -203,7 +203,7 @@ export default {
       // too. Anthropic's error text never contains the key.
       const parsed = safeJsonParse(rawText);
       const apiError = parsed && parsed.error ? parsed.error : {};
-      const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+      const reason = anthropicReason(anthropicResponse.status, apiError, rawText);
       const kind = cleanString(apiError.type);
       console.error("Anthropic request failed", anthropicResponse.status, kind, reason, "model:", model);
       return jsonResponse(
@@ -534,7 +534,7 @@ async function handleLyrics(request, env) {
   const parsed = safeJsonParse(rawText);
   if (!response.ok) {
     const apiError = parsed && parsed.error ? parsed.error : {};
-    const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+    const reason = anthropicReason(response.status, apiError, rawText);
     return jsonResponse(
       { error: "Anthropic API request failed (" + response.status + "): " + reason },
       response.status === 429 ? 429 : 502,
@@ -666,7 +666,7 @@ async function handleTranslate(request, env) {
   const parsed = safeJsonParse(rawText);
   if (!response.ok) {
     const apiError = parsed && parsed.error ? parsed.error : {};
-    const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+    const reason = anthropicReason(response.status, apiError, rawText);
     return jsonResponse(
       { error: "Anthropic API request failed (" + response.status + "): " + reason },
       response.status === 429 ? 429 : 502,
@@ -762,7 +762,7 @@ async function handleSongStory(request, env) {
   const parsed = safeJsonParse(rawText);
   if (!response.ok) {
     const apiError = parsed && parsed.error ? parsed.error : {};
-    const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+    const reason = anthropicReason(response.status, apiError, rawText);
     return jsonResponse(
       { error: "Anthropic API request failed (" + response.status + "): " + reason },
       response.status === 429 ? 429 : 502,
@@ -1089,6 +1089,19 @@ function isAuthorized(request, env) {
 
 function cleanString(value) {
   return String(value || "").trim();
+}
+
+// Anthropic's reason for refusing a call, for the app to show. A 403
+// "Request not allowed" is about where the call came from: the Cloudflare
+// data centre the worker ran in is in a region Anthropic doesn't serve
+// (Hong Kong, for visitors from the Philippines). [placement] in
+// wrangler.toml keeps the worker in the US so this shouldn't happen.
+function anthropicReason(status, apiError, rawText) {
+  const reason = cleanString(apiError.message) || cleanString(rawText).slice(0, 200) || "no details";
+  if (status === 403 && /request not allowed/i.test(reason)) {
+    return reason + " (Anthropic doesn't serve the region the worker ran in; check [placement] in wrangler.toml)";
+  }
+  return reason;
 }
 
 function safeJsonParse(text) {

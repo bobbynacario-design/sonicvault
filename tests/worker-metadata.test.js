@@ -19,7 +19,9 @@ async function run(statuses) {
     if (status === 200) return new Response(JSON.stringify({ content: [{ type: "text", text: METADATA }] }), { status });
     const error = status === 529
       ? { type: "overloaded_error", message: "Overloaded" }
-      : { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." };
+      : status === 403
+        ? { type: "forbidden", message: "Request not allowed" }
+        : { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." };
     return new Response(JSON.stringify({ type: "error", error }), { status });
   };
   const quiet = console.warn;
@@ -50,4 +52,11 @@ test("a failure that will not pass -- no credit, a bad key -- is reported at onc
   assert.equal(calls, 1);
   assert.equal(res.status, 502);
   assert.equal(body.error, "Anthropic API request failed (400 invalid_request_error): Your credit balance is too low to access the Anthropic API.");
+});
+
+test("a call from a region Anthropic doesn't serve says so, instead of a bare \"Request not allowed\"", async () => {
+  const { res, body, calls } = await run([403]);
+  assert.equal(calls, 1);
+  assert.equal(res.status, 502);
+  assert.equal(body.error, "Anthropic API request failed (403 forbidden): Request not allowed (Anthropic doesn't serve the region the worker ran in; check [placement] in wrangler.toml)");
 });
