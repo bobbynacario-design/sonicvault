@@ -1,5 +1,6 @@
-// The vault itself: tracks, playlists and settings. localStorage is the
-// offline cache, and js/app.js replaces the window copies on each sync.
+// The vault itself: tracks, playlists and settings. The tracks' offline
+// cache is in IndexedDB (js/features/store.js); playlists and settings stay
+// in localStorage. js/app.js replaces the window copies on each sync.
 // Track and playlist changes go out through persistTracks() and
 // persistPlaylists().
 
@@ -13,6 +14,9 @@ window.appSettings = load('settings', {});
 var tracks = window.tracks;
 var playlists = window.playlists;
 var appSettings = window.appSettings;
+// tracks above is only the old localStorage copy, on the first visit after
+// the cache moved; the IndexedDB copy arrives a moment later.
+hydrateTrackCache();
 
 // Lyric timings from the first lyric-sync build were stored in a shape
 // Firestore rejects (an array of [start, end] arrays), so every save of
@@ -51,13 +55,9 @@ function persistTracks() {
     invalidateFilterCache();
     return;
   }
-  // localStorage keeps the whole array as the offline cache; Firestore gets
+  // IndexedDB keeps the whole array as the offline cache; Firestore gets
   // only the documents that actually changed.
-  try {
-    localStorage.setItem('sv_tracks', JSON.stringify(tracks));
-  } catch (e) {
-    console.warn('local track cache not written:', e);
-  }
+  cacheTracks(tracks);
   syncTrackDocs();
   invalidateFilterCache();
   if (typeof scheduleShareRefresh === 'function') scheduleShareRefresh();

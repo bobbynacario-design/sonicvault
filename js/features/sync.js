@@ -193,7 +193,8 @@ window.svApplyRemoteTracks = function(remoteList) {
   next.sort(compareNewestFirst);
   window.tracks = next;
   tracks = next;
-  try { localStorage.setItem('sv_tracks', JSON.stringify(tracks)); } catch (e) {}
+  _tracksFromServer = true;
+  cacheTracks(tracks);
   invalidateFilterCache();
 };
 

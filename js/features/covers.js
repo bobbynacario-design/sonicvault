@@ -46,7 +46,14 @@ function makeCoverDemoTracks() {
   });
 }
 
+var _tracksBeforeDemo = null;
+var _playlistsBeforeDemo = null;
+
 function startCoverDemo() {
+  if (!_coverDemoActive) {
+    _tracksBeforeDemo = tracks;
+    _playlistsBeforeDemo = playlists;
+  }
   _coverDemoActive = true;
   _currentTrack = null;
   _isPlaying = false;
@@ -67,8 +74,9 @@ function startCoverDemo() {
 // owner, the sign-in page comes back.
 function exitCoverDemo(quiet) {
   _coverDemoActive = false;
-  tracks = load('tracks', []);
-  playlists = load('playlists', []);
+  tracks = _tracksBeforeDemo || [];
+  playlists = _playlistsBeforeDemo || load('playlists', []);
+  _tracksBeforeDemo = _playlistsBeforeDemo = null;
   window.tracks = tracks;
   window.playlists = playlists;
   invalidateFilterCache();

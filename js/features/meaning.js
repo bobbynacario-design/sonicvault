@@ -4,7 +4,7 @@
 // kept on this device; a search makes one for the query and ranks the songs
 // by how close they are. A song's vector is remade when its words change.
 
-var MEANING_CACHE_KEY = 'sv_meaning';
+var MEANING_CACHE_KEY = 'sv_meaning';   // the old localStorage home; IndexedDB 'meaning' now
 var MEANING_BATCH = 12;
 var MEANING_INDEX_DELAY_MS = 20000;
 var _meaningIndex = loadMeaningIndex();     // { model, items: { id: { h, scale, data } } }
@@ -27,9 +27,36 @@ function loadMeaningIndex() {
   return { model:MEANING_MODEL, items:{} };
 }
 
+// Saved to IndexedDB (js/features/store.js) once the saved copy has been
+// read, so a start-up index never replaces it.
+var _meaningHydrated = false;
 function saveMeaningIndex() {
-  try { localStorage.setItem(MEANING_CACHE_KEY, JSON.stringify(_meaningIndex)); } catch (e) {}
+  if (_meaningHydrated) svIdbSave('meaning', _meaningIndex);
 }
+
+// The saved vectors, merged under any read since start-up; the old
+// localStorage copy moves across and is cleared.
+svIdbGet('meaning').then(function(saved) {
+  if (saved && saved.model === MEANING_MODEL && saved.items) {
+    Object.keys(saved.items).forEach(function(id) {
+      if (!_meaningIndex.items[id]) _meaningIndex.items[id] = saved.items[id];
+    });
+  }
+  _meaningHydrated = true;
+  var hadLegacy = false;
+  try { hadLegacy = !!localStorage.getItem(MEANING_CACHE_KEY); } catch (e) {}
+  if (hadLegacy) {
+    svIdbSet('meaning', _meaningIndex).then(function() {
+      try { localStorage.removeItem(MEANING_CACHE_KEY); } catch (e) {}
+    }).catch(function() {});
+  }
+  scheduleMeaningIndex();
+}).catch(function() {
+  _meaningHydrated = true;
+  saveMeaningIndex = function() {
+    try { localStorage.setItem(MEANING_CACHE_KEY, JSON.stringify(_meaningIndex)); } catch (e) {}
+  };
+});
 
 function meaningAvailable() {
   return !!(_aiConfig && _aiConfig.endpoint) && !(typeof _coverDemoActive !== 'undefined' && _coverDemoActive);
