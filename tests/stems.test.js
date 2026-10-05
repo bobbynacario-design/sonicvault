@@ -133,3 +133,16 @@ test("a zip cut short says so, instead of reading past its end", async () => {
   end.writeUInt32LE(0x7fffffff, 16);
   await assert.rejects(g.readZipEntries(new Blob([whole])), /damaged or didn’t finish downloading/);
 });
+
+test("the song itself, picked by mistake, isn't taken as its instrumental", () => {
+  const track = { title: "The World Won’t End", fileSize: 4484726 };
+  assert.ok(g.looksLikeTheSong(track, "The World Won't End.mp3", 1));
+  assert.ok(g.looksLikeTheSong(track, "the world wont end (1).mp3", 1));
+  assert.ok(g.looksLikeTheSong(track, "download.mp3", 4484726));
+  assert.ok(!g.looksLikeTheSong(track, "The World Won't End (Instrumental).mp3", 1));
+  assert.ok(!g.looksLikeTheSong(track, "The World Won't End - karaoke.mp3", 1));
+  assert.ok(!g.looksLikeTheSong(track, "The World Won't End (Inst).mp3", 1));
+  assert.ok(g.looksLikeTheSong({ title: "Installed" }, "Installed.mp3", 1));
+  assert.ok(!g.looksLikeTheSong(track, "Still In.mp3", 1));
+  assert.ok(!g.looksLikeTheSong({ title: "" }, ".mp3", 1));
+});

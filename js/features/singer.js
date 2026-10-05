@@ -319,7 +319,14 @@ function isZipFile(file) {
 // anything else is parts to choose from.
 async function handleInstrumentalFiles(trackId, files) {
   var list = Array.prototype.slice.call(files || []);
-  if (list.length === 1 && !isZipFile(list[0])) { uploadInstrumental(trackId, list[0]); return; }
+  if (list.length === 1 && !isZipFile(list[0])) {
+    if (looksLikeTheSong(getVaultTrack(trackId), list[0].name, list[0].size)) {
+      showToast('“' + list[0].name + '” is the song itself, with the singer. Pick the stems zip, or an instrumental.');
+      return;
+    }
+    uploadInstrumental(trackId, list[0]);
+    return;
+  }
   var parts = [];
   try {
     for (var i = 0; i < list.length; i++) {

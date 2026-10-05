@@ -105,3 +105,19 @@ function isAudioFileName(name) {
 function defaultStemPick(names) {
   return names.map(function(name) { return !classifyStem(name).voice; });
 }
+
+// Whether a file picked as the instrumental is really the song itself, voice
+// and all: Suno's MP3 download sits next to the stems zip with the song's
+// name ("The World Won't End.mp3"), and attaching it makes Singer off play
+// the singer. The same size as the uploaded song, or the song's title with
+// nothing saying instrumental.
+function looksLikeTheSong(track, fileName, fileSize) {
+  if (!track) return false;
+  if (track.fileSize && fileSize && Number(track.fileSize) === Number(fileSize)) return true;
+  var name = String(fileName || '');
+  if (/instrumental|karaoke|inst\b|no.?vocals?|minus.?one|backing.?track|accompaniment/i.test(name)) return false;
+  var bare = function(text) {
+    return String(text || '').replace(/\.[a-z0-9]+$/i, '').replace(/\s*\(\d+\)\s*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  };
+  return !!bare(track.title) && bare(name) === bare(track.title);
+}
