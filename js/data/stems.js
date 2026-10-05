@@ -6,7 +6,10 @@
 
 // The files in a zip: [{ name, size, read() -> Promise<Blob> }]. Handles the
 // two ways zips store files (as they are, and deflated), which is all a
-// browser download produces; folders are left out.
+// browser download produces; folders are left out. Also ZIP64, which
+// Suno's stems download uses even for a small zip: the usual size and
+// position fields hold ffffffff and the real ones are in a ZIP64 record
+// (for the whole zip) and an extra field (for each file).
 async function readZipEntries(blob) {
   var bytes = new Uint8Array(await blob.arrayBuffer());
   var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -17,9 +20,17 @@ async function readZipEntries(blob) {
   if (end < 0) throw new Error('That isn’t a zip file.');
   var count = view.getUint16(end + 10, true);
   var at = view.getUint32(end + 16, true);
+  if ((count === 0xffff || at === 0xffffffff) && end >= 20 && view.getUint32(end - 20, true) === 0x07064b50) {
+    var record = zipUint64(view, end - 12);
+    zipCheck(bytes, record, 56);
+    if (view.getUint32(record, true) !== 0x06064b50) throw new Error('That zip is damaged.');
+    count = zipUint64(view, record + 32);
+    at = zipUint64(view, record + 48);
+  }
   var decoder = new TextDecoder();
   var entries = [];
   for (var n = 0; n < count; n++) {
+    zipCheck(bytes, at, 46);
     if (view.getUint32(at, true) !== 0x02014b50) break;
     var method = view.getUint16(at + 10, true);
     var compressed = view.getUint32(at + 20, true);
@@ -28,7 +39,19 @@ async function readZipEntries(blob) {
     var extraLength = view.getUint16(at + 30, true);
     var commentLength = view.getUint16(at + 32, true);
     var local = view.getUint32(at + 42, true);
+    zipCheck(bytes, at + 46, nameLength + extraLength);
     var name = decoder.decode(bytes.subarray(at + 46, at + 46 + nameLength));
+    // ZIP64's extra field (id 1): the real values, in this order, for
+    // just the fields that hold ffffffff.
+    for (var x = at + 46 + nameLength, xEnd = x + extraLength; x + 4 <= xEnd;) {
+      var id = view.getUint16(x, true), length = view.getUint16(x + 2, true), v = x + 4;
+      if (id === 1) {
+        if (size === 0xffffffff && v + 8 <= x + 4 + length) { size = zipUint64(view, v); v += 8; }
+        if (compressed === 0xffffffff && v + 8 <= x + 4 + length) { compressed = zipUint64(view, v); v += 8; }
+        if (local === 0xffffffff && v + 8 <= x + 4 + length) { local = zipUint64(view, v); v += 8; }
+      }
+      x += 4 + length;
+    }
     at += 46 + nameLength + extraLength + commentLength;
     if (/\/$/.test(name)) continue;
     entries.push(zipEntry(bytes, view, name, method, local, compressed, size));
@@ -36,12 +59,27 @@ async function readZipEntries(blob) {
   return entries;
 }
 
+function zipUint64(view, at) {
+  return view.getUint32(at, true) + view.getUint32(at + 4, true) * 4294967296;
+}
+
+// Reading past the end means a damaged or cut-short download.
+function zipCheck(bytes, at, length) {
+  if (!(at >= 0) || at + length > bytes.length) throw new Error('That zip is damaged or didn’t finish downloading.');
+}
+
 function zipEntry(bytes, view, name, method, local, compressed, size) {
   return {
     name:name.split('/').pop(),
     size:size,
     read:function() {
-      var start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+      try {
+        zipCheck(bytes, local, 30);
+        var start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+        zipCheck(bytes, start, compressed);
+      } catch (e) {
+        return Promise.reject(e);
+      }
       var data = bytes.slice(start, start + compressed);
       if (method === 0) return Promise.resolve(new Blob([data]));
       if (method === 8) return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
