@@ -17,8 +17,10 @@ function toggleMute() {
 }
 
 function keyboardSeek(delta) {
-  if (!_audio.duration) return;
-  _audio.currentTime = Math.max(0, Math.min(_audio.duration, _audio.currentTime + delta));
+  // Karaoke with the singer off plays through its own element (js/features/singer.js).
+  var el = typeof singerClock === 'function' ? singerClock() : _audio;
+  if (!el.duration) return;
+  el.currentTime = Math.max(0, Math.min(el.duration, el.currentTime + delta));
   updateMediaSessionPosition();
 }
 
@@ -81,7 +83,9 @@ document.addEventListener('keydown', function(e) {
     case ' ':
     case 'k':
     case 'K':
-      togglePlayback(); e.preventDefault(); break;
+      if (overlay && overlay.id === 'modal-karaoke' && typeof karaokeTogglePlay === 'function') karaokeTogglePlay();
+      else togglePlayback();
+      e.preventDefault(); break;
     case 'j':
     case 'J':
       keyboardSeek(-10); e.preventDefault(); break;

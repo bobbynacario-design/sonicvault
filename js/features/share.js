@@ -59,6 +59,8 @@ function makeTrackSnapshot(track, full) {
   };
   if (full) {
     snapshot.songStory = String(track.songStory || '');
+    // Visitors can sing along with the clean instrumental too (js/features/singer.js).
+    snapshot.instrumentalURL = String(track.instrumentalURL || '');
     snapshot.lyrics = getTrackLyrics(track);
     snapshot.lyricSync = publicLyricSync(track);
     snapshot.translation = publicTranslation(track);
@@ -425,7 +427,7 @@ function trackShareSignature(track) {
     track.title, track.genre, track.mood, track.audioURL, getCoverStyle(track), getTrackSummary(track),
     getTrackAITags(track).join(','), getTrackLyrics(track),
     sync ? sync.key + sync.at + sync.source + (sync.words ? sync.words.length : 0) : '',
-    tr ? tr.lang + tr.at : '', getRealPeaksForTrack(track).length, String(track.songStory || '')
+    tr ? tr.lang + tr.at : '', getRealPeaksForTrack(track).length, String(track.songStory || ''), String(track.instrumentalURL || '')
   ].join('|'));
 }
 

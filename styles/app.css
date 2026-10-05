@@ -3453,6 +3453,11 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .karaoke-bg-btn{display:inline-flex;align-items:center;gap:.45rem;height:44px;padding:0 1rem 0 .85rem;border:none;border-radius:999px;background:rgba(255,255,255,.1);color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer}
 .karaoke-bg-btn:hover{background:rgba(255,255,255,.18)}
 .karaoke-bg-btn .ic{width:16px;height:16px}
+.karaoke-singer-btn[hidden]{display:none}
+.karaoke-singer-btn.is-off{background:var(--k-accent, #fff);color:#10121c}
+.karaoke-singer-note{margin-top:.35rem;font-size:13px;line-height:1.5;color:rgba(255,255,255,.72)}
+.karaoke-singer-note[hidden]{display:none}
+.karaoke-link{padding:0;border:none;background:none;color:#fff;font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 .karaoke-close{flex:none;display:grid;place-items:center;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;cursor:pointer}
 .karaoke-close:hover{background:rgba(255,255,255,.18)}
 .karaoke-close .ic{width:18px;height:18px}

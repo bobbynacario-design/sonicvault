@@ -39,6 +39,7 @@ function openKaraoke() {
 
 // Called by closeModal however the view closes.
 function onKaraokeClosed() {
+  if (typeof onSingerKaraokeClosed === 'function') onSingerKaraokeClosed();
   if (_karaoke) cancelAnimationFrame(_karaoke.frame);
   _karaoke = null;
 }
@@ -87,6 +88,9 @@ function prepareKaraokeSong(track) {
   // Songs timed before word times were kept get them once.
   var sync = track && getLyricSync(track);
   if (sync && !sync.words && getVaultTrack(track.id) && lyricSyncEndpoint() && !_sungCheckJobs[track.id] && !_sungCheckFailed[track.id]) requestSungCheck(track);
+  // With the singer off, the next song plays without its singer too.
+  if (track && typeof singerFollowTrack === 'function') singerFollowTrack(track);
+  if (typeof renderSingerControls === 'function') renderSingerControls();
 }
 
 function karaokeLineWords(track, index, times) {
@@ -168,7 +172,8 @@ function karaokeFrame() {
   var track = karaokeTrack();
   var usable = karaokeAvailable(track) ? track : null;
   if ((usable ? usable.id : '') !== _karaoke.trackId || (usable && karaokeSongKey(usable) !== _karaoke.key)) prepareKaraokeSong(usable);
-  var t = _audio.currentTime || 0;
+  var clock = singerClock();
+  var t = clock.currentTime || 0;
   var times = usable ? getCurrentLyricTimes() : [];
   var index = usable && times ? currentLyricIndex(times, t, .25) : -1;
   if (index !== _karaoke.index) {
@@ -177,14 +182,14 @@ function karaokeFrame() {
   }
   if (usable && index >= 0) paintKaraokeWords(usable, index, times, t);
 
-  var playing = !_audio.paused;
+  var playing = !clock.paused;
   if (playing !== _karaoke.playing) {
     _karaoke.playing = playing;
     setPlayButton(document.getElementById('karaoke-play'), playing);
     document.getElementById('modal-karaoke').classList.toggle('k-paused', !playing);
   }
   if (karaokeBackground() === 'music') paintKaraokeLevel(usable || karaokeTrack(), t);
-  var duration = _audio.duration || 0;
+  var duration = clock.duration || _audio.duration || 0;
   document.getElementById('karaoke-fill').style.width = duration ? Math.min(100, t / duration * 100).toFixed(2) + '%' : '0%';
   document.getElementById('karaoke-time').textContent = fmtTime(t) + ' / ' + fmtTime(duration);
   var status = document.getElementById('karaoke-status');
@@ -197,8 +202,9 @@ function karaokeFrame() {
 function karaokeSeek(event) {
   var bar = event.currentTarget;
   var rect = bar.getBoundingClientRect();
-  if (!_audio.duration || !rect.width) return;
-  _audio.currentTime = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * _audio.duration;
+  var clock = singerClock();
+  if (!clock.duration || !rect.width) return;
+  clock.currentTime = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * clock.duration;
   updateMediaSessionPosition();
 }
 

@@ -61,6 +61,7 @@ var SHELL_ASSETS = [
   './js/features/meaning.js',
   './js/features/story.js',
   './js/features/karaoke.js',
+  './js/features/singer.js',
   './js/features/translate.js',
   './js/features/radio.js',
   './js/features/song-story.js',
