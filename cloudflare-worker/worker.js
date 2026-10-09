@@ -34,7 +34,7 @@
 import { handleShareRoute, readShare } from "./share.js";
 import { sendPush, isPushEndpoint, b64urlToBytes, bytesToB64url } from "./push.js";
 
-const MODEL_NAME = "claude-haiku-4-5";
+const MODEL_NAME = "claude-haiku-5-5";
 const WHISPER_MODEL = "@cf/openai/whisper-large-v3-turbo";
 // Lyria 3.5 makes full songs of a couple of minutes, vocals included. The
 // LYRIA_MODEL var can name another (lyria-3-clip-preview makes 30s clips).
@@ -51,7 +51,36 @@ const AUDIO_HOST = "res.cloudinary.com";
 const AUDIO_PATH_PREFIX = "/dtw4em0ob/";
 const MAX_AUDIO_BYTES = 30 * 1024 * 1024;
 const ANTHROPIC_VERSION = "2023-06-01";
-const MAX_TOKENS = 1024;
+// Haiku 5.5 thinks before it answers, and its thinking counts against this.
+const MAX_TOKENS = 4096;
+const COVER_STYLES = ["aurora", "vinyl", "poster", "scope", "prism", "mono", "pulse", "tape"];
+
+// Newer models refuse a started ("{") reply and any temperature, so the JSON
+// is held to these schemas instead (structured outputs).
+const METADATA_SCHEMA = {
+  type: "object",
+  properties: {
+    aiGenre: { type: "string" },
+    aiMood: { type: "string" },
+    aiTheme: { type: "string" },
+    aiEnergy: { type: "string", enum: ["High", "Medium", "Low"] },
+    aiVocalStyle: { type: "string" },
+    aiEra: { type: "string" },
+    aiInstruments: { type: "array", items: { type: "string" } },
+    aiTags: { type: "array", items: { type: "string" } },
+    aiSummary: { type: "string" },
+    coverStyle: { type: "string", enum: COVER_STYLES },
+    aiExplicit: { type: "boolean" }
+  },
+  required: ["aiGenre", "aiMood", "aiTheme", "aiEnergy", "aiVocalStyle", "aiEra", "aiInstruments", "aiTags", "aiSummary", "coverStyle", "aiExplicit"],
+  additionalProperties: false
+};
+const LYRICS_SCHEMA = {
+  type: "object",
+  properties: { title: { type: "string" }, lyrics: { type: "string" } },
+  required: ["title", "lyrics"],
+  additionalProperties: false
+};
 
 const SYSTEM_PROMPT = [
   "You are a strict music metadata extraction engine for SonicVault, a personal vault of AI-generated songs.",
@@ -170,14 +199,15 @@ export default {
     const anthropicBody = {
       model: model,
       max_tokens: MAX_TOKENS,
-      temperature: 0.25,
       system: SYSTEM_PROMPT,
-      messages: [
-        { role: "user", content: userText },
-        // Prefill the assistant turn with "{" so the model is forced to emit a
-        // bare JSON object; we re-add the leading brace before parsing.
-        { role: "assistant", content: "{" }
-      ]
+      messages: [{ role: "user", content: userText }],
+      output_config: Object.assign(
+        { format: { type: "json_schema", schema: METADATA_SCHEMA } },
+        // Tagging is simple work, so the default model thinks briefly. A
+        // model named in the app's settings keeps its own default: Haiku 4.5
+        // turns an effort setting away.
+        model === MODEL_NAME ? { effort: "low" } : {}
+      )
     };
 
     if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
@@ -232,6 +262,9 @@ export default {
       );
     }
 
+    const declined = refusalMessage(anthropicData);
+    if (declined) return jsonResponse({ error: declined }, 502, request, env);
+
     const text = extractAnthropicText(anthropicData);
     if (!text) {
       return jsonResponse(
@@ -244,8 +277,7 @@ export default {
 
     let metadata;
     try {
-      // Re-add the prefilled "{" before parsing.
-      metadata = extractJsonObject("{" + text);
+      metadata = extractJsonObject(text);
       metadata = normalizeMetadata(metadata);
       validateMetadata(metadata);
     } catch (err) {
@@ -525,12 +557,9 @@ async function handleLyrics(request, env) {
     response = await callAnthropic(env, {
       model: model,
       max_tokens: MAX_TOKENS,
-      temperature: 0.9,
       system: LYRICS_SYSTEM_PROMPT,
-      messages: [
-        { role: "user", content: userText },
-        { role: "assistant", content: "{" }
-      ]
+      messages: [{ role: "user", content: userText }],
+      output_config: { format: { type: "json_schema", schema: LYRICS_SCHEMA } }
     });
   } catch (err) {
     return jsonResponse({ error: "Could not reach Anthropic." }, 502, request, env);
@@ -547,9 +576,11 @@ async function handleLyrics(request, env) {
       env
     );
   }
+  const declined = refusalMessage(parsed);
+  if (declined) return jsonResponse({ error: declined }, 502, request, env);
   let song;
   try {
-    song = extractJsonObject("{" + extractAnthropicText(parsed || {}));
+    song = extractJsonObject(extractAnthropicText(parsed || {}));
   } catch (err) {
     song = null;
   }
@@ -1172,6 +1203,14 @@ function safeJsonParse(text) {
   }
 }
 
+// Haiku 5.5 runs safety filters that can decline a request: a normal 200
+// with stop_reason "refusal", whose text may not match the schema.
+function refusalMessage(data) {
+  if (!data || data.stop_reason !== "refusal") return "";
+  const category = cleanString(data.stop_details && data.stop_details.category);
+  return "Claude declined this one" + (category ? " (" + category + ")" : "") + ". Try rewording the prompt or lyrics.";
+}
+
 function extractAnthropicText(data) {
   try {
     if (!Array.isArray(data.content)) return "";
@@ -1239,7 +1278,7 @@ function validateMetadata(data) {
     throw new Error('Invalid value for "aiEnergy".');
   }
 
-  if (!["aurora", "vinyl", "poster", "scope", "prism", "mono", "pulse", "tape"].includes(data.coverStyle)) {
+  if (!COVER_STYLES.includes(data.coverStyle)) {
     throw new Error('Invalid value for "coverStyle".');
   }
 

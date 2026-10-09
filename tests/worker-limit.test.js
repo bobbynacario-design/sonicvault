@@ -7,7 +7,7 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
 const load = () => import(pathToFileURL(path.join(__dirname, "..", "cloudflare-worker", "worker.js")).href);
-const METADATA = '"aiGenre":"Pop","aiMood":"Warm","aiTheme":"Home","aiEnergy":"Medium","aiVocalStyle":"Lead","aiEra":"Modern","aiInstruments":["Guitar"],"aiTags":["home"],"aiSummary":"One. Two.","coverStyle":"tape","aiExplicit":false}';
+const METADATA = '{"aiGenre":"Pop","aiMood":"Warm","aiTheme":"Home","aiEnergy":"Medium","aiVocalStyle":"Lead","aiEra":"Modern","aiInstruments":["Guitar"],"aiTags":["home"],"aiSummary":"One. Two.","coverStyle":"tape","aiExplicit":false}';
 
 // Just enough of D1 for the usage table: the create, and the counting upsert.
 function fakeD1({ broken } = {}) {
