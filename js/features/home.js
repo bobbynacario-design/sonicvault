@@ -175,6 +175,7 @@ function buildLibrarySkeleton() {
 function renderLibraryHome() {
   var el = document.getElementById('library-home');
   if (!el) return;
+  renderAskCard();
 
   if (!tracks.length && window.svBootPending) {
     el.innerHTML = buildLibrarySkeleton();

@@ -590,6 +590,7 @@ function renderTakes() {
 }
 
 function renderCreate() {
+  renderSongLab();
   hydrateCreateForm();
   renderTakes();
   renderCreateSetup();

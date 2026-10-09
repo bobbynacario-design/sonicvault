@@ -96,6 +96,28 @@ function queueSong(id, where) {
   showToast((where === 'next' ? 'Playing next: ' : 'Added to queue: ') + (track.title || 'Untitled'));
 }
 
+// Several songs onto the end of the queue at once (Ask your vault), with one
+// toast. With nothing playing, they play.
+function queueSongs(ids) {
+  var list = (ids || []).filter(function(id) { return getTrackById(id); });
+  if (!list.length) return;
+  if (!_currentTrack) {
+    startPlayback(list[0], list, 'Your queue');
+    return;
+  }
+  if (_playQueueIds.indexOf(_currentTrack.id) === -1) _playQueueIds.unshift(_currentTrack.id);
+  var shuffled = _shuffleMode && _shuffleOrder.length === _playQueueIds.length;
+  list.forEach(function(id) {
+    if (id === _currentTrack.id) return;
+    _playQueueIds = queueWithSong(_playQueueIds, _currentTrack.id, id, 'end');
+    if (shuffled) _shuffleOrder = queueWithSong(_shuffleOrder, _currentTrack.id, id, 'end');
+  });
+  updateMediaSession();
+  updateNowPlaying();
+  if (typeof updateExpandedPlayer === 'function') updateExpandedPlayer();
+  showToast('Added ' + list.length + (list.length === 1 ? ' song' : ' songs') + ' to the queue');
+}
+
 function queueMenuItems(track) {
   var stop = 'event.stopPropagation();closeAllCardMenus();';
   return '<button role="menuitem" onclick="' + stop + 'queueSong(' + jsq(track.id) + ', &quot;next&quot;)">Play next</button>'

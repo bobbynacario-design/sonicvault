@@ -142,6 +142,8 @@ export default {
     if (route === "/embed") return handleEmbed(request, env);
     if (route === "/translate") return handleTranslate(request, env);
     if (route === "/story") return handleSongStory(request, env);
+    if (route === "/songlab") return handleSongLab(request, env);
+    if (route === "/ask") return handleAsk(request, env);
     if (route === "/listens") return handleListens(request, env);
     if (route === "/followers") return handleFollowers(request, env);
     if (route === "/notify") return handleNotify(request, env);
@@ -201,13 +203,8 @@ export default {
       max_tokens: MAX_TOKENS,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userText }],
-      output_config: Object.assign(
-        { format: { type: "json_schema", schema: METADATA_SCHEMA } },
-        // Tagging is simple work, so the default model thinks briefly. A
-        // model named in the app's settings keeps its own default: Haiku 4.5
-        // turns an effort setting away.
-        model === MODEL_NAME ? { effort: "low" } : {}
-      )
+      // Tagging is simple work, so the default model thinks briefly.
+      output_config: Object.assign({ format: { type: "json_schema", schema: METADATA_SCHEMA } }, effortFor(model, "low"))
     };
 
     if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
@@ -818,6 +815,277 @@ async function handleSongStory(request, env) {
   return jsonResponse({ story: story }, 200, request, env);
 }
 
+// ── Song lab ─────────────────────────────────────────────────────────────
+// POST /songlab { idea, language, examples: [{ title, sound, lyrics }],
+//                 previous: { title, style, lyrics }, change, model? }
+// -> { title, style, lyrics, about }
+// The songwriter's next song, ready to paste into Suno: a style for its
+// Style of Music box and a lyric sheet, in the voice of the songs they love
+// most (the examples, picked by the app -- js/data/song-lab.js). With a
+// previous draft and a change, that draft rewritten. Written by the writing
+// model, like translations and stories.
+
+const MAX_LAB_EXAMPLES = 8;
+const MAX_LAB_IDEA = 1000;
+const MAX_LAB_CHANGE = 500;
+const MAX_LAB_SOUND = 800;
+const MAX_LAB_EXAMPLE_LYRICS = 2500;
+const MAX_LAB_TOKENS = 8192;
+const LAB_LANGUAGES = ["Like my songs", "English", "Tagalog", "Bikol", "Taglish"];
+const SONGLAB_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    style: { type: "string" },
+    lyrics: { type: "string" },
+    about: { type: "string" }
+  },
+  required: ["title", "style", "lyrics", "about"],
+  additionalProperties: false
+};
+const SONGLAB_SYSTEM_PROMPT = [
+  "You are a songwriting partner for one songwriter, who makes songs with Suno and keeps them in SonicVault.",
+  "They write in English, Tagalog and Bikol (Central Bikol, from the Bicol region of the Philippines): real Bikol, not Tagalog with a few Bikol words, and never Hiligaynon, Cebuano or Waray.",
+  "You get some of the songs they love most: each one's title, its sound (the style they gave Suno, or a description of it) and its lyrics. Learn their voice from these -- what they write about, the images and words they reach for, how their verses and choruses are built, the sounds they favour -- and write a new, original song in it. Never reuse their lines, titles or hooks.",
+  "When there is an idea, the song is about it. With none, choose a subject close to what they write about, but not a song they have already written.",
+  "Write in the language asked for. Taglish is Tagalog and English mixed the way people talk. \"Like my songs\" means the language their songs mostly use, or the idea's own language.",
+  "Concrete images over abstractions. Rhyme naturally or not at all. Lines that sit well when sung.",
+  "The reply is JSON:",
+  "- title: short, in the song's language.",
+  "- style: for Suno's Style of Music box: comma-separated genre, mood, instruments, voice, tempo and production, under 250 characters. Never name a real artist, band or song; Suno refuses them.",
+  "- lyrics: the sheet for Suno's lyrics box. Each section's tag alone on a line in square brackets: [Intro], [Verse 1], [Pre-Chorus], [Chorus], [Verse 2], [Bridge], [Outro]. Suno sings every other line, so write only what is sung; backing vocals go in (parentheses) after a line. About three minutes: two or three verses, a chorus that comes back, at most one bridge, under 2,500 characters.",
+  "- about: one or two plain sentences in English: what the song is about, and what of their songs it draws on.",
+  "Given a previous draft and a change, rewrite the draft with that change and keep what works."
+].join("\n");
+
+async function handleSongLab(request, env) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return jsonResponse({ error: "Worker secret ANTHROPIC_API_KEY is not configured." }, 500, request, env);
+  }
+  const payload = await readJsonBody(request);
+  if (!payload) {
+    return jsonResponse({ error: "Request body must be valid JSON." }, 400, request, env);
+  }
+  const idea = cleanString(payload.idea).slice(0, MAX_LAB_IDEA);
+  const language = LAB_LANGUAGES.includes(cleanString(payload.language)) ? cleanString(payload.language) : LAB_LANGUAGES[0];
+  const examples = (Array.isArray(payload.examples) ? payload.examples : []).slice(0, MAX_LAB_EXAMPLES).map(function (song) {
+    return {
+      title: cleanString(song && song.title).slice(0, MAX_SONG_TITLE),
+      sound: cleanString(song && song.sound).slice(0, MAX_LAB_SOUND),
+      lyrics: cleanString(song && song.lyrics).slice(0, MAX_LAB_EXAMPLE_LYRICS)
+    };
+  }).filter(function (song) { return song.sound || song.lyrics; });
+  const previous = payload.previous && typeof payload.previous === "object" ? {
+    title: cleanString(payload.previous.title).slice(0, MAX_SONG_TITLE),
+    style: cleanString(payload.previous.style).slice(0, MAX_SONG_STYLE),
+    lyrics: cleanString(payload.previous.lyrics).slice(0, MAX_SONG_LYRICS)
+  } : null;
+  const change = cleanString(payload.change).slice(0, MAX_LAB_CHANGE);
+  if (change && !(previous && previous.lyrics)) {
+    return jsonResponse({ error: "Send the draft to change along with the change." }, 400, request, env);
+  }
+  if (!examples.length && !idea && !change) {
+    return jsonResponse({ error: "Give an idea, or have a few songs with lyrics to learn from." }, 400, request, env);
+  }
+
+  const lines = [
+    "Language: " + language,
+    "Idea: " + (idea || "(none: choose a subject close to what they write about)")
+  ];
+  if (examples.length) {
+    lines.push("", "Songs they love most:");
+    examples.forEach(function (song, i) {
+      lines.push("", (i + 1) + ". " + (song.title || "Untitled"));
+      if (song.sound) lines.push("Sound: " + song.sound);
+      if (song.lyrics) lines.push("Lyrics:", song.lyrics);
+    });
+  }
+  if (change) {
+    lines.push("", "Previous draft:", "Title: " + previous.title, "Style: " + previous.style, "Lyrics:", previous.lyrics, "", "Change: " + change);
+  }
+
+  const model = cleanString(payload.model) || cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL;
+  if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
+
+  let response;
+  try {
+    response = await callAnthropic(env, {
+      model: model,
+      max_tokens: MAX_LAB_TOKENS,
+      system: SONGLAB_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: lines.join("\n") }],
+      output_config: Object.assign({ format: { type: "json_schema", schema: SONGLAB_SCHEMA } }, effortFor(model, "medium"))
+    });
+  } catch (err) {
+    return jsonResponse({ error: "Could not reach Anthropic." }, 502, request, env);
+  }
+  const rawText = await response.text();
+  const parsed = safeJsonParse(rawText);
+  if (!response.ok) {
+    const apiError = parsed && parsed.error ? parsed.error : {};
+    const reason = anthropicReason(response.status, apiError, rawText);
+    return jsonResponse(
+      { error: "Anthropic API request failed (" + response.status + "): " + reason },
+      response.status === 429 ? 429 : 502,
+      request,
+      env
+    );
+  }
+  const declined = refusalMessage(parsed);
+  if (declined) return jsonResponse({ error: declined }, 502, request, env);
+  let song;
+  try {
+    song = extractJsonObject(extractAnthropicText(parsed || {}));
+  } catch (err) {
+    song = null;
+  }
+  const lyrics = cleanString(song && song.lyrics).slice(0, MAX_SONG_LYRICS);
+  if (!lyrics) {
+    return jsonResponse({ error: "Claude returned no lyrics. Try again." }, 502, request, env);
+  }
+  return jsonResponse({
+    title: cleanString(song.title).slice(0, MAX_SONG_TITLE),
+    style: cleanString(song.style).slice(0, MAX_SONG_STYLE),
+    lyrics: lyrics,
+    about: cleanString(song.about).slice(0, 600)
+  }, 200, request, env);
+}
+
+// ── Ask your vault ───────────────────────────────────────────────────────
+// POST /ask { question, catalog, passages, history: [{ q, a, songs, action }], today }
+// -> { answer, songs: [ids], action: "none" | "play" | "queue" | "playlist", playlistName }
+// The app writes the whole vault out as a catalog (js/data/ask.js): a line
+// per song, with the totals already counted at the top. With the question
+// come the lyrics of the songs closest to it in meaning. The catalog sits in
+// the system prompt behind a cache breakpoint, so a follow-up within five
+// minutes reads it from the cache at a tenth of the price.
+
+const MAX_ASK_QUESTION = 500;
+const MAX_ASK_CATALOG = 600000;
+const MAX_ASK_PASSAGES = 40000;
+const MAX_ASK_HISTORY = 6;
+const MAX_ASK_SONGS = 30;
+const ASK_ACTIONS = ["none", "play", "queue", "playlist"];
+const ASK_SCHEMA = {
+  type: "object",
+  properties: {
+    answer: { type: "string" },
+    songs: { type: "array", items: { type: "string" } },
+    action: { type: "string", enum: ASK_ACTIONS },
+    playlistName: { type: "string" }
+  },
+  required: ["answer", "songs", "action", "playlistName"],
+  additionalProperties: false
+};
+const ASK_SYSTEM_PROMPT = [
+  "You are the assistant in SonicVault, one songwriter's private vault of their own songs, most made with Suno, in English, Tagalog and Bikol.",
+  "Answer their questions about their songs, and pick songs for them to play, from the vault below: one line per song, its id in [brackets], with the totals counted at the top. The lyrics of the songs closest to a question come with it.",
+  "Use only what the vault says. Never invent a song, a number, a line or a fact; when the vault can't answer, say so. Where a total at the top answers a question, use it rather than counting lines.",
+  "Talk to them as \"you\", warmly and briefly: a sentence or three, or a short list. Name songs by their titles.",
+  "The reply is JSON:",
+  "- answer: what you say.",
+  "- songs: the ids of the songs the answer is about, or that fit what they asked for, best first, at most 30, exactly as written in the vault. Empty when no particular songs apply.",
+  "- action: \"play\" when they ask to play, hear or put on something; \"queue\" when they ask to add songs to what is playing or up next; \"playlist\" when they ask for a playlist to be made or saved; otherwise \"none\".",
+  "- playlistName: a short name for the playlist when action is \"playlist\", otherwise empty.",
+  "The app starts playing or queues the songs as soon as you answer. A playlist is only saved when they tap Save, so offer it (\"here's a playlist you can save\") rather than saying it is saved.",
+  "For a length of time (\"30 minutes of...\"), choose songs whose lengths add up to about that."
+].join("\n");
+
+function askIds(list) {
+  return Array.isArray(list) ? list.map(cleanString).filter(Boolean).slice(0, 40) : [];
+}
+
+async function handleAsk(request, env) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return jsonResponse({ error: "Worker secret ANTHROPIC_API_KEY is not configured." }, 500, request, env);
+  }
+  const payload = await readJsonBody(request);
+  if (!payload) {
+    return jsonResponse({ error: "Request body must be valid JSON." }, 400, request, env);
+  }
+  const question = cleanString(payload.question).slice(0, MAX_ASK_QUESTION);
+  const catalog = cleanString(payload.catalog);
+  if (!question || !catalog) {
+    return jsonResponse({ error: "Ask a question about a vault with songs in it." }, 400, request, env);
+  }
+  if (catalog.length > MAX_ASK_CATALOG) {
+    return jsonResponse({ error: "The vault is too big to send with a question." }, 413, request, env);
+  }
+  const passages = cleanString(payload.passages).slice(0, MAX_ASK_PASSAGES);
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(cleanString(payload.today)) ? cleanString(payload.today) : new Date().toISOString().slice(0, 10);
+
+  // Earlier turns go back as they were answered, so a follow-up ("only the
+  // Bikol ones") has something to follow.
+  const messages = [];
+  (Array.isArray(payload.history) ? payload.history : []).slice(-MAX_ASK_HISTORY).forEach(function (turn) {
+    const q = cleanString(turn && turn.q).slice(0, MAX_ASK_QUESTION);
+    const a = cleanString(turn && turn.a).slice(0, 2000);
+    if (!q || !a) return;
+    messages.push({ role: "user", content: "Question: " + q });
+    messages.push({ role: "assistant", content: JSON.stringify({
+      answer: a,
+      songs: askIds(turn.songs),
+      action: ASK_ACTIONS.includes(turn.action) ? turn.action : "none",
+      playlistName: ""
+    }) });
+  });
+  messages.push({ role: "user", content: "Question: " + question + (passages ? "\n\nLyrics of the songs closest to this question:\n\n" + passages : "") });
+
+  const model = cleanString(payload.model) || MODEL_NAME;
+  if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
+
+  let response;
+  try {
+    response = await callAnthropic(env, {
+      model: model,
+      max_tokens: MAX_TOKENS,
+      system: [
+        { type: "text", text: ASK_SYSTEM_PROMPT + "\nToday is " + today + "." },
+        { type: "text", text: "The vault:\n" + catalog, cache_control: { type: "ephemeral" } }
+      ],
+      messages: messages,
+      output_config: Object.assign({ format: { type: "json_schema", schema: ASK_SCHEMA } }, effortFor(model, "low"))
+    });
+  } catch (err) {
+    return jsonResponse({ error: "Could not reach Anthropic." }, 502, request, env);
+  }
+  const rawText = await response.text();
+  const parsed = safeJsonParse(rawText);
+  if (!response.ok) {
+    const apiError = parsed && parsed.error ? parsed.error : {};
+    const reason = anthropicReason(response.status, apiError, rawText);
+    return jsonResponse(
+      { error: "Anthropic API request failed (" + response.status + "): " + reason },
+      response.status === 429 ? 429 : 502,
+      request,
+      env
+    );
+  }
+  const declined = refusalMessage(parsed);
+  if (declined) return jsonResponse({ error: declined }, 502, request, env);
+  let reply;
+  try {
+    reply = extractJsonObject(extractAnthropicText(parsed || {}));
+  } catch (err) {
+    reply = null;
+  }
+  const answer = cleanString(reply && reply.answer).slice(0, 3000);
+  if (!answer) {
+    return jsonResponse({ error: "Claude's answer came back unreadable. Try again." }, 502, request, env);
+  }
+  // Only songs that are in the vault: an id Claude made up goes no further.
+  const songs = askIds(reply.songs).filter(function (id, i, all) {
+    return all.indexOf(id) === i && catalog.includes("[" + id + "]");
+  }).slice(0, MAX_ASK_SONGS);
+  const action = ASK_ACTIONS.includes(reply.action) ? reply.action : "none";
+  return jsonResponse({
+    answer: answer,
+    songs: songs,
+    action: songs.length ? action : "none",
+    playlistName: action === "playlist" ? cleanString(reply.playlistName).slice(0, 80) : ""
+  }, 200, request, env);
+}
+
 // ── Plays and hearts on share links ──────────────────────────────────────
 // POST /listen { id, kind: "play" | "heart", pos } from a share page, no
 // token: counted only for a song that really is shared (its public record
@@ -1201,6 +1469,13 @@ function safeJsonParse(text) {
   } catch (err) {
     return null;
   }
+}
+
+// How hard the models these routes default to think. A model named in the
+// app's settings keeps its own default: Haiku 4.5 turns an effort setting
+// away.
+function effortFor(model, effort) {
+  return model === MODEL_NAME || model === TRANSLATE_MODEL ? { effort: effort } : {};
 }
 
 // Haiku 5.5 runs safety filters that can decline a request: a normal 200
