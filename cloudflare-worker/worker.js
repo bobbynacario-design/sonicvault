@@ -535,6 +535,8 @@ const SONG_VOICE_PROMPT = [
   "You get some of their songs, newest first: each one's title, when it was made, its sound and its lyrics. The newest show how they write now; follow those most closely -- the way they talk, how long their lines run, how plain or figurative they get, whether and how they rhyme, how they build a song and tag its sections. Older songs show what they have loved. Write a new song that sounds like the same person wrote it next. Never reuse their lines, titles or hooks.",
   "What makes their best songs work: one specific situation rather than a theme, small details only this person would notice, plain conversational lines that turn somewhere unexpected, and restraint. Leave out lessons, slogans and motivational stock phrases, and any rhyme that bends a line out of shape.",
   "When there is an idea, the song is about it. With none, find a small, specific moment that none of their songs and none of the recent drafts listed already cover.",
+  // Drafts kept furnishing every song from the same Filipino home (2026-10-10).
+  "Give each song details of its own. Drafts have kept reaching for the same household props -- slippers, the gate, a rice cooker, a rooster, a ceiling fan, the electric bill, coffee at dawn -- so leave those out unless the idea asks for one, along with the images the recent drafts listed were built on, and find what this one moment alone would have.",
   "Write in the language asked for. Taglish is Tagalog and English mixed the way they mix them in their songs. \"Like my songs\" means the language of their newest songs, or the idea's own language."
 ].join("\n");
 
@@ -579,9 +581,9 @@ function songVoiceLines(examples, avoid) {
       if (song.lyrics) lines.push("Lyrics:", song.lyrics);
     });
   }
-  const recent = (Array.isArray(avoid) ? avoid : []).map(function (item) { return cleanString(item).slice(0, 240); }).filter(Boolean).slice(0, MAX_AVOID);
+  const recent = (Array.isArray(avoid) ? avoid : []).map(function (item) { return cleanString(item).slice(0, 320); }).filter(Boolean).slice(0, MAX_AVOID);
   if (recent.length) {
-    lines.push("", "Recent drafts, so write about something else:");
+    lines.push("", "Recent drafts, so write about something else and leave their images alone:");
     recent.forEach(function (item) { lines.push("- " + item); });
   }
   return lines;
@@ -901,17 +903,20 @@ const SONGLAB_SCHEMA = {
     title: { type: "string" },
     style: { type: "string" },
     lyrics: { type: "string" },
-    about: { type: "string" }
+    about: { type: "string" },
+    images: { type: "array", items: { type: "string" } }
   },
-  required: ["title", "style", "lyrics", "about"],
+  required: ["title", "style", "lyrics", "about", "images"],
   additionalProperties: false
 };
+const MAX_LAB_IMAGES = 8;
 const SONGLAB_SYSTEM_PROMPT = SONG_VOICE_PROMPT + "\n" + [
   "The reply is JSON:",
   "- title: short, in the song's language.",
   "- style: for Suno's Style of Music box: genre, mood, instruments, voice, tempo and production as comma-separated descriptors, under 300 characters. Never name a real artist, band or song; Suno refuses them.",
   "- lyrics: the sheet for Suno's lyrics box. Each section tag alone on its own line in square brackets, the way their songs tag them; a production cue goes inside the tag after a dash, as they write it ([Bridge - mandolin only, then bass enters]). Suno sings every line that isn't in square brackets, so no stage directions or sound descriptions in the lyrics, in parentheses or otherwise; parentheses only for sung backing vocals. About three minutes, under 2,500 characters.",
   "- about: one or two plain sentences in English: what the song is about, and which of their songs it draws on.",
+  "- images: the three to six concrete things the song is built on -- objects, places, sounds -- a few words each, in English. Later drafts are asked to steer clear of them.",
   "Given a previous draft and a change, rewrite the draft with that change and keep what works."
 ].join("\n");
 
@@ -991,7 +996,8 @@ async function handleSongLab(request, env) {
     title: cleanString(song.title).slice(0, MAX_SONG_TITLE),
     style: cleanString(song.style).slice(0, MAX_SONG_STYLE),
     lyrics: lyrics,
-    about: cleanString(song.about).slice(0, 600)
+    about: cleanString(song.about).slice(0, 600),
+    images: (Array.isArray(song.images) ? song.images : []).map(function (image) { return cleanString(image).slice(0, 40); }).filter(Boolean).slice(0, MAX_LAB_IMAGES)
   }, 200, request, env);
 }
 

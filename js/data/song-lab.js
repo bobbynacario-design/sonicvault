@@ -92,6 +92,7 @@ function songLabDraft(raw, request, now) {
     style:String(raw && raw.style || '').trim().slice(0, 1000),
     lyrics:String(raw && raw.lyrics || '').trim().slice(0, 6000),
     about:String(raw && raw.about || '').trim().slice(0, 600),
+    images:(Array.isArray(raw && raw.images) ? raw.images : []).map(function(image) { return String(image || '').trim().slice(0, 40); }).filter(Boolean).slice(0, 8),
     idea:String(ask.idea || '').trim().slice(0, 1000),
     change:String(ask.change || '').trim().slice(0, 500),
     language:String(ask.language || ''),
@@ -137,14 +138,15 @@ function songLabMadeAs(draft, list) {
   })[0] || null;
 }
 
-// The newest drafts as a line each -- title, then what it is about -- for
-// the worker to steer clear of, so a draft with no idea isn't the last one
-// again.
+// The newest drafts as a line each -- title, what it is about, and the
+// images it was built on -- for the worker to steer clear of, so a draft
+// with no idea isn't the last one again, furnished with the same things.
 function songLabAvoidList(drafts, count) {
   return (Array.isArray(drafts) ? drafts : []).filter(function(draft) {
     return draft && draft.title;
   }).slice(0, count || 6).map(function(draft) {
-    return trimText(draft.title + (draft.about ? ': ' + draft.about : ''), 240);
+    var images = Array.isArray(draft.images) && draft.images.length ? ' (images: ' + draft.images.join(', ') + ')' : '';
+    return trimText(draft.title + (draft.about ? ': ' + draft.about : '') + images, 320);
   });
 }
 

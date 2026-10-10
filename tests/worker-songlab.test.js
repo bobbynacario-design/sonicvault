@@ -36,7 +36,7 @@ const claude = (answer, extra = {}) => async () => new Response(JSON.stringify({
   ...extra
 }));
 
-const DRAFT = { title: "Ilaw sa Pantalan", style: "acoustic folk, warm female vocal, 90 BPM", lyrics: "[Verse 1]\nAn mga ilaw", about: "A homecoming." };
+const DRAFT = { title: "Ilaw sa Pantalan", style: "acoustic folk, warm female vocal, 90 BPM", lyrics: "[Verse 1]\nAn mga ilaw", about: "A homecoming.", images: ["harbour lights", "a tied boat"] };
 const EXAMPLES = [{ title: "Harbour Lights", sound: "warm folk", lyrics: "[Verse]\nThe boats come home" }, { title: "", sound: "", lyrics: "" }];
 
 test("/songlab writes in the songwriter's voice, from their songs, with the writing model", async () => {
@@ -48,7 +48,9 @@ test("/songlab writes in the songwriter's voice, from their songs, with the writ
   assert.equal(sent.temperature, undefined);
   assert.equal(sent.messages.length, 1);
   assert.equal(sent.output_config.effort, "high");
-  assert.deepEqual(sent.output_config.format.schema.required, ["title", "style", "lyrics", "about"]);
+  assert.deepEqual(sent.output_config.format.schema.required, ["title", "style", "lyrics", "about", "images"]);
+  assert.match(sent.system, /same household props -- slippers, the gate, a rice cooker/, "the props drafts kept reaching for are named");
+  assert.match(sent.system, /unless the idea asks for one/);
   assert.match(sent.system, /Central Bikol/);
   assert.match(sent.system, /Never name a real artist/);
   assert.match(sent.system, /newest show how they write now/);
@@ -57,7 +59,7 @@ test("/songlab writes in the songwriter's voice, from their songs, with the writ
   assert.match(text, /^Language: Bikol\nIdea: my father's boat\n/);
   assert.match(text, /Their songs, newest first:\n\n1\. Harbour Lights\nSound: warm folk\nLyrics:\n\[Verse\]\nThe boats come home/);
   assert.doesNotMatch(text, /2\. /, "an empty example is left out");
-  assert.match(text, /Recent drafts, so write about something else:\n- Kape sa Madaling Araw: a quiet morning\n- Tahimik na Pundasyon$/);
+  assert.match(text, /Recent drafts, so write about something else and leave their images alone:\n- Kape sa Madaling Araw: a quiet morning\n- Tahimik na Pundasyon$/);
 });
 
 test("/songlab rewrites a draft with a change; an unknown language means like my songs", async () => {
