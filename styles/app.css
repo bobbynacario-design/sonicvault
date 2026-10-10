@@ -3500,6 +3500,49 @@ body.light #sv-toast{background:rgba(255,255,255,.96);color:#171414}
 .karaoke-bar{background:linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) center / 100% 4px no-repeat;border-radius:999px}
 .karaoke-time{flex:none;font-family:var(--mono);font-size:12px;color:rgba(255,255,255,.7)}
 .karaoke-status{min-height:1.2em;margin-top:.5rem;font-size:12.5px;color:rgba(255,255,255,.55)}
+/* Sing it and keep it (js/features/sing.js): the record button by play, the
+   count-in over the words, the dialogs above karaoke (105). */
+.karaoke-record{flex:none;display:grid;place-items:center;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,.12);color:#ff5a5f;cursor:pointer;transition:background .16s ease,transform .16s ease}
+.karaoke-record[hidden]{display:none}
+.karaoke-record:hover{background:rgba(255,255,255,.2)}
+.karaoke-record .ic{width:20px;height:20px}
+.karaoke-record.is-recording{background:#ff5a5f;color:#fff;animation:k-rec 1.4s ease-in-out infinite}
+.karaoke-record[disabled]{opacity:.5;cursor:default}
+@keyframes k-rec{0%,100%{box-shadow:0 0 0 0 rgba(255,90,95,.55)}50%{box-shadow:0 0 0 10px rgba(255,90,95,0)}}
+.karaoke-middle{position:relative}
+.karaoke-countdown{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display, inherit);font-size:min(30vw, 220px);font-weight:800;line-height:1;color:#fff;text-shadow:0 8px 40px rgba(0,0,0,.45);pointer-events:none}
+.karaoke-countdown[hidden]{display:none}
+.karaoke-sing-note .sing-dot{display:inline-block;width:8px;height:8px;margin-right:.45rem;border-radius:50%;background:#ff5a5f;vertical-align:.08em;animation:k-dot 1s steps(2, start) infinite}
+@keyframes k-dot{to{visibility:hidden}}
+@media (prefers-reduced-motion:reduce){.karaoke-record.is-recording,.karaoke-sing-note .sing-dot{animation:none}}
+.modal-overlay.over-karaoke{z-index:110}
+.take-modal,.takes-modal{max-width:520px}
+.take-player{display:flex;align-items:center;gap:.85rem;margin:1.1rem 0 .4rem}
+.take-play{flex:none;display:grid;place-items:center;width:48px;height:48px;border:none;border-radius:50%;background:var(--text);color:var(--bg);cursor:pointer}
+.take-play[disabled]{opacity:.4;cursor:default}
+.take-play .ic{width:20px;height:20px}
+.take-bar{flex:1;height:22px;display:flex;align-items:center;cursor:pointer;background:linear-gradient(var(--surface-hover), var(--surface-hover)) center / 100% 4px no-repeat;border-radius:999px}
+.take-bar span{display:block;height:4px;width:0;border-radius:999px;background:var(--accent-dynamic)}
+.take-time{flex:none;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.take-slider{display:block;margin-top:1rem;font-size:13.5px;font-weight:600}
+.take-slider b{margin-left:.35rem;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--accent-dynamic)}
+.take-range{display:block;width:100%;margin:.45rem 0 0;accent-color:var(--accent-dynamic)}
+.take-range-ends{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted2)}
+.takes-list{display:grid;gap:.4rem;margin-top:1rem}
+.take-row{display:flex;align-items:center;gap:.75rem;padding:.55rem .7rem;border-radius:12px;background:var(--surface)}
+.take-row-play{flex:none;display:grid;place-items:center;width:38px;height:38px;border:none;border-radius:50%;background:var(--text);color:var(--bg);cursor:pointer}
+.take-row-play .ic{width:16px;height:16px}
+.take-row-text{flex:1;min-width:0}
+.take-row-when{font-size:14px;font-weight:600}
+.take-row-sub{font-size:12px;color:var(--muted)}
+.take-row-link{display:inline-flex;align-items:center;gap:.3rem;min-height:36px;padding:0 .55rem;border:none;border-radius:999px;background:none;color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer}
+.take-row-link:hover{background:var(--surface-hover);color:var(--text)}
+.take-row-link .ic{width:15px;height:15px}
+.take-row-delete[data-sure]{color:#ff5a5f}
+@media (max-width:640px){
+  .take-row-link span{display:none}
+  .karaoke-bottom{gap:.7rem}
+}
 @media (max-width:640px){
   .karaoke-stage{padding-left:20px;padding-right:20px}
   .karaoke-bg-btn{width:44px;padding:0;justify-content:center}

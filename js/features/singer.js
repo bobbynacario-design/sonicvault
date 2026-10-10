@@ -89,6 +89,9 @@ function singerClock() {
 }
 
 function karaokeTogglePlay() {
+  // Mid-recording, play/pause (and Space) means stop: a paused song under a
+  // running mic would put the voice against the wrong music.
+  if (typeof singRecording === 'function' && singRecording()) { stopSingRecording(); return; }
   if (!_singer.off) { togglePlayback(); return; }
   var audio = _singer.audio;
   if (audio.paused) {
@@ -128,6 +131,7 @@ function loadSingerTrack(track, at, play) {
 function setSingerOff(off) {
   var track = karaokeTrack();
   if (!track || off === _singer.off) return;
+  if (!off && typeof singRecording === 'function' && singRecording()) stopSingRecording();
   if (off) {
     if (!singerSupported()) { showToast('This browser can’t take the singer out.'); return; }
     var at = _audio.currentTime || 0;
@@ -162,6 +166,8 @@ function toggleSinger() {
 // The main player starts it muted and is paused again once it plays.
 function onSingerEnded() {
   if (!_singer.off) return;
+  // A take ends with the song, and stays on it.
+  if (typeof singRecording === 'function' && singRecording()) { stopSingRecording(); return; }
   var before = _currentTrack && _currentTrack.id;
   playNext();
   if (!_currentTrack || _currentTrack.id === before) return;
@@ -172,6 +178,7 @@ function onSingerEnded() {
 // A different song while the singer is off (Next, or the queue): follow it.
 function singerFollowTrack(track) {
   if (!_singer.off || !track || _singer.trackId === track.id) return;
+  if (typeof singRecording === 'function' && singRecording()) stopSingRecording();
   _audio.muted = true;
   pauseMainForSinger();
   loadSingerTrack(track, _audio.currentTime || 0, true);
@@ -311,6 +318,35 @@ function loadLame() {
   return _lamePromise;
 }
 
+// A 192 kbps stereo MP3 of left/right (Float32, -1..1) as Blob parts. The
+// peak is brought just under full scale if it ran past it (parts or a voice
+// added together can). Yields between blocks so onProgress(percent) shows.
+async function encodeMp3(left, right, rate, onProgress) {
+  var length = left.length;
+  var peak = 0;
+  for (var s = 0; s < length; s++) peak = Math.max(peak, Math.abs(left[s]), Math.abs(right[s]));
+  var scale = peak > .98 ? .98 / peak : 1;
+  var lame = await loadLame();
+  var encoder = new lame.Mp3Encoder(2, rate, 192);
+  var chunks = [];
+  var block = 1152 * 40;
+  var l16 = new Int16Array(block), r16 = new Int16Array(block);
+  for (var at = 0; at < length; at += block) {
+    var n = Math.min(block, length - at);
+    for (s = 0; s < n; s++) {
+      l16[s] = Math.max(-32768, Math.min(32767, Math.round(left[at + s] * scale * 32767)));
+      r16[s] = Math.max(-32768, Math.min(32767, Math.round(right[at + s] * scale * 32767)));
+    }
+    var out = encoder.encodeBuffer(n === block ? l16 : l16.subarray(0, n), n === block ? r16 : r16.subarray(0, n));
+    if (out.length) chunks.push(new Uint8Array(out));
+    if (onProgress) onProgress(Math.round(Math.min(1, (at + n) / length) * 100));
+    await new Promise(function(resolve) { setTimeout(resolve, 0); });
+  }
+  var tail = encoder.flush();
+  if (tail.length) chunks.push(new Uint8Array(tail));
+  return chunks;
+}
+
 function isZipFile(file) {
   return /\.zip$/i.test(file.name) || /zip/.test(file.type || '');
 }
@@ -428,29 +464,8 @@ async function makeKaraokeTrack() {
       var b = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : a;
       for (var s = 0; s < buffer.length; s++) { left[s] += a[s]; right[s] += b[s]; }
     }
-    // Parts added together can run past full scale; bring the peak just under it.
-    var peak = 0;
-    for (s = 0; s < length; s++) peak = Math.max(peak, Math.abs(left[s]), Math.abs(right[s]));
-    var scale = peak > .98 ? .98 / peak : 1;
     stemsProgress('Making the MP3… 0%');
-    var lame = await loadLame();
-    var encoder = new lame.Mp3Encoder(2, rate, 192);
-    var chunks = [];
-    var block = 1152 * 40;
-    var l16 = new Int16Array(block), r16 = new Int16Array(block);
-    for (var at = 0; at < length; at += block) {
-      var n = Math.min(block, length - at);
-      for (s = 0; s < n; s++) {
-        l16[s] = Math.max(-32768, Math.min(32767, Math.round(left[at + s] * scale * 32767)));
-        r16[s] = Math.max(-32768, Math.min(32767, Math.round(right[at + s] * scale * 32767)));
-      }
-      var out = encoder.encodeBuffer(n === block ? l16 : l16.subarray(0, n), n === block ? r16 : r16.subarray(0, n));
-      if (out.length) chunks.push(new Uint8Array(out));
-      stemsProgress('Making the MP3… ' + Math.round(Math.min(1, (at + n) / length) * 100) + '%');
-      await new Promise(function(resolve) { setTimeout(resolve, 0); });
-    }
-    var tail = encoder.flush();
-    if (tail.length) chunks.push(new Uint8Array(tail));
+    var chunks = await encodeMp3(left, right, rate, function(pct) { stemsProgress('Making the MP3… ' + pct + '%'); });
     var track = getVaultTrack(job.trackId);
     var base = (track && track.title || 'Song').replace(/[\\/:*?"<>|]+/g, '').trim() || 'Song';
     var file = new File(chunks, base + ' (karaoke).mp3', { type:'audio/mpeg' });

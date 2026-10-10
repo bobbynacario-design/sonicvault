@@ -39,6 +39,8 @@ function openKaraoke() {
 
 // Called by closeModal however the view closes.
 function onKaraokeClosed() {
+  // A recording stops first, so the singer coming back doesn't play on under it.
+  if (typeof onSingKaraokeClosed === 'function') onSingKaraokeClosed();
   if (typeof onSingerKaraokeClosed === 'function') onSingerKaraokeClosed();
   if (_karaoke) cancelAnimationFrame(_karaoke.frame);
   _karaoke = null;
@@ -91,6 +93,7 @@ function prepareKaraokeSong(track) {
   // With the singer off, the next song plays without its singer too.
   if (track && typeof singerFollowTrack === 'function') singerFollowTrack(track);
   if (typeof renderSingerControls === 'function') renderSingerControls();
+  if (typeof renderSingControls === 'function') renderSingControls();
 }
 
 function karaokeLineWords(track, index, times) {
@@ -195,11 +198,14 @@ function karaokeFrame() {
   var status = document.getElementById('karaoke-status');
   var note = karaokeStatus(usable);
   if (status.textContent !== note) status.textContent = note;
+  if (typeof singFrame === 'function') singFrame();
   // Hidden tabs get no frames; the view catches up when it is seen again.
   _karaoke.frame = requestAnimationFrame(karaokeFrame);
 }
 
 function karaokeSeek(event) {
+  // A jump mid-recording would put the voice against the wrong music.
+  if (typeof singRecording === 'function' && singRecording()) return;
   var bar = event.currentTarget;
   var rect = bar.getBoundingClientRect();
   var clock = singerClock();

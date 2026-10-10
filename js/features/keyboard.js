@@ -20,6 +20,7 @@ function keyboardSeek(delta) {
   // Karaoke with the singer off plays through its own element (js/features/singer.js).
   var el = typeof singerClock === 'function' ? singerClock() : _audio;
   if (!el.duration) return;
+  if (typeof singRecording === 'function' && singRecording()) return;
   el.currentTime = Math.max(0, Math.min(el.duration, el.currentTime + delta));
   updateMediaSessionPosition();
 }

@@ -64,6 +64,8 @@ function closeModal(id) {
   if (id === 'modal-story') onStoryClipClosed();
   if (id === 'modal-karaoke') onKaraokeClosed();
   if (id === 'modal-compare') onCompareClosed();
+  if (id === 'modal-take') onTakeReviewClosed();
+  if (id === 'modal-takes') onTakesListClosed();
   var returnTo = _modalReturnFocus[id];
   delete _modalReturnFocus[id];
   if (returnTo && returnTo.focus && document.contains(returnTo)) {
