@@ -96,8 +96,10 @@ function renderInsights() {
     +     '<div class="health-tile"><div class="health-val">' + fmtLongDuration(catalogSecs) + '</div><div class="health-label">Catalog runtime</div><div class="health-sub">total length of the vault</div></div>'
     +   '</div>'
     +   '<div class="dist-list" style="margin-top:1.2rem">' + buildDistributionBars(sources, function() { return 'var(--accent-dynamic)'; }, tracks.length, function(k) { return 'setSourceFilter(' + jsq(k) + ");switchView('library')"; }) + '</div>'
-    + '</div></div>';
+    + '</div></div>'
+    + '<div id="costs-card"></div>';
   renderWeekRecap();
   renderTidy();
   renderShareListens();
+  renderCosts();
 }

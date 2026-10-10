@@ -4261,3 +4261,27 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
   .tidy-row .tidy-actions{grid-column:1 / -1;justify-content:flex-start}
   .tidy-sheet,.tidy-error{margin-left:0}
 }
+
+/* ── AI usage & cost (js/features/costs.js) ──────────────────────────────── */
+/* The card sits in a grid track; without this the table's width would set it. */
+#costs-card{min-width:0}
+.cost-periods{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1.2rem}
+.cost-table-wrap{margin-top:1.3rem;overflow-x:auto}
+.cost-table{width:100%;border-collapse:collapse;font-size:13px}
+.cost-table th{padding:.5rem .6rem;border-bottom:1px solid var(--rim2);font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--muted2);text-align:left;white-space:nowrap}
+.cost-table td{padding:.55rem .6rem;border-bottom:1px solid var(--rim);color:var(--text);vertical-align:top}
+.cost-table .num{text-align:right;font-family:var(--mono);font-size:12px;white-space:nowrap}
+.cost-table .cost-model{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.cost-table td:first-child{min-width:8.5rem}
+.cost-table .cost-total td{border-bottom:none;font-weight:700}
+.cost-note{color:var(--muted2);font-size:11.5px}
+.cost-line{margin:.8rem 0 0;max-width:760px;font-size:13px;line-height:1.6;color:var(--muted)}
+.cost-notes{margin-top:1rem;font-size:13px;color:var(--muted)}
+.cost-notes summary{cursor:pointer;color:var(--text);font-weight:600}
+.cost-notes p{margin:.5rem 0 0;max-width:760px;line-height:1.6}
+@media (max-width:900px){.cost-periods{grid-template-columns:1fr 1fr}}
+.cost-model-sub{display:none;margin-top:.15rem;font-family:var(--mono);font-size:10.5px;color:var(--muted2);overflow-wrap:anywhere}
+@media (max-width:640px){
+  .cost-table .cost-wide{display:none}
+  .cost-model-sub{display:block}
+}

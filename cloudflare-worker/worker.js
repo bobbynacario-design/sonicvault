@@ -42,6 +42,7 @@ const LYRIA_MODEL = "lyria-3.5";
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/";
 const LYRIA_RETRY_MS = 1500;
 const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const COVER_STEPS = 6;
 const MAX_SONG_TITLE = 120;
 const MAX_SONG_STYLE = 1000;
 const MAX_SONG_LYRICS = 6000;
@@ -144,6 +145,7 @@ export default {
     if (route === "/story") return handleSongStory(request, env);
     if (route === "/songlab") return handleSongLab(request, env);
     if (route === "/ask") return handleAsk(request, env);
+    if (route === "/costs") return handleCosts(request, env);
     if (route === "/listens") return handleListens(request, env);
     if (route === "/followers") return handleFollowers(request, env);
     if (route === "/notify") return handleNotify(request, env);
@@ -258,6 +260,7 @@ export default {
         env
       );
     }
+    await recordClaudeUsage(env, "describe", model, anthropicData);
 
     const declined = refusalMessage(anthropicData);
     if (declined) return jsonResponse({ error: declined }, 502, request, env);
@@ -355,6 +358,10 @@ async function handleTranscribe(request, env) {
     );
   }
 
+  // Whisper is billed by the minute of audio heard.
+  const heardSeconds = Number(result && result.transcription_info && result.transcription_info.duration) || 0;
+  await recordUsage(env, "transcribe", WHISPER_MODEL, { units: heardSeconds, neurons: aiNeurons(result) });
+
   // Words only, as compact [text, start, end] triples -- all the app needs.
   const words = [];
   (Array.isArray(result && result.segments) ? result.segments : []).forEach(function (segment) {
@@ -369,7 +376,7 @@ async function handleTranscribe(request, env) {
     {
       model: WHISPER_MODEL,
       language: cleanString(result && result.transcription_info && result.transcription_info.language),
-      duration: Number(result && result.transcription_info && result.transcription_info.duration) || 0,
+      duration: heardSeconds,
       words: words
     },
     200,
@@ -502,6 +509,9 @@ async function handleGenerate(request, env) {
     );
   }
 
+  // Google bills each request that comes back, per song.
+  await recordUsage(env, "lyria", model, { units: 1 });
+
   // A song is a few MB of base64. Parsing it here would spend the worker's
   // CPU on what the browser has to parse anyway, so it streams through.
   const headers = corsHeaders(request, env);
@@ -573,6 +583,7 @@ async function handleLyrics(request, env) {
       env
     );
   }
+  await recordClaudeUsage(env, "lyrics", model, parsed);
   const declined = refusalMessage(parsed);
   if (declined) return jsonResponse({ error: declined }, 502, request, env);
   let song;
@@ -616,10 +627,11 @@ async function handleCover(request, env) {
   }
   let result;
   try {
-    result = await env.AI.run(IMAGE_MODEL, { prompt: buildCoverPrompt(title, style), steps: 6 });
+    result = await env.AI.run(IMAGE_MODEL, { prompt: buildCoverPrompt(title, style), steps: COVER_STEPS });
   } catch (err) {
     return jsonResponse({ error: "Cover generation failed.", details: cleanString(err && err.message) }, 502, request, env);
   }
+  await recordUsage(env, "cover", IMAGE_MODEL, { units: 1, neurons: aiNeurons(result) });
   const image = cleanString(result && result.image);
   if (!image) {
     return jsonResponse({ error: "Cover generation returned no image." }, 502, request, env);
@@ -709,6 +721,7 @@ async function handleTranslate(request, env) {
       env
     );
   }
+  await recordClaudeUsage(env, "translate", model, parsed);
   let answer;
   try {
     answer = extractJsonObject(extractAnthropicText(parsed || {}));
@@ -808,6 +821,7 @@ async function handleSongStory(request, env) {
       env
     );
   }
+  await recordClaudeUsage(env, "story", model, parsed);
   const story = cleanString(extractAnthropicText(parsed || {})).replace(/^["\u201c]+|["\u201d]+$/g, "").trim().slice(0, 1200);
   if (!story) {
     return jsonResponse({ error: "Claude returned nothing. Try again." }, 502, request, env);
@@ -931,6 +945,7 @@ async function handleSongLab(request, env) {
       env
     );
   }
+  await recordClaudeUsage(env, "song-lab", model, parsed);
   const declined = refusalMessage(parsed);
   if (declined) return jsonResponse({ error: declined }, 502, request, env);
   let song;
@@ -1061,6 +1076,7 @@ async function handleAsk(request, env) {
       env
     );
   }
+  await recordClaudeUsage(env, "ask", model, parsed);
   const declined = refusalMessage(parsed);
   if (declined) return jsonResponse({ error: declined }, 502, request, env);
   let reply;
@@ -1309,6 +1325,12 @@ async function handleEmbed(request, env) {
   } catch (err) {
     return jsonResponse({ error: "Embedding failed.", details: cleanString(err && err.message) }, 502, request, env);
   }
+  // Billed by input token, which the result's meta counts.
+  const meta = (result && result.meta) || {};
+  await recordUsage(env, "embed", EMBED_MODEL, {
+    units: meta.cost_metric_name_1 === "input_tokens" ? meta.cost_metric_value_1 : 0,
+    neurons: aiNeurons(result)
+  });
   const vectors = result && Array.isArray(result.data) ? result.data : [];
   if (vectors.length !== texts.length) {
     return jsonResponse({ error: "Embedding returned " + vectors.length + " vectors for " + texts.length + " texts." }, 502, request, env);
@@ -1382,6 +1404,98 @@ async function overDailyLimit(env, kind, weight) {
     console.error("Daily usage count failed:", kind, cleanString(err && err.message));
     return 0;
   }
+}
+
+// ── The cost ledger ─────────────────────────────────────────────────────
+// Like Daybook's: every paid AI call records what it used, per UTC day,
+// feature and model, in D1 table llm_usage -- tokens for Claude (as Anthropic
+// counts them: input apart from cache reads and cache writes), and units for
+// the rest: seconds of audio for Whisper, images for FLUX, input tokens for
+// embeddings, songs for Lyria -- and, for Workers AI, the neurons Cloudflare
+// says each call cost (aiNeurons), since that is what it bills. Prices are
+// applied by the app, from one rate table (js/data/costs.js), so the figure
+// can be checked against it. Never throws: the ledger must not break the
+// call it records.
+const USAGE_TABLE_SQL = "CREATE TABLE IF NOT EXISTS llm_usage (day TEXT NOT NULL, feature TEXT NOT NULL, model TEXT NOT NULL, "
+  + "calls INTEGER NOT NULL DEFAULT 0, input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0, "
+  + "cache_read_tokens INTEGER NOT NULL DEFAULT 0, cache_write_tokens INTEGER NOT NULL DEFAULT 0, units REAL NOT NULL DEFAULT 0, neurons REAL NOT NULL DEFAULT 0, "
+  + "PRIMARY KEY (day, feature, model))";
+let ledgerTableMade = false;
+
+function ledgerNumber(value) {
+  const n = Number(value);
+  return isFinite(n) && n > 0 ? n : 0;
+}
+
+async function makeLedgerTable(env) {
+  if (ledgerTableMade) return;
+  await env.LISTENS.prepare(USAGE_TABLE_SQL).run();
+  ledgerTableMade = true;
+}
+
+// usage: { input, output, cacheRead, cacheWrite, units, neurons }, any of them.
+async function recordUsage(env, feature, model, usage) {
+  if (!env.LISTENS) return;
+  const u = usage || {};
+  try {
+    await makeLedgerTable(env);
+    await env.LISTENS.prepare(
+      "INSERT INTO llm_usage (day, feature, model, calls, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, units, neurons) "
+      + "VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, ?8, ?9) ON CONFLICT (day, feature, model) DO UPDATE SET calls = calls + 1, "
+      + "input_tokens = input_tokens + ?4, output_tokens = output_tokens + ?5, cache_read_tokens = cache_read_tokens + ?6, "
+      + "cache_write_tokens = cache_write_tokens + ?7, units = units + ?8, neurons = neurons + ?9"
+    ).bind(new Date().toISOString().slice(0, 10), feature, model,
+      ledgerNumber(u.input), ledgerNumber(u.output), ledgerNumber(u.cacheRead), ledgerNumber(u.cacheWrite), ledgerNumber(u.units), ledgerNumber(u.neurons)).run();
+  } catch (err) {
+    console.error("Usage ledger write failed:", feature, model, cleanString(err && err.message));
+  }
+}
+
+// The neurons a Workers AI result says it cost: FLUX and Whisper report them
+// under usage, embeddings under meta. 0 when it doesn't say.
+function aiNeurons(result) {
+  const from = (result && result.usage) || (result && result.meta) || {};
+  return ledgerNumber(from.neurons);
+}
+
+// Claude's usage block from a reply. Haiku 5.5 bills a prompt over 100K
+// tokens on a dearer rate card, so such a call is kept as a model of its
+// own, as Daybook does.
+function recordClaudeUsage(env, feature, model, reply) {
+  const u = reply && reply.usage;
+  if (!u) return Promise.resolve();
+  const usage = { input: u.input_tokens, output: u.output_tokens, cacheRead: u.cache_read_input_tokens, cacheWrite: u.cache_creation_input_tokens };
+  const prompt = ledgerNumber(usage.input) + ledgerNumber(usage.cacheRead) + ledgerNumber(usage.cacheWrite);
+  return recordUsage(env, feature, model === "claude-haiku-5-5" && prompt > 100000 ? model + "/over-100k" : model, usage);
+}
+
+// POST /costs (owner, token) -> { rows: [every ledger row, oldest day
+// first], today, budget: { claude: { used, limit }, lyria: { used, limit } } }
+async function handleCosts(request, env) {
+  if (!env.LISTENS) {
+    return jsonResponse({ error: "The worker has no D1 binding \"LISTENS\" to keep the ledger in." }, 500, request, env);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  let rows;
+  try {
+    await makeLedgerTable(env);
+    rows = (await env.LISTENS.prepare(
+      "SELECT day, feature, model, calls, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, units, neurons FROM llm_usage ORDER BY day, feature, model"
+    ).all()).results || [];
+  } catch (err) {
+    return jsonResponse({ error: "Couldn't read the cost ledger.", details: cleanString(err && err.message) }, 502, request, env);
+  }
+  const budget = {};
+  Object.keys(DAILY_LIMITS).forEach(function (kind) {
+    budget[kind] = { used: 0, limit: Number(env[kind.toUpperCase() + "_DAILY_LIMIT"]) || DAILY_LIMITS[kind] };
+  });
+  try {
+    const counted = (await env.LISTENS.prepare("SELECT kind, n FROM ai_usage WHERE day = ?1").bind(today).all()).results || [];
+    counted.forEach(function (row) { if (budget[row.kind]) budget[row.kind].used = Number(row.n) || 0; });
+  } catch (err) {
+    // No ai_usage table yet: nothing counted today.
+  }
+  return jsonResponse({ rows: rows, today: today, budget: budget }, 200, request, env);
 }
 
 function dailyLimitResponse(kind, request, env) {
