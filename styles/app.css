@@ -4242,3 +4242,22 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
 .week-block .rank-list{margin-top:.7rem}
 .week-block .rank-row .sec-action{padding:.42rem .85rem;white-space:nowrap}
 .week-card .insight-cols{margin-top:1.6rem}
+
+/* ── Tidy up (js/features/tidy.js) ───────────────────────────────────────── */
+.tidy-head{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap}
+.tidy-count{display:inline-block;min-width:1.6rem;margin-left:.3rem;padding:.1rem .45rem;border-radius:999px;background:var(--accent-dynamic-soft);color:var(--accent-dynamic);font-family:var(--mono);font-size:11px;font-weight:500;text-align:center;vertical-align:middle}
+.tidy-row{display:grid;gap:.5rem}
+.tidy-row .rank-row{grid-template-columns:54px minmax(0,1fr) auto}
+.tidy-row .rank-sub{white-space:normal;line-height:1.45}
+.tidy-row .rank-sub strong{color:var(--text);font-weight:600}
+.tidy-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.4rem}
+.tidy-actions .sec-action{padding:.42rem .85rem;white-space:nowrap}
+.tidy-sheet{display:grid;gap:.5rem;margin:0 .55rem .4rem calc(54px + 1.3rem)}
+.tidy-sheet .tidy-actions{justify-content:flex-start}
+.tidy-error{margin:0 .55rem 0 calc(54px + 1.3rem);font-size:13px;color:var(--danger)}
+.tidy-more{margin-top:.6rem;font-size:13px}
+@media (max-width:640px){
+  .tidy-row .rank-row{grid-template-columns:54px minmax(0,1fr)}
+  .tidy-row .tidy-actions{grid-column:1 / -1;justify-content:flex-start}
+  .tidy-sheet,.tidy-error{margin-left:0}
+}

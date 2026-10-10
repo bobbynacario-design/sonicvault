@@ -77,6 +77,7 @@ function renderInsights() {
     +   '<div class="stat-grid">' + statsHtml + '</div>'
     + '</div></div>'
     + '<div id="week-recap"></div>'
+    + '<div id="tidy-card"></div>'
     + '<div id="share-listens"></div>'
     + '<div class="insight-cols">'
     +   '<div class="section-card"><div class="section-inner"><div class="section-title">Genres</div><div class="dist-list">' + buildDistributionBars(genres, getGenreColor, tracks.length, function(k) { return 'setGenreFilter(' + jsq(k) + ");switchView('library')"; }) + '</div></div></div>'
@@ -97,5 +98,6 @@ function renderInsights() {
     +   '<div class="dist-list" style="margin-top:1.2rem">' + buildDistributionBars(sources, function() { return 'var(--accent-dynamic)'; }, tracks.length, function(k) { return 'setSourceFilter(' + jsq(k) + ");switchView('library')"; }) + '</div>'
     + '</div></div>';
   renderWeekRecap();
+  renderTidy();
   renderShareListens();
 }

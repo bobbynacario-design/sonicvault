@@ -1,8 +1,9 @@
 // Listening smarts (js/data/listening.js): the "On repeat" rail on Home,
 // songs that keep being skipped kept out of the smart mixes, radio and the
-// mix for the time of day, a winning take marked among a song's versions,
-// and "Your week" on Insights -- the last seven days of your own listening
-// beside what people did on your share links (js/features/listens.js).
+// mix for the time of day, a winning take marked among a song's versions
+// (offered as the main take by Tidy up, js/features/tidy.js), and "Your
+// week" on Insights -- the last seven days of your own listening beside what
+// people did on your share links (js/features/listens.js).
 // Skips are recorded by the player (skippedTrack in js/features/player.js).
 
 // Songs the vault's own mixes may choose: all but the ones kept being skipped.
@@ -104,17 +105,6 @@ function renderWeekRecap() {
     ? week.top.map(function(item) { return weekRow(item.track, item.listens + (item.listens === 1 ? ' play' : ' plays') + ' this week'); }).join('')
     : '<div class="insight-empty-row">Nothing played this week yet.</div>';
 
-  var settle = [];
-  var groups = getVersionGroups();
-  Object.keys(groups).forEach(function(key) {
-    var group = groups[key];
-    var win = winningTake(group, now);
-    if (!win || win.take === primaryVersion(group)) return;
-    settle.push(weekRow(win.take,
-      versionLabel(win.take, group) + ' is winning: ' + win.plays + ' plays to ' + win.runnerUpPlays + ' lately',
-      '<button type="button" class="sec-action" onclick="event.stopPropagation();setMainVersion(' + jsq(win.take.id) + ');renderInsights()">Make it main</button>'));
-  });
-
   var skipped = tracks.filter(function(track) { return oftenSkipped(track, now); }).map(function(track) {
     var n = countSince(track.skipDays, now, SKIP_WINDOW_DAYS);
     return weekRow(track, 'Skipped ' + n + ' times lately',
@@ -131,7 +121,6 @@ function renderWeekRecap() {
           ? '<div class="week-block"><div class="week-label">Made this week</div><div class="rank-list">' + week.made.slice(0, 5).map(function(track) { return weekRow(track, [track.genre, track.mood].filter(Boolean).join(' / ')); }).join('') + '</div></div>'
           : ''))
     + '</div>'
-    + (settle.length ? '<div class="week-block"><div class="week-label">Takes to settle</div><p class="week-lead">One take of these songs is played far more than the other lately. Making it main puts it in their place on the shelf and in mixes.</p><div class="rank-list">' + settle.join('') + '</div></div>' : '')
     + (skipped.length ? '<div class="week-block"><div class="week-label">Kept out of mixes</div><p class="week-lead">You keep skipping these, so the smart mixes, radio and the mix for the time of day leave them out. They stay in the library and your playlists.</p><div class="rank-list">' + skipped.join('') + '</div></div>' : '')
     + '</div></div>';
 }

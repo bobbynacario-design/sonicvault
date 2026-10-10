@@ -589,9 +589,16 @@ function deleteTrack(id) {
   if (!confirm(wasShared
       ? 'Delete this track and revoke its public link?'
       : 'Delete this track from SonicVault?')) return;
+  removeTrackFromVault(id);
+}
+
+// The track gone from the vault, its playlists and the player, once someone
+// has agreed to it (deleteTrack, or merging a duplicate in js/features/tidy.js).
+function removeTrackFromVault(id) {
+  var doomed = getTrackById(id);
   // Take the public page down first — otherwise the shared URL keeps serving
   // the prompt, lyrics excerpt, and audio after the track is gone locally.
-  if (wasShared) revokeShare('track', id);
+  if (doomed && doomed.shared) revokeShare('track', id);
   tracks = tracks.filter(function(track) { return track.id !== id; });
   playlists.forEach(function(pl) {
     pl.trackIds = (pl.trackIds || []).filter(function(trackId) { return trackId !== id; });
