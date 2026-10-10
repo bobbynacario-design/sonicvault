@@ -25,6 +25,7 @@ async function loadCosts() {
   _costs.loading = true;
   _costs.error = '';
   renderCosts();
+  renderAICostSummary();
   try {
     var response = await workerRequest('/costs', {});
     var data = await response.json().catch(function() { return {}; });
@@ -36,6 +37,7 @@ async function loadCosts() {
   } finally {
     _costs.loading = false;
     renderCosts();
+    renderAICostSummary();
   }
 }
 
@@ -115,4 +117,44 @@ function renderCosts() {
     + '<p>Describing songs, Ask your vault and Write with Claude use Claude Haiku 5.5. Song lab, translations and the story behind a song use Claude Sonnet 5.5, which writes better. Lyric timing, the sung check and Tidy up’s transcribing use Whisper; covers use FLUX; search by meaning, radio and Ask use the BGE-M3 embeddings. Those three run on Cloudflare Workers AI. Songs made on the Create page use Google’s Lyria. Counting began when this tracker was deployed; earlier spend is in the Anthropic and Google consoles.</p>'
     + '</details>'
     + '</div></div>';
+}
+
+// The line on the AI worker card (Import): what was spent today and this
+// month, today's Claude cap, and the way to the breakdown on Insights. It
+// loads the ledger when that page opens, sharing it with the Insights card.
+function renderAICostSummary() {
+  var el = document.getElementById('ai-cost-summary');
+  if (!el) return;
+  if (!_aiConfig || !_aiConfig.endpoint || !_aiConfig.token || _coverDemoActive) { el.hidden = true; return; }
+  el.hidden = false;
+  var stale = !_costs.data || Date.now() - _costs.at > COSTS_FRESH_MS;
+  if (stale && !_costs.loading && !_costs.error && typeof _activeView !== 'undefined' && _activeView === 'upload') {
+    loadCosts();
+    return;
+  }
+  var data = _costs.data;
+  var line;
+  if (!data) {
+    line = _costs.error ? '<strong>AI spend:</strong> ' + esc(_costs.error) : 'Adding up the AI spend…';
+  } else if (!data.rows || !data.rows.length) {
+    line = '<strong>AI spend:</strong> nothing recorded yet. Every AI call from now on is counted.';
+  } else {
+    var s = summarizeCosts(data.rows, data.today);
+    var cap = data.budget && data.budget.claude;
+    line = '<strong>AI spend:</strong> ' + esc(fmtUsd(s.today)) + ' today · ' + esc(fmtUsd(s.month)) + ' this month'
+      + (s.since < data.today.slice(0, 8) + '01' ? ' · ' + esc(fmtUsd(s.all)) + ' since ' + esc(askDate(s.since)) : '')
+      + (cap ? ' · Claude cap ' + costInt(cap.used) + ' of ' + costInt(cap.limit) + ' today' : '') + '.';
+  }
+  el.innerHTML = '<div class="describe-line"><span>' + line + '</span>'
+    + '<button type="button" class="sec-action" onclick="openCostBreakdown()">See the breakdown</button></div>';
+}
+
+// Straight to the card: switched without the usual scroll to the top,
+// which would otherwise race this one.
+function openCostBreakdown() {
+  switchView('insights', true);
+  setTimeout(function() {
+    var card = document.getElementById('costs-card');
+    if (card) card.scrollIntoView({ behavior:motionAllowed() ? 'smooth' : 'auto', block:'start' });
+  }, 80);
 }

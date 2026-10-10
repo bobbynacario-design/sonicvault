@@ -77,6 +77,7 @@ function hydrateAIConfigInputs() {
 function updateAIConfigStatus() {
   hydrateAIConfigInputs();
   if (typeof renderDescribePanel === 'function') renderDescribePanel();
+  if (typeof renderAICostSummary === 'function') renderAICostSummary();
   var el = document.getElementById('upload-ai-status');
   if (!el) return;
   if (_aiConfig.endpoint) {

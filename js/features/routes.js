@@ -156,6 +156,7 @@ function switchView(view) {
   if (view === 'playlists') renderPlaylists();
   if (view === 'create') renderCreate();
   if (view === 'upload') renderPendingPreview();
+  if (view === 'upload' && typeof renderAICostSummary === 'function') renderAICostSummary();
   if (view === 'insights') renderInsights();
   updatePageChrome(null, _currentTrack || null);
   if (!skipRoute) scrollContentToTop(true);
