@@ -18,11 +18,7 @@ function askDate(key) {
 
 // Plays in the `days` days up to and including today, from track.playDays.
 function playsSince(track, now, days) {
-  var after = localDayKey(new Date(now.getTime() - days * 86400000));
-  var map = track && track.playDays && typeof track.playDays === 'object' ? track.playDays : {};
-  return Object.keys(map).reduce(function(sum, day) {
-    return day > after ? sum + (Number(map[day]) || 0) : sum;
-  }, 0);
+  return countSince(track && track.playDays, now, days);
 }
 
 function lastPlayedDay(track) {
@@ -47,10 +43,12 @@ function songLanguage(takes) {
 function askSongLine(song, takes, now) {
   var plays = 0;
   var recent = 0;
+  var skips = 0;
   var last = '';
   takes.forEach(function(take) {
     plays += Number(take.plays || 0);
     recent += playsSince(take, now, 30);
+    skips += countSince(take.skipDays, now, 30);
     var day = lastPlayedDay(take);
     if (day > last) last = day;
   });
@@ -67,6 +65,7 @@ function askSongLine(song, takes, now) {
     hasLyrics(song) ? (song.aiVocalStyle ? 'voice: ' + song.aiVocalStyle : '') : 'instrumental',
     song.duration ? fmtTime(song.duration) + ' long' : '',
     'played ' + plays + (recent ? ' (' + recent + ' in the last 30 days)' : '') + (last ? ', last on ' + askDate(last) : ''),
+    skips ? 'skipped ' + skips + ' in the last 30 days' + (takes.some(function(take) { return oftenSkipped(take, now); }) ? ', kept out of mixes' : '') : '',
     takes.length > 1 ? takes.length + ' takes' : '',
     language ? 'in ' + language : '',
     tags.length ? 'tags: ' + tags.join(', ') : '',

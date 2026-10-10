@@ -4231,3 +4231,14 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
   .lab-draft-body{padding:0 1rem 1rem}
   .ask-songs{grid-template-columns:1fr}
 }
+
+/* ── Listening smarts (js/features/listening.js) ─────────────────────────── */
+.version-winning{padding:.2rem .6rem;border-radius:999px;background:rgba(122,211,156,.14);color:var(--success);font-size:12px;font-weight:600}
+.week-note{margin-top:.45rem;font-size:12px;line-height:1.45;color:var(--muted)}
+.week-block{min-width:0;margin-top:1.4rem}
+.week-card .insight-cols .week-block{margin-top:0}
+.week-label{font-family:var(--display);font-weight:700;font-size:17px;line-height:1.2}
+.week-lead{margin:.45rem 0 0;max-width:640px;font-size:13px;line-height:1.6;color:var(--muted)}
+.week-block .rank-list{margin-top:.7rem}
+.week-block .rank-row .sec-action{padding:.42rem .85rem;white-space:nowrap}
+.week-card .insight-cols{margin-top:1.6rem}

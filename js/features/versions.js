@@ -103,9 +103,12 @@ function versionListHTML(track) {
   var group = _shelfVersions[track.id];
   if (!group || !_openVersions[track.id]) return '';
   var main = primaryVersion(group);
+  // The take played far more than the others lately (js/data/listening.js).
+  var win = winningTake(group, new Date());
   return '<div class="version-list" id="versions-' + attr(track.id) + '" role="list" aria-label="' + attr('Versions of ' + baseSongTitle(track.title)) + '">'
     + group.map(function(take) {
       var isMain = take === main;
+      var winning = win && win.take === take;
       var isCurrent = _currentTrack && _currentTrack.id === take.id;
       var name = versionLabel(take, group) + (take.title !== track.title ? ' · ' + take.title : '');
       return '<div class="version-row' + (isCurrent ? ' current' : '') + '" role="listitem">'
@@ -113,6 +116,7 @@ function versionListHTML(track) {
         + '<span class="version-facts">' + fmtTime(take.duration || 0) + ' · ' + fmtCompactNumber(take.plays || 0) + (Number(take.plays) === 1 ? ' play' : ' plays')
         // Which take sang the sheet best, once they have been checked.
         + (sungCheckSummary(take) ? ' · ' + sungCheckSummary(take) : '') + '</span>'
+        + (winning ? '<span class="version-winning" title="' + attr(win.plays + ' plays to ' + win.runnerUpPlays + ' in the last 60 days') + '">Winning</span>' : '')
         + (isMain ? '<span class="version-main">Main</span>' : '<button type="button" class="sec-action" onclick="event.stopPropagation();setMainVersion(' + jsq(take.id) + ')">Make main</button>')
         + '<button type="button" class="sec-action" onclick="event.stopPropagation();playVersion(' + jsq(take.id) + ', ' + jsq(track.id) + ')">' + (isCurrent && _isPlaying ? 'Pause' : 'Play') + '</button>'
         + '</div>';

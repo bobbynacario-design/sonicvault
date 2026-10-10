@@ -8,8 +8,9 @@ var _radio = null;           // { seedId, label }
 var RADIO_TOP_UP_AT = 3;     // songs left in the queue when more are added
 var RADIO_KEEP_BEHIND = 20;  // songs already played kept in the queue
 
+// Songs that keep being skipped stay off the radio (js/features/listening.js).
 function radioPool() {
-  return tracks.filter(function(track) { return track.audioURL || track.audioData; });
+  return mixableTracks().filter(function(track) { return track.audioURL || track.audioData; });
 }
 
 // Search by meaning's vectors, when the songs have been read for it.

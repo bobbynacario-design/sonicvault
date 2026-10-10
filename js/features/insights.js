@@ -76,6 +76,7 @@ function renderInsights() {
     +   '<div class="section-head"><div><div class="section-title is-hero">Your private listening room, by the numbers</div><div class="section-sub">Everything here comes from the tracks and play counts in your vault, plus anonymous counts on links you’ve shared.</div></div></div>'
     +   '<div class="stat-grid">' + statsHtml + '</div>'
     + '</div></div>'
+    + '<div id="week-recap"></div>'
     + '<div id="share-listens"></div>'
     + '<div class="insight-cols">'
     +   '<div class="section-card"><div class="section-inner"><div class="section-title">Genres</div><div class="dist-list">' + buildDistributionBars(genres, getGenreColor, tracks.length, function(k) { return 'setGenreFilter(' + jsq(k) + ");switchView('library')"; }) + '</div></div></div>'
@@ -95,5 +96,6 @@ function renderInsights() {
     +   '</div>'
     +   '<div class="dist-list" style="margin-top:1.2rem">' + buildDistributionBars(sources, function() { return 'var(--accent-dynamic)'; }, tracks.length, function(k) { return 'setSourceFilter(' + jsq(k) + ");switchView('library')"; }) + '</div>'
     + '</div></div>';
+  renderWeekRecap();
   renderShareListens();
 }

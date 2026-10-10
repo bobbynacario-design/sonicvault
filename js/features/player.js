@@ -399,6 +399,18 @@ _audio.addEventListener('pause', function() {
   updateMediaSession();
 });
 
+// The vault song being left, when leaving it now is a skip (isSkip in
+// js/data/listening.js: under 30 seconds in, and not at its end) -- but not
+// when the next song is another take of it.
+function skippedTrack(leaving, next) {
+  if (!leaving || !next || leaving.id === next.id) return null;
+  var vaultTrack = getVaultTrack(leaving.id);
+  if (!vaultTrack || !isSkip(_audio.currentTime, Number(vaultTrack.duration) || _audio.duration, _audio.ended)) return null;
+  var group = getVersionGroup(vaultTrack);
+  if (group && group.some(function(take) { return take.id === next.id; })) return null;
+  return vaultTrack;
+}
+
 function startPlayback(id, queueIds, queueLabel) {
   var track = getTrackById(id);
   if (!track) return;
@@ -424,6 +436,9 @@ function startPlayback(id, queueIds, queueLabel) {
     return;
   }
 
+  // Read before the new source resets the position. Songs that keep being
+  // skipped drop out of the mixes and radio.
+  var skipped = skippedTrack(_currentTrack, track);
   _currentTrack = track;
   if (track.audioURL) {
     _audio.src = track.audioURL;
@@ -441,6 +456,7 @@ function startPlayback(id, queueIds, queueLabel) {
     showToast('Playback failed in this browser');
   });
   _isPlaying = true;
+  if (skipped) skipped.skipDays = addPlayDay(skipped.skipDays, new Date());
   if (privateTrack) {
     privateTrack.plays = Number(privateTrack.plays || 0) + 1;
     privateTrack.playDays = addPlayDay(privateTrack.playDays, new Date());
@@ -449,6 +465,7 @@ function startPlayback(id, queueIds, queueLabel) {
     rememberPlayback(privateTrack);
   } else {
     track.plays = Number(track.plays || 0) + 1;
+    if (skipped) persistTracks();
   }
   updateNowPlaying();
   renderTracks(); // already refreshes the hero — no second renderLibraryHome()

@@ -80,6 +80,7 @@ async function loadShareListens() {
   } finally {
     _shareListens.loading = false;
     renderShareListens();
+    if (typeof renderWeekRecap === 'function') renderWeekRecap();
   }
 }
 

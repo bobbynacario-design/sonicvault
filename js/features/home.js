@@ -99,7 +99,7 @@ function buildMomentCards() {
     cards.push(momentCard(day.label + ', you made', songs.length === 1 ? (songs[0].title || 'Untitled') : songs.length + ' songs',
       songs.length === 1 ? (getTrackSummary(songs[0]) || [songs[0].genre, songs[0].mood].filter(Boolean).join(' · ')) : names, songs, day.label));
   }
-  var mix = timeOfDayMix(tracks, now, 12);
+  var mix = timeOfDayMix(mixableTracks(), now, 12);
   if (mix) {
     var mixTracks = mix.ids.map(function(id) { return getTrackById(id); }).filter(Boolean);
     cards.push(momentCard('Right now', mix.name, mix.desc + ' ' + mixTracks.length + ' songs.', mixTracks, mix.name));
@@ -196,6 +196,7 @@ function renderLibraryHome() {
   var hiddenGems = getLeastPlayedTracks(4);
   var mostPlayed = getMostPlayedTracks(4);
   var recentlyPlayed = getRecentlyPlayedTracks(4, getContinueTrack() ? continueTrack.id : '');
+  var repeating = onRepeatTracks(4);
 
   // The old home opened with a marketing hero, four stat tiles, a spotlight
   // card, two side cards, a four-card snapshot grid, and nine rails before a
@@ -220,6 +221,10 @@ function renderLibraryHome() {
     +   '</div>'
     +   buildMomentCards()
     +   '<div class="rail-grid">'
+    // Played at least twice this week (js/features/listening.js).
+    +     (repeating.length
+            ? '<div class="rail-card"><div class="rail-title">On repeat</div><div class="mini-track-list">' + buildMiniRail(repeating, 'On repeat') + '</div></div>'
+            : '')
     +     '<div class="rail-card"><div class="rail-title">Recently added</div><div class="mini-track-list">' + buildMiniRail(recentTracks, 'Recently added') + '</div></div>'
     +     (recentlyPlayed.length
             ? '<div class="rail-card"><div class="rail-title">Recently played</div><div class="mini-track-list">' + buildMiniRail(recentlyPlayed, 'Recently played') + '</div></div>'

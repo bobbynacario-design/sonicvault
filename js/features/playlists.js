@@ -267,9 +267,11 @@ function getSmartMixes() {
   if (!tracks.length) return [];
   var mixes = [];
   var minSize = tracks.length >= 8 ? 3 : 2;
+  // Songs that keep being skipped stay out (js/features/listening.js).
+  var mixable = mixableTracks();
 
   function build(id, name, desc, color, predicate) {
-    var ids = tracks.filter(predicate).map(function(t) { return t.id; });
+    var ids = mixable.filter(predicate).map(function(t) { return t.id; });
     if (ids.length >= minSize) mixes.push({ id: id, name: name, desc: desc, color: color, trackIds: ids });
   }
 
