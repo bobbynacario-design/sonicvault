@@ -80,7 +80,7 @@ function hydrateSongLabForm() {
 function renderSongLabFrom() {
   var el = document.getElementById('lab-from');
   if (!el) return;
-  var examples = pickSongLabExamples(tracks, new Date(), getSongLabInput().seed);
+  var examples = pickSongLabExamples(tracks, new Date(), getSongLabInput().seed, 0, songLabDrafts());
   el.textContent = examples.length
     ? 'Learning from ' + examples.map(function(track) { return '“' + (track.title || 'Untitled') + '”'; }).join(', ') + '.'
     : 'Songs with lyrics teach Claude your voice; until the vault has some, it writes from your idea alone.';
@@ -108,7 +108,7 @@ async function draftSongLab() {
   if (_songLab.busy) return;
   if (!_aiConfig.endpoint) { renderSongLab(); return; }
   var input = getSongLabInput();
-  var examples = pickSongLabExamples(tracks, new Date(), input.seed);
+  var examples = pickSongLabExamples(tracks, new Date(), input.seed, 0, songLabDrafts());
   if (!examples.length && !input.idea) {
     setSongLabStatus('Say what the song is about first: the vault has no songs with lyrics to learn your voice from yet.');
     return;
@@ -120,7 +120,8 @@ async function draftSongLab() {
     var draft = await requestSongLabDraft({
       idea:input.idea,
       language:input.language,
-      examples:examples.map(songLabExample)
+      examples:examples.map(songLabExample),
+      avoid:songLabAvoidList(songLabDrafts())
     }, examples.map(function(track) { return track.title || 'Untitled'; }));
     setSongLabStatus('');
     renderSongLabDrafts(draft.id);
@@ -139,7 +140,7 @@ async function reviseSongLabDraft(id) {
   if (!draft || !change || _songLab.revising) return;
   _songLab.revising = id;
   renderSongLabDrafts(id);
-  var examples = pickSongLabExamples(tracks, new Date(), '', 3);
+  var examples = pickSongLabExamples(tracks, new Date(), '', 3, songLabDrafts());
   try {
     var next = await requestSongLabDraft({
       language:draft.language,

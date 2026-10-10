@@ -8,31 +8,51 @@ const g = require("./helpers/data-scripts.js").loadDataScripts();
 const NOW = new Date(2026, 9, 10, 12);
 const SHEET = (word) => "[Verse 1]\n" + Array.from({ length: 6 }, (_, i) => word + " line number " + i + " of the song").join("\n");
 
-test("the most loved songs are learnt from: recent plays count four times, one take each", () => {
+test("the newest songs lead -- how they write now -- then the most loved, one take each", () => {
   const list = [
-    { id: "t-1", title: "Old Favourite", lyrics: SHEET("old"), plays: 20 },
-    { id: "t-2", title: "On Repeat", lyrics: SHEET("repeat"), plays: 6, playDays: { "2026-10-01": 3, "2026-10-09": 3 } },
-    { id: "t-3", title: "Instrumental", lyrics: "", plays: 99 },
-    { id: "t-4", title: "On Repeat (2)", lyrics: SHEET("repeat"), plays: 1 },
-    { id: "t-5", title: "Quiet", lyrics: SHEET("quiet"), plays: 0 }
+    { id: "t-1", title: "March Favourite", created: "2026-03-29", lyrics: SHEET("march"), plays: 180 },
+    { id: "t-2", title: "March Other", created: "2026-03-29", lyrics: SHEET("other"), plays: 60, playDays: { "2026-10-09": 5 } },
+    { id: "t-3", title: "April", created: "2026-04-02", lyrics: SHEET("april"), plays: 9 },
+    { id: "t-4", title: "Instrumental", created: "2026-10-09", lyrics: "", plays: 99 },
+    { id: "t-5", title: "October", created: "2026-10-04", lyrics: SHEET("october"), plays: 20 },
+    { id: "t-6", title: "October (2)", created: "2026-10-04", lyrics: SHEET("october"), plays: 1 },
+    { id: "t-7", title: "This Week", created: "2026-10-08", lyrics: SHEET("week"), plays: 2 },
+    { id: "t-8", title: "Today", created: "2026-10-10", lyrics: SHEET("today"), plays: 0 }
   ];
   const picked = g.pickSongLabExamples(list, NOW, "", 6).map((t) => t.title);
-  // 6 + 3*6 = 24 beats 20; the second take of On Repeat is not a second song;
-  // songs without lyrics have no voice to learn.
-  assert.deepEqual(picked, ["On Repeat", "Old Favourite", "Quiet"]);
-  assert.equal(g.pickSongLabExamples(list, NOW, "", 1).length, 1);
+  // The three newest songs with lyrics, then by love: 60 + 3*5 = 75 for March
+  // Other against 180 for March Favourite; one take of October; no lyrics, no voice.
+  assert.deepEqual(picked, ["Today", "This Week", "October", "March Favourite", "March Other", "April"]);
+  assert.deepEqual(g.pickSongLabExamples(list, NOW, "", 2).map((t) => t.title), ["Today", "This Week"]);
 });
 
 test("a song chosen by name leads, without its other take", () => {
   const list = [
-    { id: "t-1", title: "A", lyrics: SHEET("a"), plays: 9 },
-    { id: "t-2", title: "B", lyrics: SHEET("b"), plays: 1 },
-    { id: "t-3", title: "B (2)", lyrics: SHEET("b"), plays: 0 },
-    { id: "t-4", title: "Instrumental", lyrics: "", plays: 0 }
+    { id: "t-1", title: "A", created: "2026-10-01", lyrics: SHEET("a"), plays: 9 },
+    { id: "t-2", title: "B", created: "2026-10-02", lyrics: SHEET("b"), plays: 1 },
+    { id: "t-3", title: "B (2)", created: "2026-10-02", lyrics: SHEET("b"), plays: 0 },
+    { id: "t-4", title: "Instrumental", created: "2026-10-03", lyrics: "", plays: 0 }
   ];
   assert.deepEqual(g.pickSongLabExamples(list, NOW, "t-3").map((t) => t.id), ["t-3", "t-1"]);
-  assert.deepEqual(g.pickSongLabExamples(list, NOW, "t-4").map((t) => t.id), ["t-4", "t-1", "t-2"], "an instrumental can set the sound");
-  assert.deepEqual(g.pickSongLabExamples(list, NOW, "gone").map((t) => t.id), ["t-1", "t-2"]);
+  assert.deepEqual(g.pickSongLabExamples(list, NOW, "t-4").map((t) => t.id), ["t-4", "t-2", "t-1"], "an instrumental can set the sound");
+  assert.deepEqual(g.pickSongLabExamples(list, NOW, "gone").map((t) => t.id), ["t-2", "t-1"]);
+});
+
+test("a song that began as a Song lab draft is Claude's writing, so it isn't learnt from", () => {
+  const list = [
+    { id: "t-1", title: "Mine", created: "2026-10-04", lyrics: SHEET("mine"), plays: 3 },
+    { id: "t-2", title: "From a draft", created: "2026-10-10", lyrics: SHEET("drafted").toUpperCase() + "!", plays: 5 }
+  ];
+  assert.deepEqual(g.pickSongLabExamples(list, NOW, "", 6, [{ lyrics: SHEET("drafted") }]).map((t) => t.title), ["Mine"]);
+  assert.deepEqual(g.pickSongLabExamples(list, NOW, "", 6).map((t) => t.title), ["From a draft", "Mine"], "no drafts given");
+  assert.deepEqual(g.pickSongLabExamples(list, NOW, "t-2", 6, [{ lyrics: SHEET("drafted") }]).map((t) => t.title), ["From a draft", "Mine"], "chosen by name, it still leads");
+});
+
+test("recent drafts go to the worker as a line each, to write about something else", () => {
+  const drafts = [{ title: "Kape", about: "A quiet morning." }, { title: "", about: "no title" }, { title: "Pundasyon" }, null];
+  assert.deepEqual(g.songLabAvoidList(drafts), ["Kape: A quiet morning.", "Pundasyon"]);
+  assert.deepEqual(g.songLabAvoidList(drafts, 1), ["Kape: A quiet morning."]);
+  assert.deepEqual(g.songLabAvoidList(undefined), []);
 });
 
 test("a song's sound is its prompt, else what its description says", () => {
@@ -43,8 +63,9 @@ test("a song's sound is its prompt, else what its description says", () => {
 });
 
 test("an example is sized for the worker", () => {
-  const ex = g.songLabExample({ title: " T ", prompt: "p".repeat(900), lyrics: "l".repeat(3000) });
+  const ex = g.songLabExample({ title: " T ", created: "2026-10-04", prompt: "p".repeat(900), lyrics: "l".repeat(3000) });
   assert.equal(ex.title, "T");
+  assert.equal(ex.made, "2026-10-04");
   assert.equal(ex.sound.length, 800);
   assert.equal(ex.lyrics.length, 2500);
 });
@@ -69,6 +90,12 @@ test("a draft is found in the vault by its words, once Suno has sung it", () => 
   assert.equal(g.songLabMadeAs(draft, [{ id: "t-1", lyrics: SHEET("other") }, made]), made);
   assert.equal(g.songLabMadeAs(draft, [{ id: "t-1", lyrics: SHEET("other") }]), null);
   assert.equal(g.songLabMadeAs({ lyrics: "short" }, [{ lyrics: "short" }]), null, "too few words to be sure");
+  // Suno sang a line twice: still the draft's song (Kape Sa Madaling Araw, 2026-10-10).
+  const repeated = { id: "t-8", lyrics: SHEET("harbour") + "\nharbour line number 5 of the song" };
+  assert.equal(g.songLabMadeAs(draft, [repeated]), repeated);
+  // Half the lines rewritten: the songwriter's own now.
+  const rewritten = { id: "t-7", lyrics: "[Verse 1]\n" + [0, 1, 2].map((i) => "harbour line number " + i + " of the song").concat(["new words a", "new words b", "new words c"]).join("\n") };
+  assert.equal(g.songLabMadeAs(draft, [rewritten]), null);
 });
 
 test("fields longer than Suno takes are named", () => {

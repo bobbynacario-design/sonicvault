@@ -40,20 +40,24 @@ const DRAFT = { title: "Ilaw sa Pantalan", style: "acoustic folk, warm female vo
 const EXAMPLES = [{ title: "Harbour Lights", sound: "warm folk", lyrics: "[Verse]\nThe boats come home" }, { title: "", sound: "", lyrics: "" }];
 
 test("/songlab writes in the songwriter's voice, from their songs, with the writing model", async () => {
-  const { res, json, sent } = await call("/songlab", { idea: "my father's boat", language: "Bikol", examples: EXAMPLES }, { fetchImpl: claude(DRAFT) });
+  const avoid = ["Kape sa Madaling Araw: a quiet morning", "", "Tahimik na Pundasyon"];
+  const { res, json, sent } = await call("/songlab", { idea: "my father's boat", language: "Bikol", examples: EXAMPLES, avoid }, { fetchImpl: claude(DRAFT) });
   assert.equal(res.status, 200);
   assert.deepEqual(json, DRAFT);
   assert.equal(sent.model, "claude-sonnet-5-5");
   assert.equal(sent.temperature, undefined);
   assert.equal(sent.messages.length, 1);
-  assert.equal(sent.output_config.effort, "medium");
+  assert.equal(sent.output_config.effort, "high");
   assert.deepEqual(sent.output_config.format.schema.required, ["title", "style", "lyrics", "about"]);
   assert.match(sent.system, /Central Bikol/);
   assert.match(sent.system, /Never name a real artist/);
+  assert.match(sent.system, /newest show how they write now/);
+  assert.match(sent.system, /production cue goes inside the tag/);
   const text = sent.messages[0].content;
   assert.match(text, /^Language: Bikol\nIdea: my father's boat\n/);
-  assert.match(text, /1\. Harbour Lights\nSound: warm folk\nLyrics:\n\[Verse\]\nThe boats come home/);
+  assert.match(text, /Their songs, newest first:\n\n1\. Harbour Lights\nSound: warm folk\nLyrics:\n\[Verse\]\nThe boats come home/);
   assert.doesNotMatch(text, /2\. /, "an empty example is left out");
+  assert.match(text, /Recent drafts, so write about something else:\n- Kape sa Madaling Araw: a quiet morning\n- Tahimik na Pundasyon$/);
 });
 
 test("/songlab rewrites a draft with a change; an unknown language means like my songs", async () => {

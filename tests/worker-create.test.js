@@ -121,17 +121,22 @@ test("over-long input is refused before Google is asked", async () => {
   assert.equal(calls.length, 0);
 });
 
-test("/lyrics returns Claude's sheet and keeps the given title", async () => {
+test("/lyrics writes in the songwriter's voice, from their songs, and keeps the given title", async () => {
   const claude = async () => new Response(JSON.stringify({
     content: [{ type: "text", text: '{"title":"Invented","lyrics":"[Verse 1]\\nOut on the water"}' }]
   }), { status: 200 });
-  const { res, text, calls } = await call("/lyrics", { title: "Harbour", style: "folk", draft: "" }, { fetchImpl: claude });
+  const examples = [{ title: "Pauwi", made: "2026-10-04", sound: "indie folk", lyrics: "[Verse 1]\nThe bus leaves at eleven" }];
+  const { res, text, calls } = await call("/lyrics", { title: "Harbour", style: "folk", draft: "", examples }, { fetchImpl: claude });
   assert.equal(res.status, 200);
   assert.deepEqual(JSON.parse(text), { title: "Harbour", lyrics: "[Verse 1]\nOut on the water" });
   const sent = JSON.parse(calls[0].init.body);
   assert.match(sent.system, /\[Verse 1\]/);
   assert.match(sent.messages[0].content, /Title:\nHarbour/);
-  assert.equal(sent.model, "claude-haiku-5-5");
+  assert.equal(sent.model, "claude-sonnet-5-5", "lyrics are writing: the writing model");
+  assert.equal(sent.output_config.effort, "high");
+  assert.match(sent.system, /newest show how they write now/);
+  assert.match(sent.system, /no stage directions/);
+  assert.match(sent.messages[0].content, /Their songs, newest first:\n\n1\. Pauwi \(made 2026-10-04\)\nSound: indie folk\nLyrics:\n\[Verse 1\]\nThe bus leaves at eleven/);
   assert.equal(sent.temperature, undefined);
   assert.equal(sent.messages.length, 1, "no started reply");
   assert.deepEqual(sent.output_config.format.schema.required, ["title", "lyrics"]);

@@ -205,7 +205,10 @@ async function writeLyricsWithClaude() {
   btn.textContent = 'Writing…';
   setCreateStatus(input.lyrics ? 'Claude is working from your draft…' : 'Claude is writing lyrics…');
   try {
-    var response = await workerRequest('/lyrics', { title:input.title, style:input.style, draft:input.lyrics, model:_aiConfig.model || '' });
+    // Written in the songwriter's voice, from their own songs (js/data/song-lab.js),
+    // on the worker's writing model rather than the tagging model in settings.
+    var examples = pickSongLabExamples(tracks, new Date(), '', 5, songLabDrafts()).map(songLabExample);
+    var response = await workerRequest('/lyrics', { title:input.title, style:input.style, draft:input.lyrics, examples:examples });
     if (!response.ok) throw new Error(await workerError(response));
     var data = await response.json();
     if (!data || !data.lyrics) throw new Error('Claude returned no lyrics.');

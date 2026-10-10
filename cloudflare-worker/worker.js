@@ -522,19 +522,70 @@ async function handleGenerate(request, env) {
   return new Response(response.body, { status: 200, headers });
 }
 
-const LYRICS_SYSTEM_PROMPT = [
-  "You write original song lyrics for SonicVault, a personal vault of AI-generated songs.",
-  "Google's Lyria will sing them in a song of about two and a half minutes.",
-  "Return ONLY a raw JSON object, no markdown or commentary: { \"title\": \"string\", \"lyrics\": \"string\" }",
-  "Rules:",
-  "- Start every section with its tag alone on a line: [Verse 1], [Chorus], [Verse 2], [Bridge], [Outro].",
-  "- Fit about two and a half minutes: two verses of four lines, a four-line chorus after each verse and again at the end, and at most a short bridge.",
-  "- Concrete images over abstractions. Rhyme naturally or not at all; never force it.",
-  "- Match the style and mood described, in the language it is written in.",
-  "- Never quote or adapt the lyrics of existing songs, and never name or imitate real artists.",
-  "- Keep the title you are given. With none, invent a short one.",
-  "- When a draft or notes are given, build on them: keep the lines that work and finish the rest."
+// How to write as this songwriter, shared by Song lab (/songlab) and Write
+// with Claude (/lyrics). Both send some of their songs, newest first. Drafts
+// that learnt from their most played songs -- months old, in an earlier
+// style -- came out as rhyming slogans, and a draft with no idea averaged
+// their themes into the same song twice; their newest songs are plain,
+// specific and conversational, so those lead, and recent drafts are listed
+// to steer clear of (2026-10-10).
+const SONG_VOICE_PROMPT = [
+  "You write songs with one songwriter, in their voice. They make the songs in Suno and keep them in SonicVault.",
+  "They write in English, Tagalog and Bikol (Central Bikol, from the Bicol region of the Philippines: real Bikol, never Tagalog with a few Bikol words, never Hiligaynon, Cebuano or Waray), and sometimes mix English and Tagalog in one song.",
+  "You get some of their songs, newest first: each one's title, when it was made, its sound and its lyrics. The newest show how they write now; follow those most closely -- the way they talk, how long their lines run, how plain or figurative they get, whether and how they rhyme, how they build a song and tag its sections. Older songs show what they have loved. Write a new song that sounds like the same person wrote it next. Never reuse their lines, titles or hooks.",
+  "What makes their best songs work: one specific situation rather than a theme, small details only this person would notice, plain conversational lines that turn somewhere unexpected, and restraint. Leave out lessons, slogans and motivational stock phrases, and any rhyme that bends a line out of shape.",
+  "When there is an idea, the song is about it. With none, find a small, specific moment that none of their songs and none of the recent drafts listed already cover.",
+  "Write in the language asked for. Taglish is Tagalog and English mixed the way they mix them in their songs. \"Like my songs\" means the language of their newest songs, or the idea's own language."
 ].join("\n");
+
+const LYRICS_SYSTEM_PROMPT = SONG_VOICE_PROMPT + "\n" + [
+  "These lyrics are for Google's Lyria, which sings them in a song of about two and a half minutes: two or three short verses, a chorus that comes back, at most a short bridge.",
+  "Lyria sings every line that isn't a section tag, so tag each section alone on its own line ([Verse 1], [Chorus], [Bridge]) and write nothing else that isn't sung: no stage directions or sound descriptions, in parentheses or otherwise. Parentheses only for sung backing vocals.",
+  "Never quote or adapt the lyrics of existing songs, and never name or imitate real artists.",
+  "Keep the title you are given. With none, give it a short one in the song's language.",
+  "When a draft or notes are given, build on them: keep the lines that work and finish the rest.",
+  "The reply is JSON: { \"title\": \"...\", \"lyrics\": \"...\" }."
+].join("\n");
+
+const MAX_VOICE_EXAMPLES = 8;
+const MAX_VOICE_SOUND = 800;
+const MAX_VOICE_LYRICS = 2500;
+const MAX_AVOID = 8;
+// How hard the writing model thinks over a song, for both routes. Set from a
+// side-by-side on the songwriter's own songs (2026-10-10).
+const SONG_EFFORT = "high";
+
+// The songs sent to learn from, cleaned: { title, made, sound, lyrics }.
+function cleanSongExamples(list) {
+  return (Array.isArray(list) ? list : []).slice(0, MAX_VOICE_EXAMPLES).map(function (song) {
+    const made = cleanString(song && song.made);
+    return {
+      title: cleanString(song && song.title).slice(0, MAX_SONG_TITLE),
+      made: /^\d{4}-\d{2}-\d{2}$/.test(made) ? made : "",
+      sound: cleanString(song && song.sound).slice(0, MAX_VOICE_SOUND),
+      lyrics: cleanString(song && song.lyrics).slice(0, MAX_VOICE_LYRICS)
+    };
+  }).filter(function (song) { return song.sound || song.lyrics; });
+}
+
+// The songs, and the recent drafts to steer clear of, as lines of the request.
+function songVoiceLines(examples, avoid) {
+  const lines = [];
+  if (examples.length) {
+    lines.push("", "Their songs, newest first:");
+    examples.forEach(function (song, i) {
+      lines.push("", (i + 1) + ". " + (song.title || "Untitled") + (song.made ? " (made " + song.made + ")" : ""));
+      if (song.sound) lines.push("Sound: " + song.sound);
+      if (song.lyrics) lines.push("Lyrics:", song.lyrics);
+    });
+  }
+  const recent = (Array.isArray(avoid) ? avoid : []).map(function (item) { return cleanString(item).slice(0, 240); }).filter(Boolean).slice(0, MAX_AVOID);
+  if (recent.length) {
+    lines.push("", "Recent drafts, so write about something else:");
+    recent.forEach(function (item) { lines.push("- " + item); });
+  }
+  return lines;
+}
 
 async function handleLyrics(request, env) {
   if (!env.ANTHROPIC_API_KEY) {
@@ -550,12 +601,13 @@ async function handleLyrics(request, env) {
   if (!title && !style && !draft) {
     return jsonResponse({ error: "Give a title, a description of the sound, or a draft to work from." }, 400, request, env);
   }
-  const model = cleanString(payload.model) || MODEL_NAME;
+  // Lyrics are writing, so the writing model, like Song lab.
+  const model = cleanString(payload.model) || cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL;
   const userText = [
     "Title:", title || "(none yet)", "",
     "The sound:", style || "(not described)", "",
     "Draft or notes:", draft || "(none)"
-  ].join("\n");
+  ].concat(songVoiceLines(cleanSongExamples(payload.examples), payload.avoid)).join("\n");
 
   if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
 
@@ -563,10 +615,10 @@ async function handleLyrics(request, env) {
   try {
     response = await callAnthropic(env, {
       model: model,
-      max_tokens: MAX_TOKENS,
+      max_tokens: MAX_LAB_TOKENS,
       system: LYRICS_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userText }],
-      output_config: { format: { type: "json_schema", schema: LYRICS_SCHEMA } }
+      output_config: Object.assign({ format: { type: "json_schema", schema: LYRICS_SCHEMA } }, effortFor(model, SONG_EFFORT))
     });
   } catch (err) {
     return jsonResponse({ error: "Could not reach Anthropic." }, 502, request, env);
@@ -839,11 +891,8 @@ async function handleSongStory(request, env) {
 // previous draft and a change, that draft rewritten. Written by the writing
 // model, like translations and stories.
 
-const MAX_LAB_EXAMPLES = 8;
 const MAX_LAB_IDEA = 1000;
 const MAX_LAB_CHANGE = 500;
-const MAX_LAB_SOUND = 800;
-const MAX_LAB_EXAMPLE_LYRICS = 2500;
 const MAX_LAB_TOKENS = 8192;
 const LAB_LANGUAGES = ["Like my songs", "English", "Tagalog", "Bikol", "Taglish"];
 const SONGLAB_SCHEMA = {
@@ -857,18 +906,12 @@ const SONGLAB_SCHEMA = {
   required: ["title", "style", "lyrics", "about"],
   additionalProperties: false
 };
-const SONGLAB_SYSTEM_PROMPT = [
-  "You are a songwriting partner for one songwriter, who makes songs with Suno and keeps them in SonicVault.",
-  "They write in English, Tagalog and Bikol (Central Bikol, from the Bicol region of the Philippines): real Bikol, not Tagalog with a few Bikol words, and never Hiligaynon, Cebuano or Waray.",
-  "You get some of the songs they love most: each one's title, its sound (the style they gave Suno, or a description of it) and its lyrics. Learn their voice from these -- what they write about, the images and words they reach for, how their verses and choruses are built, the sounds they favour -- and write a new, original song in it. Never reuse their lines, titles or hooks.",
-  "When there is an idea, the song is about it. With none, choose a subject close to what they write about, but not a song they have already written.",
-  "Write in the language asked for. Taglish is Tagalog and English mixed the way people talk. \"Like my songs\" means the language their songs mostly use, or the idea's own language.",
-  "Concrete images over abstractions. Rhyme naturally or not at all. Lines that sit well when sung.",
+const SONGLAB_SYSTEM_PROMPT = SONG_VOICE_PROMPT + "\n" + [
   "The reply is JSON:",
   "- title: short, in the song's language.",
-  "- style: for Suno's Style of Music box: comma-separated genre, mood, instruments, voice, tempo and production, under 250 characters. Never name a real artist, band or song; Suno refuses them.",
-  "- lyrics: the sheet for Suno's lyrics box. Each section's tag alone on a line in square brackets: [Intro], [Verse 1], [Pre-Chorus], [Chorus], [Verse 2], [Bridge], [Outro]. Suno sings every other line, so write only what is sung; backing vocals go in (parentheses) after a line. About three minutes: two or three verses, a chorus that comes back, at most one bridge, under 2,500 characters.",
-  "- about: one or two plain sentences in English: what the song is about, and what of their songs it draws on.",
+  "- style: for Suno's Style of Music box: genre, mood, instruments, voice, tempo and production as comma-separated descriptors, under 300 characters. Never name a real artist, band or song; Suno refuses them.",
+  "- lyrics: the sheet for Suno's lyrics box. Each section tag alone on its own line in square brackets, the way their songs tag them; a production cue goes inside the tag after a dash, as they write it ([Bridge - mandolin only, then bass enters]). Suno sings every line that isn't in square brackets, so no stage directions or sound descriptions in the lyrics, in parentheses or otherwise; parentheses only for sung backing vocals. About three minutes, under 2,500 characters.",
+  "- about: one or two plain sentences in English: what the song is about, and which of their songs it draws on.",
   "Given a previous draft and a change, rewrite the draft with that change and keep what works."
 ].join("\n");
 
@@ -882,13 +925,7 @@ async function handleSongLab(request, env) {
   }
   const idea = cleanString(payload.idea).slice(0, MAX_LAB_IDEA);
   const language = LAB_LANGUAGES.includes(cleanString(payload.language)) ? cleanString(payload.language) : LAB_LANGUAGES[0];
-  const examples = (Array.isArray(payload.examples) ? payload.examples : []).slice(0, MAX_LAB_EXAMPLES).map(function (song) {
-    return {
-      title: cleanString(song && song.title).slice(0, MAX_SONG_TITLE),
-      sound: cleanString(song && song.sound).slice(0, MAX_LAB_SOUND),
-      lyrics: cleanString(song && song.lyrics).slice(0, MAX_LAB_EXAMPLE_LYRICS)
-    };
-  }).filter(function (song) { return song.sound || song.lyrics; });
+  const examples = cleanSongExamples(payload.examples);
   const previous = payload.previous && typeof payload.previous === "object" ? {
     title: cleanString(payload.previous.title).slice(0, MAX_SONG_TITLE),
     style: cleanString(payload.previous.style).slice(0, MAX_SONG_STYLE),
@@ -904,16 +941,8 @@ async function handleSongLab(request, env) {
 
   const lines = [
     "Language: " + language,
-    "Idea: " + (idea || "(none: choose a subject close to what they write about)")
-  ];
-  if (examples.length) {
-    lines.push("", "Songs they love most:");
-    examples.forEach(function (song, i) {
-      lines.push("", (i + 1) + ". " + (song.title || "Untitled"));
-      if (song.sound) lines.push("Sound: " + song.sound);
-      if (song.lyrics) lines.push("Lyrics:", song.lyrics);
-    });
-  }
+    "Idea: " + (idea || "(none: find a small, specific moment of your own)")
+  ].concat(songVoiceLines(examples, change ? [] : payload.avoid));
   if (change) {
     lines.push("", "Previous draft:", "Title: " + previous.title, "Style: " + previous.style, "Lyrics:", previous.lyrics, "", "Change: " + change);
   }
@@ -928,7 +957,7 @@ async function handleSongLab(request, env) {
       max_tokens: MAX_LAB_TOKENS,
       system: SONGLAB_SYSTEM_PROMPT,
       messages: [{ role: "user", content: lines.join("\n") }],
-      output_config: Object.assign({ format: { type: "json_schema", schema: SONGLAB_SCHEMA } }, effortFor(model, "medium"))
+      output_config: Object.assign({ format: { type: "json_schema", schema: SONGLAB_SCHEMA } }, effortFor(model, SONG_EFFORT))
     });
   } catch (err) {
     return jsonResponse({ error: "Could not reach Anthropic." }, 502, request, env);

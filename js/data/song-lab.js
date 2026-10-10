@@ -43,17 +43,26 @@ function songLabSound(track) {
   ].filter(function(value) { return value && value !== 'Other'; })).join(', ');
 }
 
-// The songs to learn from: one take of each song with lyrics, the most
-// loved first. A song chosen by name (seedId) leads, lyrics or not.
-function pickSongLabExamples(list, now, seedId, count) {
+// The songs to learn from, one take of each with lyrics: the newest few
+// first -- they show how the songwriter writes now, where the most played
+// can be months old and in an earlier style -- then the most loved of the
+// rest. Songs that began as Song lab drafts (drafts, matched by their words)
+// are Claude's writing, not the songwriter's, so they are left out. A song
+// chosen by name (seedId) leads, lyrics or not.
+var SONG_LAB_NEWEST = 3;
+function pickSongLabExamples(list, now, seedId, count, drafts) {
   var all = list || [];
   var collapsed = collapseVersions(all, all);
-  var scored = collapsed.list.filter(hasLyrics).map(function(track) {
+  var withLyrics = collapsed.list.filter(function(track) {
+    return hasLyrics(track) && !(drafts || []).some(function(draft) { return songCameFromDraft(track.lyrics, draft && draft.lyrics); });
+  });
+  var newest = withLyrics.slice().sort(compareNewestFirst).slice(0, SONG_LAB_NEWEST);
+  var loved = withLyrics.filter(function(track) { return newest.indexOf(track) === -1; }).map(function(track) {
     return { track:track, score:songLabScore(collapsed.versions[track.id] || [track], now) };
   }).sort(function(a, b) {
     return b.score - a.score || compareNewestFirst(a.track, b.track);
   });
-  var picked = scored.map(function(item) { return item.track; });
+  var picked = newest.concat(loved.map(function(item) { return item.track; }));
   var seed = seedId ? all.filter(function(track) { return track.id === seedId; })[0] : null;
   if (seed) {
     var key = versionKey(seed);
@@ -64,10 +73,11 @@ function pickSongLabExamples(list, now, seedId, count) {
   return picked.slice(0, count || SONG_LAB_EXAMPLES);
 }
 
-// One example as the worker takes it.
+// One example as the worker takes it, with the day it was made.
 function songLabExample(track) {
   return {
     title:String(track && track.title || '').trim(),
+    made:madeOnDay(track),
     sound:songLabSound(track).slice(0, 800),
     lyrics:getTrackLyrics(track).slice(0, 2500)
   };
@@ -99,16 +109,43 @@ function addSongLabDraft(list, draft) {
   return [draft].concat(rest).slice(0, SONG_LAB_DRAFTS);
 }
 
-// The song a draft became, once it is in the vault: a track whose lyric
-// sheet is the draft's word for word (Suno writes the sheet it sang into
-// the MP3, and the watcher reads it from there). Null for one not made yet,
-// or made with the words changed.
+// A sheet's sung lines, each reduced to its words (versionLyricsText), so a
+// re-tagged or re-punctuated line still matches.
+function sungLineWords(lyrics) {
+  return String(lyrics || '').split(/\r\n?|\n/).map(versionLyricsText).filter(Boolean);
+}
+
+// Whether a song's words came from a draft: six lines or more, and at least
+// eight in ten of them lines of the draft. Exact sheets miss a song where
+// Suno sang a line twice, or a section was dropped.
+function songCameFromDraft(songLyrics, draftLyrics) {
+  var lines = sungLineWords(songLyrics);
+  if (lines.length < 6) return false;
+  var draftLines = {};
+  sungLineWords(draftLyrics).forEach(function(line) { draftLines[line] = true; });
+  var shared = lines.filter(function(line) { return draftLines[line]; }).length;
+  return shared >= 0.8 * lines.length;
+}
+
+// The song a draft became, once it is in the vault: a track whose words
+// came from the draft (Suno writes the sheet it sang into the MP3, and the
+// watcher reads it from there). Null for one not made yet, or made with
+// the words largely changed.
 function songLabMadeAs(draft, list) {
-  var words = versionLyricsText(draft && draft.lyrics);
-  if (words.length < 60) return null;
   return (list || []).filter(function(track) {
-    return versionLyricsText(track && track.lyrics) === words;
+    return songCameFromDraft(track && track.lyrics, draft && draft.lyrics);
   })[0] || null;
+}
+
+// The newest drafts as a line each -- title, then what it is about -- for
+// the worker to steer clear of, so a draft with no idea isn't the last one
+// again.
+function songLabAvoidList(drafts, count) {
+  return (Array.isArray(drafts) ? drafts : []).filter(function(draft) {
+    return draft && draft.title;
+  }).slice(0, count || 6).map(function(draft) {
+    return trimText(draft.title + (draft.about ? ': ' + draft.about : ''), 240);
+  });
 }
 
 // The fields too long for Suno's boxes: [{ field, length, limit }].
