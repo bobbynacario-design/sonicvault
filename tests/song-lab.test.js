@@ -53,6 +53,8 @@ test("recent drafts go to the worker as a line each, to write about something el
   assert.deepEqual(g.songLabAvoidList(drafts), ["Kape: A quiet morning.", "Pundasyon"]);
   assert.deepEqual(g.songLabAvoidList([{ title: "Mama", about: "A video call.", images: ["ceiling fan", "loose screw"] }]),
     ["Mama: A video call. (images: ceiling fan, loose screw)"], "the images a draft was built on go too");
+  assert.deepEqual(g.songLabAvoidList([{ title: "Photo", about: "A passport photo.", subject: "a son and his mother; leaving home", images: ["passport photo"] }]),
+    ["Photo: A passport photo. (subject: a son and his mother; leaving home; images: passport photo)"], "and its subject");
   assert.deepEqual(g.songLabAvoidList(drafts, 1), ["Kape: A quiet morning."]);
   assert.deepEqual(g.songLabAvoidList(undefined), []);
 });
@@ -73,11 +75,12 @@ test("an example is sized for the worker", () => {
 });
 
 test("drafts are kept newest first, twelve at most, and junk is dropped", () => {
-  const make = (n) => g.songLabDraft({ title: "Song " + n, style: "s", lyrics: "l", about: "a", images: [" a fan ", "", "x".repeat(50)] }, { idea: "i", language: "Bikol", from: ["A", "", "B"] }, new Date(2026, 9, 10, 12, n));
+  const make = (n) => g.songLabDraft({ title: "Song " + n, style: "s", lyrics: "l", about: "a", subject: " a man and his neighbour ", images: [" a fan ", "", "x".repeat(50)] }, { idea: "i", language: "Bikol", from: ["A", "", "B"] }, new Date(2026, 9, 10, 12, n));
   const first = make(1);
   assert.equal(first.id, "draft-" + new Date(2026, 9, 10, 12, 1).getTime());
   assert.deepEqual(first.from, ["A", "B"]);
   assert.deepEqual(first.images, ["a fan", "x".repeat(40)]);
+  assert.equal(first.subject, "a man and his neighbour");
   assert.equal(first.language, "Bikol");
   let list = g.addSongLabDraft([null, "junk", { id: "x" }], first);
   assert.deepEqual(list.map((d) => d.title), ["Song 1"]);
