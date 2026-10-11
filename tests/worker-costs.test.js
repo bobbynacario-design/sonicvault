@@ -78,12 +78,12 @@ test("a prompt over 100K tokens on Haiku 5.5 is kept on its own rate card", asyn
   assert.equal(row.input_tokens, 90000);
 });
 
-test("Song lab records on the writing model; a failed call records nothing", async () => {
+test("Song lab records on the song model; a failed call records nothing", async () => {
   const draft = '{"title":"T","style":"folk","lyrics":"[Verse]\\nla","about":"a"}';
   await call("/songlab", { idea: "x" }, { fetchImpl: claude(draft, { input_tokens: 3000, output_tokens: 2400 }) });
   await call("/songlab", { idea: "x" }, { fetchImpl: async () => new Response(JSON.stringify({ type: "error", error: { type: "invalid_request_error", message: "no" } }), { status: 400 }) });
   const row = line(await ledger(), "song-lab");
-  assert.deepEqual([row.model, row.calls, row.output_tokens], ["claude-sonnet-5-5", 1, 2400]);
+  assert.deepEqual([row.model, row.calls, row.output_tokens], ["claude-opus-5-5", 1, 2400]);
 });
 
 test("Workers AI records the neurons it reports, and its units", async () => {

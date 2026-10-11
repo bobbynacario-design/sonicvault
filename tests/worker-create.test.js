@@ -132,13 +132,13 @@ test("/lyrics writes in the songwriter's voice, from their songs, and keeps the 
   const sent = JSON.parse(calls[0].init.body);
   assert.match(sent.system, /\[Verse 1\]/);
   assert.match(sent.messages[0].content, /Title:\nHarbour/);
-  assert.equal(sent.model, "claude-sonnet-5-5", "lyrics are writing: the writing model");
-  assert.equal(sent.output_config.effort, "high");
-  assert.match(sent.system, /They show how they write now/);
+  assert.equal(sent.model, "claude-opus-5-5", "lyrics are songwriting: the song model");
+  assert.equal(sent.output_config.effort, undefined);
+  assert.match(sent.system, /The ones they play most -- rhymed, singable songs about their own days -- are what they love to hear/);
   assert.match(sent.system, /Never invent relatives/, "a sheet makes nothing up either");
   assert.match(sent.messages[0].content, /\n\nAbout me:\n\(not written yet\)\n/);
   assert.match(sent.system, /no stage directions/);
-  assert.match(sent.messages[0].content, /Their songs, newest first:\n\n1\. Pauwi \(made 2026-10-04\)\nSound: indie folk\nLyrics:\n\[Verse 1\]\nThe bus leaves at eleven/);
+  assert.match(sent.messages[0].content, /Their songs:\n\n1\. Pauwi \(made 2026-10-04\)\nSound: indie folk\nLyrics:\n\[Verse 1\]\nThe bus leaves at eleven/);
   assert.equal(sent.temperature, undefined);
   assert.equal(sent.messages.length, 1, "no started reply");
   assert.deepEqual(sent.output_config.format.schema.required, ["title", "lyrics"]);

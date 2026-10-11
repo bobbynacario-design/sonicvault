@@ -19,21 +19,12 @@ function songLabWordCount(text) {
   return words ? words.length : 0;
 }
 
-// How much a song is being played now, for choosing examples: its plays in
-// the last 60 days, over all its takes, with a nudge for the take picked as
-// main. Old play counts are left out: the most played songs overall are the
-// March ones, in a style the songwriter has moved on from.
-function songLabScore(takes, now) {
-  var since = localDayKey(new Date(now.getTime() - 60 * 86400000));
-  var score = 0;
-  (takes || []).forEach(function(track) {
-    var days = track.playDays && typeof track.playDays === 'object' ? track.playDays : {};
-    Object.keys(days).forEach(function(day) {
-      if (day > since) score += Number(days[day]) || 0;
-    });
-    if (track.versionPick === true) score += 2;
-  });
-  return score;
+// How loved a song is, for choosing examples: its plays over all its takes.
+// The songs played most (150 to 184 plays, rhymed pairs about the
+// songwriter's own days) are what they love to hear; when the examples left
+// them out, the drafts stopped rhyming and "won't register" (2026-10-11).
+function songLabPlays(takes) {
+  return (takes || []).reduce(function(sum, track) { return sum + (Number(track && track.plays) || 0); }, 0);
 }
 
 // When a song was made: the moment Suno stamped in its file (track.madeAt),
@@ -64,14 +55,12 @@ function songLabSound(track) {
 }
 
 // The songs to learn from, one take of each with lyrics: the newest by the
-// day Suno made them -- how the songwriter writes now -- then the ones
-// played most in the last 60 days, so a song on repeat is always in, then
-// the next newest. Songs played a lot long ago but rarely now (the March
-// favourites) only fill in when there aren't enough. Songs that began as
-// Song lab drafts (drafts, matched by their words) are Claude's writing,
-// not the songwriter's, so they are left out. A song chosen by name
-// (seedId) leads, lyrics or not.
-var SONG_LAB_NEWEST = 4;
+// day Suno made them -- where the songwriter's writing is going -- then the
+// most played, what they love to hear. Songs that began as Song lab drafts
+// (drafts, matched by their words) are Claude's writing, not the
+// songwriter's, so they are left out. A song chosen by name (seedId) leads,
+// lyrics or not.
+var SONG_LAB_NEWEST = 3;
 function pickSongLabExamples(list, now, seedId, count, drafts) {
   var all = list || [];
   var collapsed = collapseVersions(all, all);
@@ -80,9 +69,9 @@ function pickSongLabExamples(list, now, seedId, count, drafts) {
   });
   var newest = withLyrics.slice().sort(compareMadeNewestFirst).slice(0, SONG_LAB_NEWEST);
   var loved = withLyrics.filter(function(track) { return newest.indexOf(track) === -1; }).map(function(track) {
-    return { track:track, score:songLabScore(collapsed.versions[track.id] || [track], now) };
+    return { track:track, plays:songLabPlays(collapsed.versions[track.id] || [track]) };
   }).sort(function(a, b) {
-    return b.score - a.score || compareMadeNewestFirst(a.track, b.track);
+    return b.plays - a.plays || compareMadeNewestFirst(a.track, b.track);
   });
   var picked = newest.concat(loved.map(function(item) { return item.track; }));
   var seed = seedId ? all.filter(function(track) { return track.id === seedId; })[0] : null;
@@ -95,13 +84,14 @@ function pickSongLabExamples(list, now, seedId, count, drafts) {
   return picked.slice(0, count || SONG_LAB_EXAMPLES);
 }
 
-// One example as the worker takes it, with the day it was made, read as
-// the release check reads it (js/data/release.js): Suno's stamp, else the
-// day it reached the vault.
+// One example as the worker takes it, with how often it has been played
+// and the day it was made, read as the release check reads it
+// (js/data/release.js): Suno's stamp, else the day it reached the vault.
 function songLabExample(track) {
   return {
     title:String(track && track.title || '').trim(),
     made:releaseMadeDay(track).day,
+    plays:Number(track && track.plays) || 0,
     sound:songLabSound(track).slice(0, 800),
     lyrics:getTrackLyrics(track).slice(0, 2500)
   };

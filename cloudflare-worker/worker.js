@@ -546,28 +546,33 @@ async function handleGenerate(request, env) {
 }
 
 // How to write as this songwriter, shared by Song lab (/songlab) and Write
-// with Claude (/lyrics). Both send some of their own songs, newest first,
-// and what they wrote under About me. Every version of this prompt that
-// knew them only from their lyrics wrote about a stranger: drafts asked for
+// with Claude (/lyrics). Both send some of their own songs (the newest,
+// then the most played), and what they wrote under About me. Every
+// version of this prompt that knew them only from their lyrics wrote
+// about a stranger: drafts asked for
 // "small details only this person would notice" made them up (a brother who
 // left), bans on props and subjects pushed drafts into plotted scenes, and
 // "never make anything up" left a Christmas song with nothing in it. Asked
 // to pick between that and a plain chat-style prompt, the user said "both
 // know nothing about me and I can't relate to both" (2026-10-11). So their
 // own account of their life leads: true, and the only source of people and
-// events; shared, everyday things are free to use.
+// events; shared, everyday things are free to use. Then the songs "don't
+// rhyme and won't register with any connections": the prompt had learnt
+// "little or no rhyme" from their newest songs, while the ones they play
+// most (150 to 184 plays) rhyme in pairs about their own days. So it rhymes,
+// keeps a beat and one thread, and learns from the most played too.
 const SONG_VOICE_PROMPT = [
   "You write songs with one songwriter, in their voice. They make the songs in Suno and keep them in SonicVault.",
   "They write in English, Tagalog and Bikol (Central Bikol, from the Bicol region of the Philippines: real Bikol, never Tagalog with a few Bikol words, never Hiligaynon, Cebuano or Waray), and sometimes mix English and Tagalog in one song.",
   "About me is them, in their own words: where they live, who is in their life, what they do, what is going on. Treat it as true and write from it. A song they can relate to comes from their real life, not a typical one.",
   "People, places and events in the song come only from About me or from what they ask for. Never invent relatives, friends, names, places or things that happened to them; a song that needs someone who isn't there leaves them out. Shared, everyday things anyone in their place would know -- the time of year, the weather, the customs where they live -- are fine to use. With no About me and nothing personal in the request, stay with the feeling rather than inventing a life.",
-  "You get some of their own songs, newest first: each one's title, when it was made, its sound and its lyrics. They show how they write now -- the way they talk, how long their lines run, whether and how they rhyme, how they build a song and tag its sections. Write a new song that sounds like the same person wrote it next. Never reuse their lines, titles or hooks.",
-  "How their best songs work:",
-  "- One feeling, said plainly, by them as themselves, to someone or to themselves. Not a story with a plot and a twist.",
-  "- One central line carries the song. It is the title, it anchors the chorus, and it comes back at the end.",
-  "- The chorus is short, four to eight lines, and the same words each time it comes back; only a final chorus may change a line or two. Lines inside it repeat or echo each other.",
-  "- Verses of about four short lines, close in length, so they sit on a tune. Repetition and parallel lines do the work rhyme would; rhyme only where it comes naturally.",
-  "- No lessons, slogans or motivational stock phrases.",
+  "You get some of their own songs: their newest, then the ones they play most, each with when it was made, how often they have played it, its sound and its lyrics. They show how they talk, the words they reach for, and how they build a song and tag its sections. The ones they play most -- rhymed, singable songs about their own days -- are what they love to hear. Write a new song that sounds like the same person wrote it next. Never reuse their lines, titles or hooks.",
+  "How to write it:",
+  "- Rhyme it, the way the songs they play most do: lines in rhyming pairs (AABB) or alternating (ABAB), in every verse, pre-chorus and chorus. Real rhymes and close ones; in Tagalog and Bikol, matching end sounds count. If a rhyme would make a line say something odd or untrue, find another rhyme -- never drop the rhyme.",
+  "- Keep the beat: the lines of a section have about the same number of syllables, so they sing to one melody.",
+  "- One thread runs through the song, and every line connects to it: the verses build the picture from their life, the chorus says what it means to them, a bridge turns it. Each section leads into the next.",
+  "- The chorus is the part people sing back: the title in its first or last line, simple everyday words, a strong rhyme, and the same words each time it comes back.",
+  "- Say the feeling straight, in words anyone would use, so a listener who doesn't know them still feels it; the true details from About me make it theirs.",
   "Write in the language asked for. Taglish is Tagalog and English mixed the way they mix them in their songs. \"Like my songs\" means the language of their newest songs, or the language they wrote to you in."
 ].join("\n");
 
@@ -589,6 +594,14 @@ const MAX_ABOUT = 3000;
 // How hard the writing model thinks over a song, for both routes. Set from a
 // side-by-side on the songwriter's own songs (2026-10-10).
 const SONG_EFFORT = "high";
+// Who writes the songs themselves (/songlab and /lyrics): Opus. After a day
+// of drafts the user called underwhelming, the same Christmas request with
+// rhyme rules came out a clearly better song from Opus than from Sonnet
+// ("Close the Books for Christmas" against "No Number on This Night"), and
+// the user chose it at about 7 cents a song against 2 (2026-10-11). Ideas
+// stay on the writing model. Opus is sent no effort, which is how it was
+// tested: effortFor sets one only for the two models it names.
+const SONG_MODEL = "claude-opus-5-5";
 
 // The songs sent to learn from, cleaned: { title, made, sound, lyrics }.
 function cleanSongExamples(list) {
@@ -597,6 +610,7 @@ function cleanSongExamples(list) {
     return {
       title: cleanString(song && song.title).slice(0, MAX_SONG_TITLE),
       made: /^\d{4}-\d{2}-\d{2}$/.test(made) ? made : "",
+      plays: Math.max(0, Math.floor(Number(song && song.plays) || 0)),
       sound: cleanString(song && song.sound).slice(0, MAX_VOICE_SOUND),
       lyrics: cleanString(song && song.lyrics).slice(0, MAX_VOICE_LYRICS)
     };
@@ -617,9 +631,10 @@ function songAboutLines(payload) {
 function songVoiceLines(examples) {
   const lines = [];
   if (examples.length) {
-    lines.push("", "Their songs, newest first:");
+    lines.push("", "Their songs:");
     examples.forEach(function (song, i) {
-      lines.push("", (i + 1) + ". " + (song.title || "Untitled") + (song.made ? " (made " + song.made + ")" : ""));
+      const notes = [song.made ? "made " + song.made : "", song.plays ? "played " + song.plays + (song.plays === 1 ? " time" : " times") : ""].filter(Boolean);
+      lines.push("", (i + 1) + ". " + (song.title || "Untitled") + (notes.length ? " (" + notes.join(", ") + ")" : ""));
       if (song.sound) lines.push("Sound: " + song.sound);
       if (song.lyrics) lines.push("Lyrics:", song.lyrics);
     });
@@ -641,8 +656,8 @@ async function handleLyrics(request, env) {
   if (!title && !style && !draft) {
     return jsonResponse({ error: "Give a title, a description of the sound, or a draft to work from." }, 400, request, env);
   }
-  // Lyrics are writing, so the writing model, like Song lab.
-  const model = cleanString(payload.model) || cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL;
+  // Lyrics are songwriting, so the song model, like Song lab.
+  const model = cleanString(payload.model) || cleanString(env.SONG_MODEL) || SONG_MODEL;
   const userText = [
     "Title:", title || "(none yet)", "",
     "The sound:", style || "(not described)", "",
@@ -1057,7 +1072,7 @@ const SONG_IDEAS_SCHEMA = {
 };
 const SONG_IDEAS_PROMPT = [
   "You help one songwriter find what to write their next song about. They make songs in Suno and keep them in SonicVault.",
-  "You get today's date, About me (them, in their own words), some of their own songs, newest first, and the songs drafted for them lately.",
+  "You get today's date, About me (them, in their own words), some of their own songs (the newest, then the ones they play most), and the songs drafted for them lately.",
   "Offer three things they could write about next, each from a different part of their life as About me tells it -- what is going on now, the people in it, the time of year -- and what their songs keep coming back to. Not what one of their songs or a recent draft already says.",
   "Use only what About me and their songs say about their life: no names, places, relatives, jobs or events beyond those, and no he or she for them. Where About me says little, point at a moment or a feeling they will recognise and let them add the true details.",
   "Each idea, in plain English:",
@@ -1108,7 +1123,7 @@ async function handleSongLab(request, env) {
     lines.push("", "Previous draft:", "Title: " + previous.title, "Style: " + previous.style, "Lyrics:", previous.lyrics, "", "Change: " + change);
   }
 
-  const asked = await askSongLabClaude(request, env, payload, "song-lab", SONGLAB_SYSTEM_PROMPT, lines, SONGLAB_SCHEMA, SONG_EFFORT);
+  const asked = await askSongLabClaude(request, env, payload, "song-lab", SONGLAB_SYSTEM_PROMPT, lines, SONGLAB_SCHEMA, SONG_EFFORT, true);
   if (asked.response) return asked.response;
   const song = asked.answer;
   const lyrics = cleanString(song && song.lyrics).slice(0, MAX_SONG_LYRICS);
@@ -1158,10 +1173,11 @@ async function handleSongIdeas(request, env) {
   return jsonResponse({ ideas: ideas }, 200, request, env);
 }
 
-// One Song lab call to the writing model: { answer } with the parsed JSON,
-// or { response } carrying the error to send back.
-async function askSongLabClaude(request, env, payload, feature, system, lines, schema, effort) {
-  const model = cleanString(payload.model) || cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL;
+// One Song lab call: { answer } with the parsed JSON, or { response }
+// carrying the error to send back. Songs go to the song model (Opus), ideas
+// to the writing model (Sonnet).
+async function askSongLabClaude(request, env, payload, feature, system, lines, schema, effort, songwriting) {
+  const model = cleanString(payload.model) || (songwriting ? cleanString(env.SONG_MODEL) || SONG_MODEL : cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL);
   if (await overDailyLimit(env, "claude", claudeWeight(model))) return { response: dailyLimitResponse("claude", request, env) };
 
   let response;

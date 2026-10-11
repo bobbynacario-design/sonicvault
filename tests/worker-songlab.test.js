@@ -37,36 +37,42 @@ const claude = (answer, extra = {}) => async () => new Response(JSON.stringify({
 }));
 
 const DRAFT = { title: "Ilaw sa Pantalan", style: "acoustic folk, warm female vocal, 90 BPM", lyrics: "[Verse 1]\nAn mga ilaw", about: "A homecoming." };
-const EXAMPLES = [{ title: "Harbour Lights", made: "2026-08-31", sound: "warm folk", lyrics: "[Verse]\nThe boats come home" }, { title: "", sound: "", lyrics: "" }];
+const EXAMPLES = [{ title: "Harbour Lights", made: "2026-08-31", plays: 22, sound: "warm folk", lyrics: "[Verse]\nThe boats come home" }, { title: "", sound: "", lyrics: "" }];
 const ABOUT = "I live in Naga with my wife and two kids.\nI fix boats for a living.";
 
-test("/songlab writes from what they say and who they are, in the voice of their songs, with the writing model", async () => {
+test("/songlab writes from what they say and who they are, in the voice of their songs, with the song model", async () => {
   const { res, json, sent } = await call("/songlab", {
     what: "the boat my father fixed every summer", who: "my father", feel: "proud, a little sorry",
     language: "Bikol", about: ABOUT, today: "2026-10-11", examples: EXAMPLES, avoid: ["Kape sa Madaling Araw: a quiet morning"]
   }, { fetchImpl: claude({ ...DRAFT, subject: "dropped", images: ["dropped"] }) });
   assert.equal(res.status, 200);
   assert.deepEqual(json, DRAFT);
-  assert.equal(sent.model, "claude-sonnet-5-5");
+  assert.equal(sent.model, "claude-opus-5-5", "songs are written by Opus (2026-10-11)");
   assert.equal(sent.temperature, undefined);
   assert.equal(sent.messages.length, 1);
-  assert.equal(sent.output_config.effort, "high");
+  assert.equal(sent.output_config.effort, undefined, "Opus is sent no effort, as it was tested");
   assert.deepEqual(sent.output_config.format.schema.required, ["title", "style", "lyrics", "about"]);
   // Their own account of their life leads, as true (2026-10-11).
   assert.match(sent.system, /About me is them, in their own words.*Treat it as true and write from it/);
   assert.match(sent.system, /People, places and events in the song come only from About me or from what they ask for\. Never invent relatives/);
   assert.match(sent.system, /Shared, everyday things anyone in their place would know/);
   assert.match(sent.system, /something that happened, something on their mind, or the kind of song they want/, "a brief is a request too");
-  // The craft of their own best songs: one line the chorus repeats.
-  assert.match(sent.system, /One central line carries the song\. It is the title/);
+  // The craft of the songs they play most: rhymed, on a beat, one thread,
+  // a chorus to sing back (2026-10-11).
+  assert.match(sent.system, /Rhyme it, the way the songs they play most do: lines in rhyming pairs \(AABB\) or alternating \(ABAB\), in every verse, pre-chorus and chorus/);
+  assert.match(sent.system, /never drop the rhyme/);
+  assert.match(sent.system, /Keep the beat/);
+  assert.match(sent.system, /One thread runs through the song, and every line connects to it/);
+  assert.match(sent.system, /The chorus is the part people sing back: the title in its first or last line/);
   assert.match(sent.system, /the same words each time it comes back/);
+  assert.doesNotMatch(sent.system, /rhyme only where it comes naturally|No lessons, slogans/, "no steering away from rhyme or from what they love");
   assert.doesNotMatch(sent.system, /rice cooker|a mother or father|images the recent drafts/, "no lists of props and subjects to stay away from");
   assert.match(sent.system, /Central Bikol/);
   assert.match(sent.system, /Never name a real artist/);
   assert.match(sent.system, /production cue goes inside the tag/);
   const text = sent.messages[0].content;
   assert.match(text, /^Language: Bikol\nWhat the song is about: the boat my father fixed every summer\nWho it's for: my father\nHow it should feel: proud, a little sorry\nToday: 2026-10-11\n\nAbout me:\nI live in Naga with my wife and two kids\.\nI fix boats for a living\.\n/);
-  assert.match(text, /Their songs, newest first:\n\n1\. Harbour Lights \(made 2026-08-31\)\nSound: warm folk\nLyrics:\n\[Verse\]\nThe boats come home$/);
+  assert.match(text, /Their songs:\n\n1\. Harbour Lights \(made 2026-08-31, played 22 times\)\nSound: warm folk\nLyrics:\n\[Verse\]\nThe boats come home$/);
   assert.doesNotMatch(text, /2\. /, "an empty example is left out");
   assert.doesNotMatch(text, /Kape|Recent drafts/, "recent drafts no longer steer a song away");
 });
@@ -125,7 +131,7 @@ test("/songlab/ideas offers three answers from their life and songs, inventing n
   assert.match(sent.system, /from a different part of their life as About me tells it -- what is going on now, the people in it, the time of year/);
   assert.match(sent.system, /Use only what About me and their songs say about their life/);
   const text = sent.messages[0].content;
-  assert.match(text, /^Today: 2026-10-11\n\nAbout me:\nI live in Naga with my wife and two kids\.\nI fix boats for a living\.\n\nTheir songs, newest first:\n\n1\. Harbour Lights/);
+  assert.match(text, /^Today: 2026-10-11\n\nAbout me:\nI live in Naga with my wife and two kids\.\nI fix boats for a living\.\n\nTheir songs:\n\n1\. Harbour Lights/);
   assert.match(text, /Drafted for them lately:\n- Kape: a quiet morning\n- Pauwi: going home$/);
 });
 

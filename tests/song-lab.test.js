@@ -8,7 +8,7 @@ const g = require("./helpers/data-scripts.js").loadDataScripts();
 const NOW = new Date(2026, 9, 10, 12);
 const SHEET = (word) => "[Verse 1]\n" + Array.from({ length: 6 }, (_, i) => word + " line number " + i + " of the song").join("\n");
 
-test("the newest songs by the day Suno made them lead, then what's played now, one take each", () => {
+test("the newest songs by the day Suno made them lead, then the most played, one take each", () => {
   const list = [
     { id: "t-1", title: "March Favourite", created: "2026-03-29", lyrics: SHEET("march"), plays: 180 },
     { id: "t-2", title: "March Other", created: "2026-03-29", lyrics: SHEET("other"), plays: 60, playDays: { "2026-10-09": 5 } },
@@ -22,10 +22,11 @@ test("the newest songs by the day Suno made them lead, then what's played now, o
     { id: "t-9", title: "August", created: "2026-10-10", madeAt: "2026-08-20T03:00:00.000Z", lyrics: SHEET("august"), plays: 4 }
   ];
   const picked = g.pickSongLabExamples(list, NOW, "", 6).map((t) => t.title);
-  // The four newest made, then by plays in the last 60 days: March Other's 5
-  // beat the 180 March Favourite had long ago, and April, newer, is next.
-  // One take of October; no lyrics, no voice.
-  assert.deepEqual(picked, ["Today", "This Week", "October", "August", "March Other", "April"]);
+  // The three newest made -- August, imported today, was made before
+  // October -- then the most played: what they love to hear. One take of
+  // October; no lyrics, no voice.
+  assert.deepEqual(picked, ["Today", "This Week", "October", "March Favourite", "March Other", "April"]);
+  assert.deepEqual(g.pickSongLabExamples(list, NOW, "", 8).map((t) => t.title).slice(-1), ["August"]);
   assert.deepEqual(g.pickSongLabExamples(list, NOW, "", 2).map((t) => t.title), ["Today", "This Week"]);
 });
 
@@ -76,6 +77,8 @@ test("an example is sized for the worker, with the day Suno made it", () => {
   const ex = g.songLabExample({ title: " T ", created: "2026-10-04", prompt: "p".repeat(900), lyrics: "l".repeat(3000) });
   assert.equal(ex.title, "T");
   assert.equal(ex.made, "2026-10-04", "no stamp: the day it reached the vault");
+  assert.equal(ex.plays, 0);
+  assert.equal(g.songLabExample({ plays: 184, lyrics: "x" }).plays, 184);
   assert.equal(ex.sound.length, 800);
   assert.equal(ex.lyrics.length, 2500);
   assert.equal(g.songLabExample({ created: "2026-10-04", madeAt: "2026-08-31T12:00:00.000Z", lyrics: "x" }).made, "2026-08-31");
