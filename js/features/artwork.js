@@ -258,17 +258,19 @@ function rememberFileLyrics(trackId, text) {
 async function probeTrackArt(track) {
   var bytes = await readAudioHead(track.audioURL);
   var hasLyricSheet = fillLyricsFromTag(track, bytes);
-  return rememberTrackArt(track, findEmbeddedArt(bytes), hasLyricSheet);
+  return rememberTrackArt(track, findEmbeddedArt(bytes), hasLyricSheet, findSunoStamp(bytes));
 }
 
 // Record what a track's file carries -- its picture ({ mime, data }, or
-// null) and whether it has a lyric sheet -- and paint the picture. Used by
-// the sweep, and by the Create page for a song whose cover it already holds,
-// so the cover shows at once instead of after the next sweep.
-async function rememberTrackArt(track, art, hasLyricSheet) {
+// null), whether it has a lyric sheet, and Suno's stamp ({ made, id }, or
+// null) -- and paint the picture. Used by the sweep, and by the Create page
+// for a song whose cover it already holds, so the cover shows at once
+// instead of after the next sweep.
+async function rememberTrackArt(track, art, hasLyricSheet, stamp) {
   var index = getArtIndex();
+  var known = { src:track.audioURL, art:false, lyrics:!!hasLyricSheet, stamp:stamp || false };
   if (!art) {
-    index[track.id] = { src:track.audioURL, art:false, lyrics:!!hasLyricSheet };
+    index[track.id] = known;
     saveArtIndex();
     return false;
   }
@@ -277,7 +279,7 @@ async function rememberTrackArt(track, art, hasLyricSheet) {
   try {
     palette = await paletteFromBlob(blob);
   } catch (e) {
-    index[track.id] = { src:track.audioURL, art:false, lyrics:!!hasLyricSheet };
+    index[track.id] = known;
     saveArtIndex();
     return false;
   }
@@ -285,7 +287,7 @@ async function rememberTrackArt(track, art, hasLyricSheet) {
     var cache = await caches.open(ART_CACHE_NAME);
     await cache.put(artCacheKey(track.id), new Response(blob, { headers:{ 'Content-Type':art.mime } }));
   }
-  index[track.id] = { src:track.audioURL, art:true, palette:palette, lyrics:!!hasLyricSheet };
+  index[track.id] = Object.assign(known, { art:true, palette:palette });
   saveArtIndex();
   setArtBlob(track.id, blob);
   paintArt(track.id);
@@ -302,14 +304,45 @@ function getArtCandidates() {
   });
 }
 
+// Copy each file's Suno stamp -- when the song was made, and its Suno id --
+// from the art index onto the private track, for the release check. All in
+// one save; the index keeps the stamps, so a save lost to a closed tab is
+// made on the next sweep.
+function applySunoStamps() {
+  if (typeof _coverDemoActive !== 'undefined' && _coverDemoActive) return 0;
+  var index = getArtIndex();
+  var changed = 0;
+  (tracks || []).forEach(function(track) {
+    var entry = track && track.id ? index[track.id] : null;
+    var stamp = entry && entry.src === track.audioURL ? entry.stamp : null;
+    if (!stamp) return;
+    var made = stamp.made || track.madeAt || '';
+    var id = stamp.id || track.sunoId || '';
+    if (made === (track.madeAt || '') && id === (track.sunoId || '')) return;
+    if (made) track.madeAt = made;
+    if (id) track.sunoId = id;
+    changed++;
+  });
+  if (changed) {
+    persistTracks();
+    if (typeof renderRelease === 'function') renderRelease();
+  }
+  return changed;
+}
+
 async function sweepArtwork() {
   if (_artSweepRunning || !('caches' in window) || !window.ReadableStream) return;
   var index = getArtIndex();
-  // Entries from before lyrics were read have no `lyrics` key: re-read
-  // those once too.
+  applySunoStamps();
+  var inVault = {};
+  (tracks || []).forEach(function(track) { if (track && track.id) inVault[track.id] = true; });
+  // Entries from before lyrics were read have no `lyrics` key, and vault
+  // songs read before Suno's stamp was have no `stamp`: re-read those once,
+  // unless another device already put the stamp on the song.
   var todo = getArtCandidates().filter(function(track) {
     var entry = index[track.id];
     if (!entry || entry.src !== track.audioURL || !('lyrics' in entry)) return true;
+    if (inVault[track.id] && !('stamp' in entry) && !track.madeAt) return true;
     // A shared track whose excerpt lost its line breaks, read before its
     // sheet was kept: read it once more for the sheet.
     return entry.lyrics && isFlattenedLyrics(track.lyricsExcerpt) && !getFileLyrics(track.id);
@@ -330,6 +363,7 @@ async function sweepArtwork() {
     }
   } finally {
     _artSweepRunning = false;
+    applySunoStamps();
     // One re-render for every lyric sheet filled, so "Lyrics missing" labels
     // clear without rebuilding the views once per track.
     if (_lyricsFilledThisSweep) renderTracks();

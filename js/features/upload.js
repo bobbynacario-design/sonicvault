@@ -132,7 +132,8 @@ function probeUploadDraft(draft) {
 
 // Read the picked file while it is still in memory -- no Cloudinary
 // round-trip needed after saving: the lyric sheet Suno embeds in its tag
-// (filled in only when the lyrics box is still empty) and the waveform.
+// (filled in only when the lyrics box is still empty), Suno's stamp of when
+// the song was made, and the waveform.
 async function decodeUploadPeaks(draft) {
   if (!draft || !draft.file) return;
   var bufferData;
@@ -140,6 +141,11 @@ async function decodeUploadPeaks(draft) {
     bufferData = await draft.file.arrayBuffer();
   } catch (e) {
     return;
+  }
+  var stamp = findSunoStamp(new Uint8Array(bufferData));
+  if (stamp) {
+    draft.madeAt = stamp.made;
+    draft.sunoId = stamp.id;
   }
   var embedded = findEmbeddedLyrics(new Uint8Array(bufferData));
   if (embedded && !getTrackLyrics(draft)) {
@@ -417,7 +423,7 @@ function cancelUpload() {
 // the Create page, whose songs are saved as drafts too. `offset` keeps ids
 // apart within one batch.
 function trackFromUploadDraft(item, audioURL, offset) {
-  return {
+  var track = {
     id: 't-' + (Date.now() + (offset || 0)),
     title: String(item.title || '').trim(),
     genre: item.genre || 'Other',
@@ -450,6 +456,9 @@ function trackFromUploadDraft(item, audioURL, offset) {
     aiMetadataVersion: Number(item.aiMetadataVersion || 0),
     aiGeneratedAt: item.aiGeneratedAt || ''
   };
+  if (item.madeAt) track.madeAt = item.madeAt;
+  if (item.sunoId) track.sunoId = item.sunoId;
+  return track;
 }
 
 // New tracks go to the top of the vault, their waveforms (read from the

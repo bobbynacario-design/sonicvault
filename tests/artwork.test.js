@@ -141,3 +141,31 @@ test("greyscale art gets a neutral palette, and empty input none", () => {
   assert.match(p.accent, /^hsl\(230 14% /);
   assert.equal(g.paletteFromPixels(new Uint8ClampedArray(0)), null);
 });
+
+// Suno's stamp, as its downloads carry it (checked against real files,
+// 2026-10-11): a COMM, plus in newer exports a TXXX "comment" written a
+// moment later; older exports have the COMM alone, in UTF-16.
+const STAMP = "made with suno; created=2026-08-31T05:32:02.379402+00:00; id=4c539672-6e58-45de-8829-b48a017565f9";
+const utf16 = (s) => [0xff, 0xfe, ...[...s].flatMap((c) => [c.charCodeAt(0), 0])];
+
+test("reads when a Suno song was made, and its id, from the COMM over the later TXXX", () => {
+  const t = tag(4, [
+    text(4, "TIT2", "Pauwi"),
+    frame(4, "TXXX", [3, ...ascii("comment"), 0, ...ascii("made with suno; created=2026-08-31T05:32:04Z; id=4c539672-6e58-45de-8829-b48a017565f9")]),
+    frame(4, "COMM", [3, ...ascii("eng"), 0, ...ascii(STAMP)])
+  ]);
+  assert.deepEqual(g.findSunoStamp(t), { made: "2026-08-31T05:32:02Z", id: "4c539672-6e58-45de-8829-b48a017565f9" });
+});
+
+test("reads an older export's UTF-16 COMM, and a TXXX alone", () => {
+  const old = tag(3, [frame(3, "COMM", [1, ...ascii("eng"), 0xff, 0xfe, 0, 0, ...utf16("made with suno; created=2026-04-28T12:34:34.381Z; id=4315b693-6e39-4f84-8444-11a979659ec4")])]);
+  assert.deepEqual(g.findSunoStamp(old), { made: "2026-04-28T12:34:34Z", id: "4315b693-6e39-4f84-8444-11a979659ec4" });
+  const txxx = tag(4, [frame(4, "TXXX", [3, ...ascii("comment"), 0, ...ascii("made with suno; created=2026-10-10T08:53:15+08:00")])]);
+  assert.deepEqual(g.findSunoStamp(txxx), { made: "2026-10-10T00:53:15Z", id: "" }, "an offset is turned to UTC");
+});
+
+test("a file Suno didn't stamp has no stamp", () => {
+  assert.equal(g.findSunoStamp(tag(4, [frame(4, "COMM", [3, ...ascii("eng"), 0, ...ascii("ripped by me")])])), null);
+  assert.equal(g.findSunoStamp(tag(3, [text(3, "TIT2", "Horizon")])), null);
+  assert.equal(g.findSunoStamp(Uint8Array.from(JPEG)), null);
+});

@@ -188,6 +188,40 @@ function findEmbeddedLyrics(bytes) {
   return best;
 }
 
+// Suno stamps every download with a comment: "made with suno;
+// created=2026-08-31T05:32:02.379402+00:00; id=<song id>", in a COMM frame
+// (UTF-16 in older exports) and, in newer ones, again in a TXXX "comment"
+// written a moment later, at export. The COMM wins when both are there.
+// { made: '2026-08-31T05:32:02Z', id } -- either may be '' -- or null for a
+// file Suno didn't stamp.
+function findSunoStamp(bytes) {
+  var found = null;
+  readID3Frames(bytes).forEach(function(frame) {
+    var comment = frame.id === 'COMM' || frame.id === 'COM';
+    if ((!comment && frame.id !== 'TXXX' && frame.id !== 'TXX') || frame.body.length < 3) return;
+    if (found && found.comment) return;
+    var encoding = frame.body[0];
+    var start = skipID3String(frame.body, comment ? 4 : 1, encoding);
+    var stamp = readSunoStamp(decodeID3Text(frame.body.subarray(start), encoding));
+    if (stamp) found = { made:stamp.made, id:stamp.id, comment:comment };
+  });
+  return found ? { made:found.made, id:found.id } : null;
+}
+
+function readSunoStamp(text) {
+  var s = String(text || '');
+  if (!/made with suno/i.test(s)) return null;
+  var when = s.match(/created=(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?/i);
+  var id = s.match(/\bid=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  var made = '';
+  if (when) {
+    var zone = when[3] && when[3].toUpperCase() !== 'Z' ? when[3].replace(/^([+-]\d{2}):?(\d{2})$/, '$1:$2') : 'Z';
+    var at = new Date(when[1] + 'T' + when[2] + zone);
+    if (!isNaN(at.getTime())) made = at.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  }
+  return { made:made, id:id ? id[1].toLowerCase() : '' };
+}
+
 function rgbToHsl(r, g, b) {
   r /= 255; g /= 255; b /= 255;
   var max = Math.max(r, g, b);

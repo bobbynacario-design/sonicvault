@@ -78,6 +78,7 @@ function renderInsights() {
     + '</div></div>'
     + '<div id="week-recap"></div>'
     + '<div id="tidy-card"></div>'
+    + '<div id="release-card"></div>'
     + '<div id="share-listens"></div>'
     + '<div class="insight-cols">'
     +   '<div class="section-card"><div class="section-inner"><div class="section-title">Genres</div><div class="dist-list">' + buildDistributionBars(genres, getGenreColor, tracks.length, function(k) { return 'setGenreFilter(' + jsq(k) + ");switchView('library')"; }) + '</div></div></div>'
@@ -100,6 +101,7 @@ function renderInsights() {
     + '<div id="costs-card"></div>';
   renderWeekRecap();
   renderTidy();
+  renderRelease();
   renderShareListens();
   renderCosts();
 }
