@@ -27,6 +27,11 @@
 //   POST /cover     { title, style } -- a square cover from FLUX.1 [schnell]
 //                   on Workers AI, returned as { mime, image } in base64.
 //
+// POST /release-cover { title, scene, style, look, seed } -- the picture for
+// a release cover (Ready for Spotify, js/features/release-cover.js), from
+// FLUX.2 [klein] 9B at 1536 x 1536; the app scales it to 3000 and sets the
+// title and artist on it.
+//
 // GET /s/... serves share-link previews to link-preview bots (share.js).
 // Those routes are public by design: they read only the share records the
 // app publishes for anyone to see.
@@ -43,6 +48,22 @@ const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models/";
 const LYRIA_RETRY_MS = 1500;
 const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const COVER_STEPS = 6;
+// Release covers (Ready for Spotify): distributors want 3000 x 3000, which
+// the app scales up to from FLUX.2 [klein] 9B's 1536 x 1536 -- the largest
+// square it took on 2026-10-11 (1792 and 1920 failed with 3043, as did a
+// size that isn't a multiple of 64). Images made through a hosted API may be
+// used commercially. About 1,600 neurons a cover, so some five a day fit in
+// the free plan's 10,000. Tried first: Lucid Origin at 2500 came back
+// blurred and banded, at some 22,000 neurons; FLUX.2 [dev] costs four
+// times klein's at this size.
+const RELEASE_COVER_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
+const RELEASE_COVER_SIZE = 1536;
+const RELEASE_COVER_LOOKS = {
+  painting: "a rich oil painting",
+  photo: "a cinematic photograph",
+  illustration: "a bold graphic illustration",
+  abstract: "abstract art made of shape, texture and colour"
+};
 const MAX_SONG_TITLE = 120;
 const MAX_SONG_STYLE = 1000;
 const MAX_SONG_LYRICS = 6000;
@@ -140,6 +161,7 @@ export default {
     if (route === "/generate") return handleGenerate(request, env);
     if (route === "/lyrics") return handleLyrics(request, env);
     if (route === "/cover") return handleCover(request, env);
+    if (route === "/release-cover") return handleReleaseCover(request, env);
     if (route === "/embed") return handleEmbed(request, env);
     if (route === "/translate") return handleTranslate(request, env);
     if (route === "/story") return handleSongStory(request, env);
@@ -693,6 +715,78 @@ async function handleCover(request, env) {
     return jsonResponse({ error: "Cover generation returned no image." }, 502, request, env);
   }
   return jsonResponse({ model: IMAGE_MODEL, mime: "image/jpeg", image: image }, 200, request, env);
+}
+
+// A release cover's picture: a scene from the song in the look asked for,
+// with quiet space low down where the app sets the title. No lettering in
+// the picture: the app sets the title and artist itself, so they are spelt
+// exactly as the release is.
+function buildReleaseCoverPrompt(input) {
+  const look = RELEASE_COVER_LOOKS[input.look] || RELEASE_COVER_LOOKS.painting;
+  return [
+    "Square artwork, " + look + ", with no text in it: " + (input.scene || "a scene of " + input.title.toLowerCase()) + ".",
+    input.style ? "Its mood and colours come from this music: " + input.style + "." : "",
+    "One clear subject, a strong simple composition, rich colour and cinematic light, with calm, uncluttered space in the lower third.",
+    "No text, no letters, no words, no signs, no signature, no typography, no logos, no watermark, no border and no frame anywhere in the image."
+  ].filter(Boolean).join(" ");
+}
+
+function imageMime(base64) {
+  if (/^iVBOR/.test(base64)) return "image/png";
+  if (/^UklGR/.test(base64)) return "image/webp";
+  return "image/jpeg";
+}
+
+// POST /release-cover { title, scene, style, look, seed } -> { model, mime,
+// image (base64), size, seed }, counted against COVER_DAILY_LIMIT. FLUX.2
+// takes its input as multipart form data, even a prompt alone; passing the
+// form through a Response makes the body and its boundary.
+async function handleReleaseCover(request, env) {
+  if (!env.AI) {
+    return jsonResponse({ error: "Workers AI binding \"AI\" is not configured." }, 500, request, env);
+  }
+  const payload = await readJsonBody(request);
+  if (!payload) {
+    return jsonResponse({ error: "Request body must be valid JSON." }, 400, request, env);
+  }
+  const input = {
+    title: cleanString(payload.title).slice(0, MAX_SONG_TITLE),
+    scene: cleanString(payload.scene).slice(0, 600),
+    style: cleanString(payload.style).slice(0, 500),
+    look: cleanString(payload.look)
+  };
+  if (!input.title && !input.scene) {
+    return jsonResponse({ error: "Give a title or say what the picture should show." }, 400, request, env);
+  }
+  const seed = Number.isInteger(payload.seed) && payload.seed >= 0 && payload.seed < 2147483648
+    ? payload.seed : Math.floor(Math.random() * 2147483647);
+  if (await overDailyLimit(env, "cover", 1)) return dailyLimitResponse("cover", request, env);
+  const form = new FormData();
+  form.append("prompt", buildReleaseCoverPrompt(input));
+  form.append("width", String(RELEASE_COVER_SIZE));
+  form.append("height", String(RELEASE_COVER_SIZE));
+  form.append("seed", String(seed));
+  const multipart = new Response(form);
+  let result;
+  try {
+    result = await env.AI.run(RELEASE_COVER_MODEL, {
+      multipart: { body: multipart.body, contentType: multipart.headers.get("content-type") }
+    });
+  } catch (err) {
+    const reason = cleanString(err && err.message);
+    // The free plan's 10,000 neurons a day, shared with lyric timing,
+    // search and the Create page's covers.
+    if (/\b4006\b|daily free allocation/i.test(reason)) {
+      return jsonResponse({ error: "Cloudflare's free AI allowance for today is used up. It starts again at 8am Philippine time (midnight UTC).", dailyLimit: true, details: reason }, 429, request, env);
+    }
+    return jsonResponse({ error: "The cover picture couldn't be made.", details: reason }, 502, request, env);
+  }
+  const image = cleanString(result && result.image);
+  if (!image) {
+    return jsonResponse({ error: "The cover picture came back empty." }, 502, request, env);
+  }
+  await recordUsage(env, "release-cover", RELEASE_COVER_MODEL, { units: 1, neurons: aiNeurons(result) });
+  return jsonResponse({ model: RELEASE_COVER_MODEL, mime: imageMime(image), image: image, size: RELEASE_COVER_SIZE, seed: seed }, 200, request, env);
 }
 
 // ─── Search by meaning ───────────────────────────────────────────────────────
@@ -1417,7 +1511,7 @@ async function callAnthropic(env, body) {
 // Days are UTC: they turn over at 8am in the Philippines. CLAUDE_DAILY_LIMIT
 // and LYRIA_DAILY_LIMIT vars override the budgets. If the count itself
 // fails, the call goes ahead: the cap is a safety net, not a gate.
-const DAILY_LIMITS = { claude: 1000, lyria: 20 };
+const DAILY_LIMITS = { claude: 1000, lyria: 20, cover: 20 };
 let usageTableMade = false;
 
 function claudeWeight(model) {
@@ -1539,7 +1633,7 @@ async function handleCosts(request, env) {
 }
 
 function dailyLimitResponse(kind, request, env) {
-  const what = kind === "lyria" ? "song-making" : "Claude";
+  const what = kind === "lyria" ? "song-making" : (kind === "cover" ? "release-cover" : "Claude");
   return jsonResponse(
     { error: "Today's " + what + " limit is used up. It starts again at 8am Philippine time (midnight UTC).", dailyLimit: true },
     429,

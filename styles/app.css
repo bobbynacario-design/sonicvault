@@ -4279,9 +4279,21 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
 .release-steps{max-width:640px;margin:.6rem 0 0;padding-left:1.1rem;font-size:13px;line-height:1.6;color:var(--muted)}
 .release-steps li+li{margin-top:.2rem}
 .release-foot a{color:var(--text)}
+.release-cover-modal{max-width:880px}
+.release-cover-body{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:1.4rem;align-items:start;margin-top:1.1rem}
+.release-cover-stage{position:sticky;top:0;aspect-ratio:1;border-radius:14px;overflow:hidden;background:#05060c;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.release-cover-stage canvas{display:block;width:100%;height:100%}
+.release-cover-side{display:flex;flex-direction:column;gap:.9rem;min-width:0}
+.release-cover-side .form-group{margin:0}
+.release-cover-side textarea{resize:vertical;min-height:4.8rem}
+.release-cover-side .week-note{margin-top:.4rem}
+.release-cover-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+.release-cover-actions .sec-action[disabled]{opacity:.6;cursor:progress}
 @media (max-width:640px){
   .release-tally{grid-template-columns:repeat(2,minmax(0,1fr))}
   .release-items{margin-left:0}
+  .release-cover-body{grid-template-columns:1fr;gap:1rem}
+  .release-cover-stage{position:static;width:min(100%, 360px);margin:0 auto}
 }
 
 /* ── AI usage & cost (js/features/costs.js) ──────────────────────────────── */

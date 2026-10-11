@@ -11,8 +11,11 @@
 // the worker records as its own model.
 // Lyria: USD per song. Workers AI: neurons per unit, for calls that didn't
 // report their neurons -- Whisper per second of audio (46.63 a minute),
-// embeddings per input token (1,075 a million), and a cover per 1024px,
-// 6-step image (249.6, measured 2026-10-10: steps are charged per tile).
+// embeddings per input token (1,075 a million), a cover per 1024px, 6-step
+// image (249.6, measured 2026-10-10: steps are charged per tile), and a
+// release cover per 1536px FLUX.2 [klein] picture (2.25 megapixels at
+// 1,363.64 for the first and 181.82 for each one after, by Cloudflare's price
+// list of 2026-10-11; not measured, since the model reports no neurons).
 var AI_RATES = {
   'claude-haiku-5-5': { input:0.10, output:0.50, cacheRead:0.01, cacheWrite:0.125 },
   'claude-haiku-5-5/over-100k': { input:0.50, output:2.50, cacheRead:0.05, cacheWrite:0.625 },
@@ -24,9 +27,10 @@ var AI_RATES = {
   'lyria-3-clip-preview': { perUnit:0.04 },
   '@cf/openai/whisper-large-v3-turbo': { neuronsPerUnit:46.63 / 60 },
   '@cf/black-forest-labs/flux-1-schnell': { neuronsPerUnit:249.6 },
+  '@cf/black-forest-labs/flux-2-klein-9b': { neuronsPerUnit:1363.64 + 1.25 * 181.82 },
   '@cf/baai/bge-m3': { neuronsPerUnit:1075 / 1e6 }
 };
-var AI_RATES_AS_OF = 'Claude 6 Oct 2026, Lyria and Workers AI 10 Oct 2026';
+var AI_RATES_AS_OF = 'Claude 6 Oct 2026, Lyria 10 Oct 2026, Workers AI 10-11 Oct 2026';
 // Workers AI: $0.011 per 1,000 neurons, after 10,000 free each UTC day.
 var WORKERS_AI_USD_PER_NEURON = 0.011 / 1000;
 var WORKERS_AI_FREE_NEURONS = 10000;

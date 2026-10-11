@@ -16,6 +16,7 @@ var COST_FEATURES = {
   'story':'Story behind a song',
   'transcribe':'Lyric timing and transcribing',
   'cover':'Covers',
+  'release-cover':'Release covers',
   'embed':'Search by meaning',
   'lyria':'Songs made with Lyria'
 };
@@ -103,7 +104,8 @@ function renderCosts() {
         : '')
       + (budget.claude
         ? '<p class="cost-line">Today’s spend cap: Claude ' + costInt(budget.claude.used) + ' of ' + costInt(budget.claude.limit) + ' (a Haiku call counts 1, any larger model 10)'
-          + (budget.lyria ? ' · Lyria ' + costInt(budget.lyria.used) + ' of ' + costInt(budget.lyria.limit) + ' songs' : '') + '.</p>'
+          + (budget.lyria ? ' · Lyria ' + costInt(budget.lyria.used) + ' of ' + costInt(budget.lyria.limit) + ' songs' : '')
+          + (budget.cover ? ' · release covers ' + costInt(budget.cover.used) + ' of ' + costInt(budget.cover.limit) : '') + '.</p>'
         : '')
       + '<p class="cost-line cost-note">Rates as of ' + esc(AI_RATES_AS_OF) + ': Haiku 5.5 $0.10 / $0.50 per million tokens in / out (prompts over 100K tokens $0.50 / $2.50), Sonnet 5.5 $2 / $10, cache reads a tenth of input and cache writes 1.25 times; Lyria 3.5 8¢ a song; Workers AI 1.1¢ per 1,000 neurons past 10,000 free a day. Days run on UTC, turning over at 8am Philippine time. Raw API cost, no markup.'
       + (s.unpriced ? ' A model with no rate in the table is shown unpriced, never guessed.' : '') + '</p>';

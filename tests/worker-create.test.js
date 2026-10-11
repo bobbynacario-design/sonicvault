@@ -164,6 +164,51 @@ test("/cover paints the title as a scene, never as a name to letter", async () =
   assert.equal(failing.res.status, 502);
 });
 
+// FLUX.2 takes multipart form data: read the fields back the way the model
+// would.
+async function multipartFields(input) {
+  const form = await new Response(input.multipart.body, { headers: { "Content-Type": input.multipart.contentType } }).formData();
+  return Object.fromEntries(form.entries());
+}
+
+test("/release-cover asks FLUX.2 [klein] for a 1536 square, as a form, with no lettering", async () => {
+  let asked;
+  const ai = { run: async (model, input) => { asked = { model, fields: await multipartFields(input) }; return { image: "iVBORw0KGgo" }; } };
+  const { res, text } = await call("/release-cover", { title: "Pauwi", scene: "a long road home at dusk", style: "acoustic folk", look: "photo", seed: 42 }, { ai });
+  assert.equal(res.status, 200);
+  assert.deepEqual(JSON.parse(text), { model: "@cf/black-forest-labs/flux-2-klein-9b", mime: "image/png", image: "iVBORw0KGgo", size: 1536, seed: 42 });
+  assert.equal(asked.model, "@cf/black-forest-labs/flux-2-klein-9b");
+  assert.equal(asked.fields.width, "1536");
+  assert.equal(asked.fields.height, "1536");
+  assert.equal(asked.fields.seed, "42");
+  assert.match(asked.fields.prompt, /a cinematic photograph, with no text in it: a long road home at dusk\./);
+  assert.match(asked.fields.prompt, /acoustic folk/);
+  assert.match(asked.fields.prompt, /no signature/);
+  assert.doesNotMatch(asked.fields.prompt, /Pauwi/, "the title is set by the app, not painted");
+});
+
+test("/release-cover falls back to a scene of the title, a painting and a seed of its own", async () => {
+  let fields;
+  const ai = { run: async (model, input) => { fields = await multipartFields(input); return { image: "/9j/AAAA" }; } };
+  const { res, text } = await call("/release-cover", { title: "Still In", look: "neon", seed: -3 }, { ai });
+  assert.equal(res.status, 200);
+  assert.equal(JSON.parse(text).mime, "image/jpeg");
+  assert.match(fields.prompt, /a rich oil painting, with no text in it: a scene of still in\./);
+  assert.ok(Number(fields.seed) >= 0, "a seed out of range is replaced");
+  const empty = await call("/release-cover", { scene: "", title: "" }, { ai });
+  assert.equal(empty.res.status, 400);
+});
+
+test("/release-cover says plainly when Cloudflare's free daily allowance is spent", async () => {
+  const spent = { run: async () => { throw new Error("4006: you have used up your daily free allocation of 10,000 neurons"); } };
+  const out = await call("/release-cover", { title: "x" }, { ai: spent });
+  assert.equal(out.res.status, 429);
+  assert.match(JSON.parse(out.text).error, /free AI allowance for today is used up/);
+  assert.equal(JSON.parse(out.text).dailyLimit, true);
+  const broken = await call("/release-cover", { title: "x" }, { ai: { run: async () => { throw new Error("3043: Internal server error"); } } });
+  assert.equal(broken.res.status, 502);
+});
+
 test("the Create routes need the token like every other", async () => {
   const worker = (await load()).default;
   const res = await worker.fetch(new Request("https://w.example/generate", {

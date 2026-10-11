@@ -16,7 +16,7 @@ var RELEASE_SECTIONS = [
 var RELEASE_LEVEL_LABELS = { block:'Can’t release: ', check:'Check: ', fix:'Fix: ', note:'Note: ', ok:'OK: ' };
 var RELEASE_STEPS = [
   'The WAV from Suno (its Download menu, on Pro or Premier), not the MP3 in the vault.',
-  'Cover art at 3000 × 3000 pixels. The picture in a Suno file is 360 × 360, too small for distributors.',
+  'Cover art at 3000 × 3000 pixels. The picture in a Suno file is 360 × 360, too small for distributors; Make cover paints one.',
   'Say that AI was used when you upload. DistroKid passes it on to Spotify’s AI credits.',
   'Your artist name, and your own name as songwriter for words you wrote.',
   'One take per song, released a few at a time rather than the whole vault at once.',
@@ -81,6 +81,7 @@ function releaseRow(item) {
   ].filter(Boolean).join(' · ');
   var tidy = item.check.items.filter(function(entry) { return entry.tidy; })[0];
   var actions = (tidy ? tidyButton('Tidy title', 'applyTidyTitle(' + jsq(track.id) + ')', false) : '')
+    + (item.check.status !== 'blocked' ? tidyButton('Make cover', 'openReleaseCover(' + jsq(track.id) + ')', false) : '')
     + (/^[0-9a-f-]{36}$/i.test(String(track.sunoId || ''))
       ? '<a class="sec-action" href="https://suno.com/song/' + attr(track.sunoId) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open in Suno</a>' : '')
     + (hasUsableLyricTimes(track) ? tidyButton('Synced lyrics', 'downloadLyricsFile(' + jsq(track.id) + ', false)', false) : '');

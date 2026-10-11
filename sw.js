@@ -16,6 +16,9 @@ var OFFLINE_CACHE = 'sv-offline-v1';
 // Story clips kept on this device (js/features/story.js): written by the
 // page, never fetched through this worker.
 var CLIPS_CACHE = 'sv-clips-v1';
+// Release cover pictures kept on this device (js/features/release-cover.js):
+// written by the page, never fetched through this worker.
+var COVERS_CACHE = 'sv-covers-v1';
 
 var SHELL_ASSETS = [
   './',
@@ -50,6 +53,7 @@ var SHELL_ASSETS = [
   './js/data/song-lab.js',
   './js/data/ask.js',
   './js/data/release.js',
+  './js/data/release-cover.js',
   './js/features/store.js',
   './js/features/vault.js',
   './js/features/sync.js',
@@ -82,6 +86,7 @@ var SHELL_ASSETS = [
   './js/features/listening.js',
   './js/features/tidy.js',
   './js/features/release.js',
+  './js/features/release-cover.js',
   './js/features/costs.js',
   './js/features/playlists.js',
   './js/features/offline.js',
@@ -118,7 +123,7 @@ self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.filter(function(key) {
-        return key.indexOf('sv-') === 0 && [SHELL_CACHE, STATIC_CACHE, AUDIO_CACHE, ART_CACHE, OFFLINE_CACHE, CLIPS_CACHE].indexOf(key) === -1;
+        return key.indexOf('sv-') === 0 && [SHELL_CACHE, STATIC_CACHE, AUDIO_CACHE, ART_CACHE, OFFLINE_CACHE, CLIPS_CACHE, COVERS_CACHE].indexOf(key) === -1;
       }).map(function(key) { return caches.delete(key); }));
     }).then(function() { return self.clients.claim(); })
   );
