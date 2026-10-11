@@ -11,6 +11,7 @@ var COST_FEATURES = {
   'describe':'Describing songs',
   'lyrics':'Write with Claude (Create)',
   'song-lab':'Song lab',
+  'song-ideas':'Song lab ideas',
   'ask':'Ask your vault',
   'translate':'Translate and explain',
   'story':'Story behind a song',

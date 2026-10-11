@@ -4201,6 +4201,13 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
 
 /* ── Song lab (js/features/song-lab.js) ──────────────────────────────────── */
 .lab-card .create-form{margin-bottom:.4rem}
+.lab-ideas{display:grid;gap:.6rem;max-width:860px}
+.lab-ideas:empty{display:none}
+.lab-idea{display:flex;align-items:center;gap:.9rem;padding:.85rem 1rem;border-radius:18px;background:var(--surface)}
+.lab-idea-text{flex:1;min-width:0}
+.lab-idea-what{font-size:14.5px;line-height:1.5;color:var(--text);overflow-wrap:anywhere}
+.lab-idea-meta{margin-top:.2rem;font-size:12.5px;color:var(--muted2)}
+.lab-idea .sec-action{flex:none;padding:.5rem .95rem}
 .lab-drafts{display:grid;gap:.75rem;max-width:860px;margin-top:1.4rem}
 .lab-drafts:empty{display:none}
 .lab-drafts-label{font-size:13px;font-weight:600;color:var(--muted)}
@@ -4229,6 +4236,8 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
 @media (max-width:640px){
   .lab-draft-head{padding:.9rem 1rem}
   .lab-draft-body{padding:0 1rem 1rem}
+  .lab-idea{flex-direction:column;align-items:stretch;gap:.6rem}
+  .lab-idea .sec-action{align-self:flex-start}
   .ask-songs{grid-template-columns:1fr}
 }
 

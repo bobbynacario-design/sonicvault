@@ -8,21 +8,24 @@ const g = require("./helpers/data-scripts.js").loadDataScripts();
 const NOW = new Date(2026, 9, 10, 12);
 const SHEET = (word) => "[Verse 1]\n" + Array.from({ length: 6 }, (_, i) => word + " line number " + i + " of the song").join("\n");
 
-test("the newest songs lead -- how they write now -- then the most loved, one take each", () => {
+test("the newest songs by the day Suno made them lead, then what's played now, one take each", () => {
   const list = [
     { id: "t-1", title: "March Favourite", created: "2026-03-29", lyrics: SHEET("march"), plays: 180 },
     { id: "t-2", title: "March Other", created: "2026-03-29", lyrics: SHEET("other"), plays: 60, playDays: { "2026-10-09": 5 } },
     { id: "t-3", title: "April", created: "2026-04-02", lyrics: SHEET("april"), plays: 9 },
     { id: "t-4", title: "Instrumental", created: "2026-10-09", lyrics: "", plays: 99 },
-    { id: "t-5", title: "October", created: "2026-10-04", lyrics: SHEET("october"), plays: 20 },
-    { id: "t-6", title: "October (2)", created: "2026-10-04", lyrics: SHEET("october"), plays: 1 },
+    { id: "t-5", title: "October", created: "2026-10-04", madeAt: "2026-08-31T05:33:00.000Z", lyrics: SHEET("october"), plays: 20 },
+    { id: "t-6", title: "October (2)", created: "2026-10-04", madeAt: "2026-08-31T05:30:00.000Z", lyrics: SHEET("october"), plays: 1 },
     { id: "t-7", title: "This Week", created: "2026-10-08", lyrics: SHEET("week"), plays: 2 },
-    { id: "t-8", title: "Today", created: "2026-10-10", lyrics: SHEET("today"), plays: 0 }
+    { id: "t-8", title: "Today", created: "2026-10-10", lyrics: SHEET("today"), plays: 0 },
+    // Imported today, made in August: older than October by the stamp.
+    { id: "t-9", title: "August", created: "2026-10-10", madeAt: "2026-08-20T03:00:00.000Z", lyrics: SHEET("august"), plays: 4 }
   ];
   const picked = g.pickSongLabExamples(list, NOW, "", 6).map((t) => t.title);
-  // The three newest songs with lyrics, then by love: 60 + 3*5 = 75 for March
-  // Other against 180 for March Favourite; one take of October; no lyrics, no voice.
-  assert.deepEqual(picked, ["Today", "This Week", "October", "March Favourite", "March Other", "April"]);
+  // The four newest made, then by plays in the last 60 days: March Other's 5
+  // beat the 180 March Favourite had long ago, and April, newer, is next.
+  // One take of October; no lyrics, no voice.
+  assert.deepEqual(picked, ["Today", "This Week", "October", "August", "March Other", "April"]);
   assert.deepEqual(g.pickSongLabExamples(list, NOW, "", 2).map((t) => t.title), ["Today", "This Week"]);
 });
 
@@ -48,15 +51,18 @@ test("a song that began as a Song lab draft is Claude's writing, so it isn't lea
   assert.deepEqual(g.pickSongLabExamples(list, NOW, "t-2", 6, [{ lyrics: SHEET("drafted") }]).map((t) => t.title), ["From a draft", "Mine"], "chosen by name, it still leads");
 });
 
-test("recent drafts go to the worker as a line each, to write about something else", () => {
-  const drafts = [{ title: "Kape", about: "A quiet morning." }, { title: "", about: "no title" }, { title: "Pundasyon" }, null];
-  assert.deepEqual(g.songLabAvoidList(drafts), ["Kape: A quiet morning.", "Pundasyon"]);
-  assert.deepEqual(g.songLabAvoidList([{ title: "Mama", about: "A video call.", images: ["ceiling fan", "loose screw"] }]),
-    ["Mama: A video call. (images: ceiling fan, loose screw)"], "the images a draft was built on go too");
-  assert.deepEqual(g.songLabAvoidList([{ title: "Photo", about: "A passport photo.", subject: "a son and his mother; leaving home", images: ["passport photo"] }]),
-    ["Photo: A passport photo. (subject: a son and his mother; leaving home; images: passport photo)"], "and its subject");
-  assert.deepEqual(g.songLabAvoidList(drafts, 1), ["Kape: A quiet morning."]);
-  assert.deepEqual(g.songLabAvoidList(undefined), []);
+test("recent drafts go with a request for ideas as a line each, so the ideas are new", () => {
+  const drafts = [{ title: "Kape", about: "A quiet morning." }, { title: "", about: "no title" }, { title: "Pundasyon" }, null, { title: "Brownout", what: "the night the power went out" }];
+  assert.deepEqual(g.songLabRecentList(drafts), ["Kape: A quiet morning.", "Pundasyon", "Brownout: the night the power went out"]);
+  assert.deepEqual(g.songLabRecentList(drafts, 1), ["Kape: A quiet morning."]);
+  assert.deepEqual(g.songLabRecentList(undefined), []);
+});
+
+test("what a draft was asked for: what happened, else an older draft's idea", () => {
+  assert.equal(g.songLabAsked({ what: " the bus home ", idea: "old" }), "the bus home");
+  assert.equal(g.songLabAsked({ idea: "a quiet morning" }), "a quiet morning");
+  assert.equal(g.songLabAsked({ idea: "" }), "");
+  assert.equal(g.songLabAsked(null), "");
 });
 
 test("a song's sound is its prompt, else what its description says", () => {
@@ -66,21 +72,23 @@ test("a song's sound is its prompt, else what its description says", () => {
   assert.equal(g.songLabSound({ genre: "Other" }), "", "the placeholder genre says nothing");
 });
 
-test("an example is sized for the worker", () => {
+test("an example is sized for the worker, with the day Suno made it", () => {
   const ex = g.songLabExample({ title: " T ", created: "2026-10-04", prompt: "p".repeat(900), lyrics: "l".repeat(3000) });
   assert.equal(ex.title, "T");
-  assert.equal(ex.made, "2026-10-04");
+  assert.equal(ex.made, "2026-10-04", "no stamp: the day it reached the vault");
   assert.equal(ex.sound.length, 800);
   assert.equal(ex.lyrics.length, 2500);
+  assert.equal(g.songLabExample({ created: "2026-10-04", madeAt: "2026-08-31T12:00:00.000Z", lyrics: "x" }).made, "2026-08-31");
 });
 
 test("drafts are kept newest first, twelve at most, and junk is dropped", () => {
-  const make = (n) => g.songLabDraft({ title: "Song " + n, style: "s", lyrics: "l", about: "a", subject: " a man and his neighbour ", images: [" a fan ", "", "x".repeat(50)] }, { idea: "i", language: "Bikol", from: ["A", "", "B"] }, new Date(2026, 9, 10, 12, n));
+  const make = (n) => g.songLabDraft({ title: "Song " + n, style: "s", lyrics: "l", about: "a" }, { what: " the bus home ", who: "my son", feel: "x".repeat(200), language: "Bikol", from: ["A", "", "B"] }, new Date(2026, 9, 10, 12, n));
   const first = make(1);
   assert.equal(first.id, "draft-" + new Date(2026, 9, 10, 12, 1).getTime());
   assert.deepEqual(first.from, ["A", "B"]);
-  assert.deepEqual(first.images, ["a fan", "x".repeat(40)]);
-  assert.equal(first.subject, "a man and his neighbour");
+  assert.equal(first.what, "the bus home");
+  assert.equal(first.who, "my son");
+  assert.equal(first.feel, "x".repeat(160));
   assert.equal(first.language, "Bikol");
   let list = g.addSongLabDraft([null, "junk", { id: "x" }], first);
   assert.deepEqual(list.map((d) => d.title), ["Song 1"]);

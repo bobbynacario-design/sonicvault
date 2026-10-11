@@ -11,21 +11,33 @@ var SONG_LAB_LANGUAGES = ['Like my songs', 'English', 'Tagalog', 'Bikol', 'Tagli
 // a title 80.
 var SUNO_LIMITS = { title:80, style:1000, lyrics:5000 };
 
-// How loved a song is, for choosing examples: every play counts, and a
-// play in the last 60 days counts four times, so a song on repeat now beats
-// one played a lot long ago. The take picked as main gets a nudge.
+// How much a song is being played now, for choosing examples: its plays in
+// the last 60 days, over all its takes, with a nudge for the take picked as
+// main. Old play counts are left out: the most played songs overall are the
+// March ones, in a style the songwriter has moved on from.
 function songLabScore(takes, now) {
   var since = localDayKey(new Date(now.getTime() - 60 * 86400000));
   var score = 0;
   (takes || []).forEach(function(track) {
-    score += Number(track.plays || 0);
     var days = track.playDays && typeof track.playDays === 'object' ? track.playDays : {};
     Object.keys(days).forEach(function(day) {
-      if (day > since) score += 3 * (Number(days[day]) || 0);
+      if (day > since) score += Number(days[day]) || 0;
     });
     if (track.versionPick === true) score += 2;
   });
   return score;
+}
+
+// When a song was made: the moment Suno stamped in its file (track.madeAt),
+// else when it reached the vault. A batch imported in October can hold
+// songs made in August.
+function songLabMadeTime(track) {
+  var at = track && track.madeAt ? Date.parse(track.madeAt) : NaN;
+  return isNaN(at) ? trackTimestamp(track) : at;
+}
+
+function compareMadeNewestFirst(a, b) {
+  return (songLabMadeTime(b) - songLabMadeTime(a)) || compareNewestFirst(a, b);
 }
 
 // A song's sound in words: the style it was made from, else what its AI
@@ -43,24 +55,26 @@ function songLabSound(track) {
   ].filter(function(value) { return value && value !== 'Other'; })).join(', ');
 }
 
-// The songs to learn from, one take of each with lyrics: the newest few
-// first -- they show how the songwriter writes now, where the most played
-// can be months old and in an earlier style -- then the most loved of the
-// rest. Songs that began as Song lab drafts (drafts, matched by their words)
-// are Claude's writing, not the songwriter's, so they are left out. A song
-// chosen by name (seedId) leads, lyrics or not.
-var SONG_LAB_NEWEST = 3;
+// The songs to learn from, one take of each with lyrics: the newest by the
+// day Suno made them -- how the songwriter writes now -- then the ones
+// played most in the last 60 days, so a song on repeat is always in, then
+// the next newest. Songs played a lot long ago but rarely now (the March
+// favourites) only fill in when there aren't enough. Songs that began as
+// Song lab drafts (drafts, matched by their words) are Claude's writing,
+// not the songwriter's, so they are left out. A song chosen by name
+// (seedId) leads, lyrics or not.
+var SONG_LAB_NEWEST = 4;
 function pickSongLabExamples(list, now, seedId, count, drafts) {
   var all = list || [];
   var collapsed = collapseVersions(all, all);
   var withLyrics = collapsed.list.filter(function(track) {
     return hasLyrics(track) && !(drafts || []).some(function(draft) { return songCameFromDraft(track.lyrics, draft && draft.lyrics); });
   });
-  var newest = withLyrics.slice().sort(compareNewestFirst).slice(0, SONG_LAB_NEWEST);
+  var newest = withLyrics.slice().sort(compareMadeNewestFirst).slice(0, SONG_LAB_NEWEST);
   var loved = withLyrics.filter(function(track) { return newest.indexOf(track) === -1; }).map(function(track) {
     return { track:track, score:songLabScore(collapsed.versions[track.id] || [track], now) };
   }).sort(function(a, b) {
-    return b.score - a.score || compareNewestFirst(a.track, b.track);
+    return b.score - a.score || compareMadeNewestFirst(a.track, b.track);
   });
   var picked = newest.concat(loved.map(function(item) { return item.track; }));
   var seed = seedId ? all.filter(function(track) { return track.id === seedId; })[0] : null;
@@ -73,17 +87,21 @@ function pickSongLabExamples(list, now, seedId, count, drafts) {
   return picked.slice(0, count || SONG_LAB_EXAMPLES);
 }
 
-// One example as the worker takes it, with the day it was made.
+// One example as the worker takes it, with the day it was made, read as
+// the release check reads it (js/data/release.js): Suno's stamp, else the
+// day it reached the vault.
 function songLabExample(track) {
   return {
     title:String(track && track.title || '').trim(),
-    made:madeOnDay(track),
+    made:releaseMadeDay(track).day,
     sound:songLabSound(track).slice(0, 800),
     lyrics:getTrackLyrics(track).slice(0, 2500)
   };
 }
 
-// A draft as the vault keeps it: what Claude wrote, and what it was asked.
+// A draft as the vault keeps it: what Claude wrote, and what it was told --
+// what happened, who it's for, how it should feel. Drafts from before
+// 2026-10-11 have an idea instead, often empty.
 function songLabDraft(raw, request, now) {
   var ask = request || {};
   return {
@@ -92,9 +110,9 @@ function songLabDraft(raw, request, now) {
     style:String(raw && raw.style || '').trim().slice(0, 1000),
     lyrics:String(raw && raw.lyrics || '').trim().slice(0, 6000),
     about:String(raw && raw.about || '').trim().slice(0, 600),
-    subject:String(raw && raw.subject || '').trim().slice(0, 120),
-    images:(Array.isArray(raw && raw.images) ? raw.images : []).map(function(image) { return String(image || '').trim().slice(0, 40); }).filter(Boolean).slice(0, 8),
-    idea:String(ask.idea || '').trim().slice(0, 1000),
+    what:String(ask.what || '').trim().slice(0, 1000),
+    who:String(ask.who || '').trim().slice(0, 160),
+    feel:String(ask.feel || '').trim().slice(0, 160),
     change:String(ask.change || '').trim().slice(0, 500),
     language:String(ask.language || ''),
     from:(ask.from || []).map(function(title) { return String(title || ''); }).filter(Boolean).slice(0, 8),
@@ -139,19 +157,21 @@ function songLabMadeAs(draft, list) {
   })[0] || null;
 }
 
-// The newest drafts as a line each -- title, what it is about, its subject
-// and the images it was built on -- for the worker to steer clear of, so a
-// draft with no idea isn't the last one again: the same people, the same
-// situation, furnished with the same things.
-function songLabAvoidList(drafts, count) {
+// The newest drafts as a line each -- title and what it says -- so the
+// ideas Song lab offers aren't the songs it just wrote.
+function songLabRecentList(drafts, count) {
   return (Array.isArray(drafts) ? drafts : []).filter(function(draft) {
     return draft && draft.title;
   }).slice(0, count || 6).map(function(draft) {
-    var notes = [];
-    if (draft.subject) notes.push('subject: ' + draft.subject);
-    if (Array.isArray(draft.images) && draft.images.length) notes.push('images: ' + draft.images.join(', '));
-    return trimText(draft.title + (draft.about ? ': ' + draft.about : '') + (notes.length ? ' (' + notes.join('; ') + ')' : ''), 360);
+    var about = draft.about || draft.what || draft.idea || '';
+    return trimText(draft.title + (about ? ': ' + about : ''), 360);
   });
+}
+
+// The words a draft was asked for, in a line: what happened, else the idea
+// a draft from before the questions had.
+function songLabAsked(draft) {
+  return String(draft && (draft.what || draft.idea) || '').trim();
 }
 
 // The fields too long for Suno's boxes: [{ field, length, limit }].
