@@ -10,6 +10,14 @@ var SONG_LAB_LANGUAGES = ['Like my songs', 'English', 'Tagalog', 'Bikol', 'Tagli
 // What Suno's boxes take: Style of Music 1000 characters, lyrics 5000,
 // a title 80.
 var SUNO_LIMITS = { title:80, style:1000, lyrics:5000 };
+// About me, the songwriter's life in their own words: as long as the
+// worker reads.
+var SONG_LAB_ABOUT_MAX = 3000;
+
+function songLabWordCount(text) {
+  var words = String(text || '').trim().match(/\S+/g);
+  return words ? words.length : 0;
+}
 
 // How much a song is being played now, for choosing examples: its plays in
 // the last 60 days, over all its takes, with a nudge for the take picked as

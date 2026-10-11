@@ -135,7 +135,8 @@ test("/lyrics writes in the songwriter's voice, from their songs, and keeps the 
   assert.equal(sent.model, "claude-sonnet-5-5", "lyrics are writing: the writing model");
   assert.equal(sent.output_config.effort, "high");
   assert.match(sent.system, /They show how they write now/);
-  assert.match(sent.system, /Never make up their life/, "a sheet makes nothing up either");
+  assert.match(sent.system, /Never invent relatives/, "a sheet makes nothing up either");
+  assert.match(sent.messages[0].content, /\n\nAbout me:\n\(not written yet\)\n/);
   assert.match(sent.system, /no stage directions/);
   assert.match(sent.messages[0].content, /Their songs, newest first:\n\n1\. Pauwi \(made 2026-10-04\)\nSound: indie folk\nLyrics:\n\[Verse 1\]\nThe bus leaves at eleven/);
   assert.equal(sent.temperature, undefined);

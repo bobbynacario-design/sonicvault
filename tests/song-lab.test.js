@@ -116,3 +116,9 @@ test("fields longer than Suno takes are named", () => {
   assert.deepEqual(g.sunoOverflow({ title: "t", style: "s".repeat(1001), lyrics: "l" }), [{ field: "style", length: 1001, limit: 1000 }]);
   assert.deepEqual(g.sunoOverflow({ title: "t", style: "s", lyrics: "l".repeat(5000) }), []);
 });
+
+test("About me is counted in words for its note", () => {
+  assert.equal(g.songLabWordCount("  I live in Naga.\n\nTwo kids.  "), 6);
+  assert.equal(g.songLabWordCount(""), 0);
+  assert.equal(g.songLabWordCount(undefined), 0);
+});

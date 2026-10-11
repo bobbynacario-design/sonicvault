@@ -4201,6 +4201,16 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
 
 /* ── Song lab (js/features/song-lab.js) ──────────────────────────────────── */
 .lab-card .create-form{margin-bottom:.4rem}
+.lab-about{max-width:860px;margin-bottom:1.2rem;border-radius:22px;background:var(--surface)}
+.lab-about-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:.3rem .8rem;padding:1rem 1.15rem;cursor:pointer;list-style:none}
+.lab-about-head::-webkit-details-marker{display:none}
+.lab-about-head::before{content:'';flex:none;align-self:center;width:7px;height:7px;border-right:2px solid var(--muted2);border-bottom:2px solid var(--muted2);transform:rotate(-45deg);transition:transform .16s ease}
+.lab-about[open] > .lab-about-head::before{transform:rotate(45deg)}
+.lab-about-title{font-family:var(--display);font-weight:700;font-size:17px;color:var(--text)}
+.lab-about-note{font-size:12.5px;color:var(--muted2)}
+.lab-about-note.is-empty{color:var(--accent-dynamic)}
+.lab-about-body{display:grid;gap:.6rem;padding:0 1.15rem 1.15rem}
+.lab-about-body textarea{min-height:12rem;line-height:1.6}
 .lab-ideas{display:grid;gap:.6rem;max-width:860px}
 .lab-ideas:empty{display:none}
 .lab-idea{display:flex;align-items:center;gap:.9rem;padding:.85rem 1rem;border-radius:18px;background:var(--surface)}

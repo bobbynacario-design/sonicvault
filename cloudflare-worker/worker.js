@@ -546,26 +546,27 @@ async function handleGenerate(request, env) {
 }
 
 // How to write as this songwriter, shared by Song lab (/songlab) and Write
-// with Claude (/lyrics). Both send some of their own songs, newest first.
-// Drafts that were asked for "small details only this person would notice"
-// with nothing to go on made those details up -- a brother who left, a
-// bakery owner they never met -- and lists of props and subjects to avoid
-// pushed each one further from their life, into plotted scenes with no hook.
-// The user called them "out of touch" (2026-10-11). Now every fact comes
-// from what they say, and the craft is the craft of their own best songs:
-// one feeling, one line the chorus repeats.
+// with Claude (/lyrics). Both send some of their own songs, newest first,
+// and what they wrote under About me. Every version of this prompt that
+// knew them only from their lyrics wrote about a stranger: drafts asked for
+// "small details only this person would notice" made them up (a brother who
+// left), bans on props and subjects pushed drafts into plotted scenes, and
+// "never make anything up" left a Christmas song with nothing in it. Asked
+// to pick between that and a plain chat-style prompt, the user said "both
+// know nothing about me and I can't relate to both" (2026-10-11). So their
+// own account of their life leads: true, and the only source of people and
+// events; shared, everyday things are free to use.
 const SONG_VOICE_PROMPT = [
   "You write songs with one songwriter, in their voice. They make the songs in Suno and keep them in SonicVault.",
   "They write in English, Tagalog and Bikol (Central Bikol, from the Bicol region of the Philippines: real Bikol, never Tagalog with a few Bikol words, never Hiligaynon, Cebuano or Waray), and sometimes mix English and Tagalog in one song.",
+  "About me is them, in their own words: where they live, who is in their life, what they do, what is going on. Treat it as true and write from it. A song they can relate to comes from their real life, not a typical one.",
+  "People, places and events in the song come only from About me or from what they ask for. Never invent relatives, friends, names, places or things that happened to them; a song that needs someone who isn't there leaves them out. Shared, everyday things anyone in their place would know -- the time of year, the weather, the customs where they live -- are fine to use. With no About me and nothing personal in the request, stay with the feeling rather than inventing a life.",
   "You get some of their own songs, newest first: each one's title, when it was made, its sound and its lyrics. They show how they write now -- the way they talk, how long their lines run, whether and how they rhyme, how they build a song and tag its sections. Write a new song that sounds like the same person wrote it next. Never reuse their lines, titles or hooks.",
-  "Never make up their life. Every person, place, event and memory in the song comes from what they told you. Don't invent relatives, names, places, jobs or things that happened. Where a line needs more than they gave, stay with the feeling -- what it is like, what they would say to that person -- rather than inventing a fact. A song with two true details beats one with ten made-up ones.",
-  "How their best songs work, and how to write this one:",
+  "How their best songs work:",
   "- One feeling, said plainly, by them as themselves, to someone or to themselves. Not a story with a plot and a twist.",
   "- One central line carries the song. It is the title, it anchors the chorus, and it comes back at the end.",
-  "- The chorus is short, four to eight lines, and the same words each time it comes back; only a final chorus may change a line or two. Lines inside it repeat or echo each other (\"Pauwi na ako / Pauwi na ako\").",
-  "- Verses of about four short lines, close in length, so they sit on a tune. Repetition and parallel lines do the work rhyme would; rhyme only where it comes naturally, never bending a line to get one.",
-  "- A bridge that steps back and says the plain thing underneath.",
-  "- Few details, each one earning its place: one or two true things the song turns on, not a room full of objects.",
+  "- The chorus is short, four to eight lines, and the same words each time it comes back; only a final chorus may change a line or two. Lines inside it repeat or echo each other.",
+  "- Verses of about four short lines, close in length, so they sit on a tune. Repetition and parallel lines do the work rhyme would; rhyme only where it comes naturally.",
   "- No lessons, slogans or motivational stock phrases.",
   "Write in the language asked for. Taglish is Tagalog and English mixed the way they mix them in their songs. \"Like my songs\" means the language of their newest songs, or the language they wrote to you in."
 ].join("\n");
@@ -583,6 +584,8 @@ const MAX_VOICE_EXAMPLES = 8;
 const MAX_VOICE_SOUND = 800;
 const MAX_VOICE_LYRICS = 2500;
 const MAX_RECENT_DRAFTS = 8;
+// About me: what the songwriter wrote about their life, used as true.
+const MAX_ABOUT = 3000;
 // How hard the writing model thinks over a song, for both routes. Set from a
 // side-by-side on the songwriter's own songs (2026-10-10).
 const SONG_EFFORT = "high";
@@ -598,6 +601,16 @@ function cleanSongExamples(list) {
       lyrics: cleanString(song && song.lyrics).slice(0, MAX_VOICE_LYRICS)
     };
   }).filter(function (song) { return song.sound || song.lyrics; });
+}
+
+// Today and About me, as lines of the request: who they are, and when.
+function songAboutLines(payload) {
+  const lines = [];
+  const today = cleanString(payload && payload.today);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(today)) lines.push("Today: " + today);
+  const about = cleanString(payload && payload.about).slice(0, MAX_ABOUT);
+  lines.push("", "About me:", about || "(not written yet)");
+  return lines;
 }
 
 // The songs as lines of the request.
@@ -634,7 +647,7 @@ async function handleLyrics(request, env) {
     "Title:", title || "(none yet)", "",
     "The sound:", style || "(not described)", "",
     "Draft or notes:", draft || "(none)"
-  ].concat(songVoiceLines(cleanSongExamples(payload.examples))).join("\n");
+  ].concat(songAboutLines(payload), songVoiceLines(cleanSongExamples(payload.examples))).join("\n");
 
   if (await overDailyLimit(env, "claude", claudeWeight(model))) return dailyLimitResponse("claude", request, env);
 
@@ -987,15 +1000,17 @@ async function handleSongStory(request, env) {
 // The songwriter's next song, ready to paste into Suno: a style for its
 // Style of Music box and a lyric sheet, in the voice of their own newest
 // songs (the examples, picked by the app -- js/data/song-lab.js), written
-// from their answers to three questions: what happened or is on their mind,
-// who the song is for, how it should feel. Nothing is written without the
-// first. With a previous draft and a change, that draft rewritten. Written
-// by the writing model, like translations and stories.
+// from their answers to three questions -- what the song is about (a story,
+// a thought or a brief like "a Christmas song"), who it is for, how it
+// should feel -- and from About me (about, their life in their own words,
+// with today's date). Nothing is written without the first answer. With a
+// previous draft and a change, that draft rewritten. Written by the writing
+// model, like translations and stories.
 //
-// POST /songlab/ideas { examples, recent: ["title: what it was about"] }
+// POST /songlab/ideas { about, today, examples, recent: ["title: what it was about"] }
 // -> { ideas: [{ what, who, feel }] }
 // Three answers to start from, for when nothing comes to mind: drawn from
-// what their songs keep coming back to, with the facts left for them to add.
+// About me, the time of year and what their songs keep coming back to.
 
 const MAX_LAB_WHAT = 1000;
 const MAX_LAB_SHORT = 160;
@@ -1015,7 +1030,7 @@ const SONGLAB_SCHEMA = {
   additionalProperties: false
 };
 const SONGLAB_SYSTEM_PROMPT = SONG_VOICE_PROMPT + "\n" + [
-  "They tell you what happened or what is on their mind, and maybe who the song is for and how it should feel. The song is about that and nothing else.",
+  "They tell you what the song is about -- something that happened, something on their mind, or the kind of song they want -- and maybe who it is for and how it should feel. That leads; About me fills in their life.",
   "The reply is JSON:",
   "- title: short, in the song's language: the song's central line, or the heart of it.",
   "- style: for Suno's Style of Music box: genre, mood, instruments, voice, tempo and production as comma-separated descriptors, under 300 characters, close to the sound of their newest songs, with a tempo and energy that suit this feeling. Never name a real artist, band or song; Suno refuses them.",
@@ -1042,11 +1057,11 @@ const SONG_IDEAS_SCHEMA = {
 };
 const SONG_IDEAS_PROMPT = [
   "You help one songwriter find what to write their next song about. They make songs in Suno and keep them in SonicVault.",
-  "You get some of their own songs, newest first, and the songs drafted for them lately.",
-  "Offer three things they could write about next, each from a different part of life, drawn from what their songs keep coming back to, so each is something they would want to say. Not what one of their songs or a recent draft already says.",
-  "Never state facts about their life: no names, places, relatives, jobs or events their songs don't already mention, and no he or she for them. Each idea points at a moment or a feeling they will recognise, and they add the true details.",
+  "You get today's date, About me (them, in their own words), some of their own songs, newest first, and the songs drafted for them lately.",
+  "Offer three things they could write about next, each from a different part of their life as About me tells it -- what is going on now, the people in it, the time of year -- and what their songs keep coming back to. Not what one of their songs or a recent draft already says.",
+  "Use only what About me and their songs say about their life: no names, places, relatives, jobs or events beyond those, and no he or she for them. Where About me says little, point at a moment or a feeling they will recognise and let them add the true details.",
   "Each idea, in plain English:",
-  "- what: a short phrase naming the kind of moment or feeling, the way a songwriter jots down a song idea. Never a sentence saying it happened to them -- they decide whether it did -- and no lead-in like \"You could write about\".",
+  "- what: a short phrase naming the song's subject, the way a songwriter jots down a song idea. Never claim something happened that About me doesn't say, and no lead-in like \"You could write about\".",
   "- who: who the song would be sung to, in a few words, or \"yourself\".",
   "- feel: two or three words for how it should feel.",
   "The reply is JSON: { \"ideas\": [ { \"what\": \"...\", \"who\": \"...\", \"feel\": \"...\" } ] }, with three ideas."
@@ -1055,7 +1070,7 @@ const SONG_IDEAS_PROMPT = [
 // The three answers, as lines of the request.
 function songLabStoryLines(what, who, feel) {
   return [
-    "What happened, or what is on their mind: " + what,
+    "What the song is about: " + what,
     "Who it's for: " + (who || "(not said)"),
     "How it should feel: " + (feel || "(not said)")
   ];
@@ -1085,10 +1100,10 @@ async function handleSongLab(request, env) {
     return jsonResponse({ error: "Send the draft to change along with the change." }, 400, request, env);
   }
   if (!what && !change) {
-    return jsonResponse({ error: "Say what happened, or what's on your mind, first: Song lab writes only from what you tell it." }, 400, request, env);
+    return jsonResponse({ error: "Say what the song is about first." }, 400, request, env);
   }
 
-  const lines = ["Language: " + language].concat(what ? songLabStoryLines(what, who, feel) : [], songVoiceLines(examples));
+  const lines = ["Language: " + language].concat(what ? songLabStoryLines(what, who, feel) : [], songAboutLines(payload), songVoiceLines(examples));
   if (change) {
     lines.push("", "Previous draft:", "Title: " + previous.title, "Style: " + previous.style, "Lyrics:", previous.lyrics, "", "Change: " + change);
   }
@@ -1120,7 +1135,7 @@ async function handleSongIdeas(request, env) {
   if (!examples.length) {
     return jsonResponse({ error: "Ideas come from your songs: the vault needs a few with lyrics first." }, 400, request, env);
   }
-  const lines = songVoiceLines(examples);
+  const lines = songAboutLines(payload).concat(songVoiceLines(examples));
   const recent = (Array.isArray(payload.recent) ? payload.recent : []).map(function (item) { return cleanString(item).slice(0, 360); }).filter(Boolean).slice(0, MAX_RECENT_DRAFTS);
   if (recent.length) {
     lines.push("", "Drafted for them lately:");

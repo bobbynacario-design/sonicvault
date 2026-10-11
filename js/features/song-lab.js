@@ -13,7 +13,8 @@ var SUNO_CREATE_URL = 'https://suno.com/create';
 // busy: 'draft' or 'ideas' while Claude works. changes: what is typed in
 // each draft's change box, kept across the re-render every sync brings.
 // ideas: the last three offered.
-var _songLab = { busy:false, revising:'', status:'', hydrated:false, changes:{}, ideas:[] };
+// aboutShown: About me has been opened or folded once, by what it holds.
+var _songLab = { busy:false, revising:'', status:'', hydrated:false, changes:{}, ideas:[], aboutShown:false };
 
 function songLabDrafts() {
   var lab = appSettings && appSettings.songLab;
@@ -22,6 +23,37 @@ function songLabDrafts() {
 
 function getSongLabDraft(id) {
   return songLabDrafts().filter(function(draft) { return draft.id === id; })[0] || null;
+}
+
+// About me: the songwriter's life in their own words, which Claude takes as
+// true for every song and idea. Kept with the vault's settings, like the
+// drafts, so it is the same on every device.
+function songLabAbout() {
+  var lab = appSettings && appSettings.songLab;
+  return lab && typeof lab.about === 'string' ? lab.about : '';
+}
+
+// Saved a moment after typing stops, not on every key: each save is a
+// settings write. A change (leaving the box) saves at once.
+var _songLabAboutTimer = null;
+function saveSongLabAbout(now) {
+  clearTimeout(_songLabAboutTimer);
+  if (!now) { _songLabAboutTimer = setTimeout(function() { saveSongLabAbout(true); }, 1000); return; }
+  var box = document.getElementById('lab-about-text');
+  if (!box) return;
+  var text = box.value.trim().slice(0, SONG_LAB_ABOUT_MAX);
+  renderSongLabAboutNote(text);
+  if (text === songLabAbout()) return;
+  appSettings = window.appSettings || appSettings || {};
+  appSettings.songLab = Object.assign({}, appSettings.songLab, { about:text });
+  window.appSettings = appSettings;
+  save('settings', appSettings);
+}
+
+// What Claude is told with every request besides the songs: About me, and
+// the day, so "this Christmas" means this one.
+function songLabContext() {
+  return { about:songLabAbout(), today:localDayKey(new Date()) };
 }
 
 function saveSongLabDrafts(list) {
@@ -126,7 +158,7 @@ async function draftSongLab() {
   if (!_aiConfig.endpoint) { renderSongLab(); return; }
   var input = getSongLabInput();
   if (!input.what) {
-    setSongLabStatus('Say what happened, or what’s on your mind, first. Stuck? Tap <strong>Give me 3 ideas</strong>.');
+    setSongLabStatus('Say what the song is about first. Stuck? Tap <strong>Give me 3 ideas</strong>.');
     var what = document.getElementById('lab-what');
     if (what) what.focus();
     return;
@@ -136,13 +168,13 @@ async function draftSongLab() {
   renderSongLabButton();
   setSongLabStatus('Claude is reading ' + (examples.length ? examples.length + ' of your songs' : 'what you wrote') + ' and writing. This takes about half a minute.');
   try {
-    var draft = await requestSongLabDraft({
+    var draft = await requestSongLabDraft(Object.assign(songLabContext(), {
       what:input.what,
       who:input.who,
       feel:input.feel,
       language:input.language,
       examples:examples.map(songLabExample)
-    }, examples.map(function(track) { return track.title || 'Untitled'; }));
+    }), examples.map(function(track) { return track.title || 'Untitled'; }));
     setSongLabStatus('');
     renderSongLabDrafts(draft.id);
   } catch (e) {
@@ -167,7 +199,7 @@ async function suggestSongLabIdeas() {
   renderSongLabButton();
   setSongLabStatus('Claude is reading ' + examples.length + ' of your songs for ideas…');
   try {
-    var response = await workerRequest('/songlab/ideas', { examples:examples.map(songLabExample), recent:songLabRecentList(songLabDrafts()) });
+    var response = await workerRequest('/songlab/ideas', Object.assign(songLabContext(), { examples:examples.map(songLabExample), recent:songLabRecentList(songLabDrafts()) }));
     if (!response.ok) throw new Error(await workerError(response));
     var data = await response.json();
     var ideas = data && Array.isArray(data.ideas) ? data.ideas.filter(function(idea) { return idea && idea.what; }) : [];
@@ -190,7 +222,7 @@ function useSongLabIdea(index) {
     if (el) el.value = String(idea[name] || '');
   });
   saveSongLabForm();
-  setSongLabStatus('Now make it yours: add what really happened, a name, what was said. The more true things you give, the more it sounds like you.');
+  setSongLabStatus('Make it yours: add what really happened, a name, what was said. The more true things you give, the more it sounds like you.');
   var what = document.getElementById('lab-what');
   if (what) {
     what.focus();
@@ -208,7 +240,7 @@ async function reviseSongLabDraft(id) {
   renderSongLabDrafts(id);
   var examples = pickSongLabExamples(tracks, new Date(), '', 3, songLabDrafts());
   try {
-    var next = await requestSongLabDraft({
+    var next = await requestSongLabDraft(Object.assign(songLabContext(), {
       language:draft.language,
       what:songLabAsked(draft),
       who:draft.who || '',
@@ -216,7 +248,7 @@ async function reviseSongLabDraft(id) {
       examples:examples.map(songLabExample),
       previous:{ title:draft.title, style:draft.style, lyrics:draft.lyrics },
       change:change
-    }, draft.from);
+    }), draft.from);
     _songLab.revising = '';
     delete _songLab.changes[id];
     renderSongLabDrafts(next.id);
@@ -313,6 +345,31 @@ function renderSongLabButton() {
   }
 }
 
+// About me opens while it is empty, and folds away once written. A sync
+// that arrives while it is being typed in leaves the box alone.
+function renderSongLabAbout() {
+  var box = document.getElementById('lab-about-text');
+  var details = document.getElementById('lab-about');
+  if (!box || !details) return;
+  var text = songLabAbout();
+  if (document.activeElement !== box && box.value.trim() !== text) box.value = text;
+  if (!_songLab.aboutShown) {
+    _songLab.aboutShown = true;
+    details.open = !text;
+  }
+  renderSongLabAboutNote(document.activeElement === box ? box.value : text);
+}
+
+function renderSongLabAboutNote(text) {
+  var note = document.getElementById('lab-about-note');
+  if (!note) return;
+  var words = songLabWordCount(text);
+  note.textContent = words
+    ? words.toLocaleString() + ' word' + (words === 1 ? '' : 's') + '. Every song is written from this.'
+    : 'Empty, so Claude knows nothing about you yet. Start here.';
+  note.classList.toggle('is-empty', !words);
+}
+
 function renderSongLabIdeas() {
   var el = document.getElementById('lab-ideas');
   if (!el) return;
@@ -401,6 +458,7 @@ function renderSongLab() {
   setup.innerHTML = message;
   setup.hidden = !message;
   hydrateSongLabForm();
+  renderSongLabAbout();
   renderSongLabFrom();
   setSongLabStatus(_songLab.status);
   renderSongLabIdeas();
