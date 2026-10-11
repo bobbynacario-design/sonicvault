@@ -25,27 +25,39 @@ function getSongLabDraft(id) {
   return songLabDrafts().filter(function(draft) { return draft.id === id; })[0] || null;
 }
 
-// About me: the songwriter's life in their own words, which Claude takes as
-// true for every song and idea. Kept with the vault's settings, like the
-// drafts, so it is the same on every device.
-function songLabAbout() {
+// The songwriter's own notes, kept with the vault's settings like the
+// drafts, so they are the same on every device. about: their life in their
+// own words, which Claude takes as true for every song and idea. say: the
+// pronunciation fixes the Copy button applies for Suno.
+var SONG_LAB_TEXTS = {
+  about:{ box:'lab-about-text', max:SONG_LAB_ABOUT_MAX },
+  say:{ box:'lab-say-text', max:SONG_LAB_SAY_MAX }
+};
+
+function songLabText(field) {
   var lab = appSettings && appSettings.songLab;
-  return lab && typeof lab.about === 'string' ? lab.about : '';
+  return lab && typeof lab[field] === 'string' ? lab[field] : '';
 }
+
+function songLabAbout() { return songLabText('about'); }
 
 // Saved a moment after typing stops, not on every key: each save is a
 // settings write. A change (leaving the box) saves at once.
-var _songLabAboutTimer = null;
-function saveSongLabAbout(now) {
-  clearTimeout(_songLabAboutTimer);
-  if (!now) { _songLabAboutTimer = setTimeout(function() { saveSongLabAbout(true); }, 1000); return; }
-  var box = document.getElementById('lab-about-text');
+var _songLabTextTimers = {};
+function saveSongLabText(field, now) {
+  var spec = SONG_LAB_TEXTS[field];
+  if (!spec) return;
+  clearTimeout(_songLabTextTimers[field]);
+  if (!now) { _songLabTextTimers[field] = setTimeout(function() { saveSongLabText(field, true); }, 1000); return; }
+  var box = document.getElementById(spec.box);
   if (!box) return;
-  var text = box.value.trim().slice(0, SONG_LAB_ABOUT_MAX);
-  renderSongLabAboutNote(text);
-  if (text === songLabAbout()) return;
+  var text = box.value.trim().slice(0, spec.max);
+  renderSongLabTextNote(field, text);
+  if (text === songLabText(field)) return;
   appSettings = window.appSettings || appSettings || {};
-  appSettings.songLab = Object.assign({}, appSettings.songLab, { about:text });
+  var change = {};
+  change[field] = text;
+  appSettings.songLab = Object.assign({}, appSettings.songLab, change);
   window.appSettings = appSettings;
   save('settings', appSettings);
 }
@@ -288,13 +300,32 @@ function copyText(text) {
   return copyCommand() ? Promise.resolve() : Promise.reject(new Error('copy failed'));
 }
 
-// Copied for pasting into Suno; where nothing can copy, the text is
+// The lyrics as they go to Suno: the draft with the pronunciation fixes in.
+function songLabSung(draft) {
+  return songLabSungLyrics(draft && draft.lyrics, parseSongLabSay(songLabText('say')));
+}
+
+// Copied for pasting into Suno, the lyrics with the pronunciation fixes in;
+// what was copied is kept on the draft (sung), so the song Suno makes from
+// it is still known as this draft's. Where nothing can copy, the text is
 // selected instead, ready for the device's own Copy.
 function copySongLabField(id, field) {
   var draft = getSongLabDraft(id);
   if (!draft || !SONG_LAB_FIELD_NAMES[field] || !draft[field]) return;
-  copyText(draft[field]).then(function() {
-    showToast('Copied the ' + SONG_LAB_FIELD_NAMES[field] + '. Paste it into Suno.');
+  var text = draft[field];
+  var respelled = 0;
+  if (field === 'lyrics') {
+    var sung = songLabSung(draft);
+    text = sung.text;
+    respelled = sung.count;
+    if ((draft.sung || '') !== (respelled ? text : '')) {
+      saveSongLabDrafts(songLabDrafts().map(function(item) {
+        return item.id === id ? Object.assign({}, item, { sung:respelled ? text : '' }) : item;
+      }));
+    }
+  }
+  copyText(text).then(function() {
+    showToast('Copied the ' + SONG_LAB_FIELD_NAMES[field] + (respelled ? ', with ' + respelled + (respelled === 1 ? ' word' : ' words') + ' respelled for Suno' : '') + '. Paste it into Suno.');
   }).catch(function() {
     var box = document.querySelector('[data-lab-text="' + id + ':' + field + '"]');
     if (box && window.getSelection) {
@@ -345,24 +376,34 @@ function renderSongLabButton() {
   }
 }
 
-// About me opens while it is empty, and folds away once written. A sync
-// that arrives while it is being typed in leaves the box alone.
-function renderSongLabAbout() {
-  var box = document.getElementById('lab-about-text');
-  var details = document.getElementById('lab-about');
-  if (!box || !details) return;
-  var text = songLabAbout();
-  if (document.activeElement !== box && box.value.trim() !== text) box.value = text;
-  if (!_songLab.aboutShown) {
+// About me opens while it is empty, and folds away once written; the
+// pronunciation fixes stay folded. A sync that arrives while a box is being
+// typed in leaves that box alone.
+function renderSongLabTexts() {
+  Object.keys(SONG_LAB_TEXTS).forEach(function(field) {
+    var box = document.getElementById(SONG_LAB_TEXTS[field].box);
+    if (!box) return;
+    var text = songLabText(field);
+    if (document.activeElement !== box && box.value.trim() !== text) box.value = text;
+    renderSongLabTextNote(field, document.activeElement === box ? box.value : text);
+  });
+  var about = document.getElementById('lab-about');
+  if (about && !_songLab.aboutShown) {
     _songLab.aboutShown = true;
-    details.open = !text;
+    about.open = !songLabAbout();
   }
-  renderSongLabAboutNote(document.activeElement === box ? box.value : text);
 }
 
-function renderSongLabAboutNote(text) {
-  var note = document.getElementById('lab-about-note');
+function renderSongLabTextNote(field, text) {
+  var note = document.getElementById(field === 'say' ? 'lab-say-note' : 'lab-about-note');
   if (!note) return;
+  if (field === 'say') {
+    var fixes = parseSongLabSay(text).length;
+    note.textContent = fixes
+      ? fixes + (fixes === 1 ? ' word' : ' words') + ' respelled when you copy lyrics for Suno.'
+      : 'When Suno says a Tagalog or Bikol word wrong, add it here.';
+    return;
+  }
   var words = songLabWordCount(text);
   note.textContent = words
     ? words.toLocaleString() + ' word' + (words === 1 ? '' : 's') + '. Every song is written from this.'
@@ -409,6 +450,7 @@ function songLabMeta(draft) {
 
 function songLabDraftHTML(draft, open) {
   var made = songLabMadeAs(draft, tracks);
+  var respelled = songLabSung(draft).count;
   var busy = _songLab.revising === draft.id;
   var badge = made
     ? '<button type="button" class="lab-made" onclick="playTrack(' + jsq(made.id) + ')">' + icon('play') + '<span>In your vault as “' + esc(made.title || 'Untitled') + '”</span></button>'
@@ -422,7 +464,7 @@ function songLabDraftHTML(draft, open) {
     +   badge
     +   (draft.about ? '<p class="lab-draft-about">' + esc(draft.about) + '</p>' : '')
     +   songLabField(draft, 'style', 'Style of Music', '<div class="lab-field-text" data-lab-text="' + attr(draft.id) + ':style">' + esc(draft.style || '') + '</div>')
-    +   songLabField(draft, 'lyrics', 'Lyrics', '<div class="lab-field-text lab-lyrics" data-lab-text="' + attr(draft.id) + ':lyrics">' + esc(draft.lyrics) + '</div>')
+    +   songLabField(draft, 'lyrics', 'Lyrics' + (respelled ? ' · ' + respelled + ' respelled for Suno' : ''), '<div class="lab-field-text lab-lyrics" data-lab-text="' + attr(draft.id) + ':lyrics">' + esc(draft.lyrics) + '</div>')
     +   '<div class="lab-draft-actions">'
     +     '<a class="sec-action primary" href="' + SUNO_CREATE_URL + '" target="_blank" rel="noopener">Open Suno</a>'
     +     '<button type="button" class="sec-action" onclick="copySongLabField(' + jsq(draft.id) + ', \'title\')">Copy title</button>'
@@ -458,7 +500,7 @@ function renderSongLab() {
   setup.innerHTML = message;
   setup.hidden = !message;
   hydrateSongLabForm();
-  renderSongLabAbout();
+  renderSongLabTexts();
   renderSongLabFrom();
   setSongLabStatus(_songLab.status);
   renderSongLabIdeas();

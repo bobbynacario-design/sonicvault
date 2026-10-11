@@ -69,6 +69,8 @@ test("/songlab writes from what they say and who they are, in the voice of their
   assert.doesNotMatch(sent.system, /rice cooker|a mother or father|images the recent drafts/, "no lists of props and subjects to stay away from");
   assert.match(sent.system, /Central Bikol/);
   assert.match(sent.system, /Never name a real artist/);
+  // Suno says Tagalog and Bikol better when the style names them (2026-10-11).
+  assert.match(sent.system, /When the lyrics have Tagalog or Bikol lines, the style names the languages sung and a native Filipino singer/);
   assert.match(sent.system, /production cue goes inside the tag/);
   const text = sent.messages[0].content;
   assert.match(text, /^Language: Bikol\nWhat the song is about: the boat my father fixed every summer\nWho it's for: my father\nHow it should feel: proud, a little sorry\nToday: 2026-10-11\n\nAbout me:\nI live in Naga with my wife and two kids\.\nI fix boats for a living\.\n/);

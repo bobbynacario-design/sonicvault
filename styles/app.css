@@ -4211,6 +4211,8 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
 .lab-about-note.is-empty{color:var(--accent-dynamic)}
 .lab-about-body{display:grid;gap:.6rem;padding:0 1.15rem 1.15rem}
 .lab-about-body textarea{min-height:12rem;line-height:1.6}
+.lab-about + .lab-about{margin-top:-.5rem}
+.lab-about-body textarea.lab-say-text{min-height:7rem;font-family:var(--mono);font-size:13px}
 .lab-ideas{display:grid;gap:.6rem;max-width:860px}
 .lab-ideas:empty{display:none}
 .lab-idea{display:flex;align-items:center;gap:.9rem;padding:.85rem 1rem;border-radius:18px;background:var(--surface)}

@@ -53,7 +53,7 @@ function releaseState() {
       takes:getVersionGroup(track),
       clashes:clashes[track.id],
       timed:hasUsableLyricTimes(track),
-      fromDraft:drafts.some(function(draft) { return songCameFromDraft(track.lyrics, draft && draft.lyrics); })
+      fromDraft:drafts.some(function(draft) { return songLabFromDraft(track.lyrics, draft); })
     });
     groups[check.status].push({ track:track, check:check, made:releaseMadeDay(track) });
   });

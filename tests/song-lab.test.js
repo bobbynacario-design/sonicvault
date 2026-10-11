@@ -125,3 +125,27 @@ test("About me is counted in words for its note", () => {
   assert.equal(g.songLabWordCount(""), 0);
   assert.equal(g.songLabWordCount(undefined), 0);
 });
+
+test("pronunciation fixes are read a line each, the word then how Suno should see it", () => {
+  assert.deepEqual(g.parseSongLabSay("mga = manga\r\nng=nang\n\nno equals here\n= nothing before\nMga = a repeat\nharong = ha-rong"), [
+    { word: "mga", say: "manga" }, { word: "ng", say: "nang" }, { word: "harong", say: "ha-rong" }
+  ]);
+  assert.deepEqual(g.parseSongLabSay(""), []);
+});
+
+test("the lyrics for Suno have the fixes in: whole words, any case, never in a section tag", () => {
+  const fixes = g.parseSongLabSay("mga = manga\nng = nang\nharong = ha-rong");
+  const sung = g.songLabSungLyrics("[Verse 1 - mga tag stays]\nMga ilaw ng harong, ang mga bituin\nangng, harong!\n[Chorus]", fixes);
+  assert.equal(sung.text, "[Verse 1 - mga tag stays]\nManga ilaw nang ha-rong, ang manga bituin\nangng, ha-rong!\n[Chorus]");
+  assert.equal(sung.count, 5);
+  assert.deepEqual(g.songLabSungLyrics("Mga ilaw", []), { text: "Mga ilaw", count: 0 });
+});
+
+test("a song Suno made from the respelled copy is still the draft's", () => {
+  const draft = { lyrics: "[Verse]\n" + Array.from({ length: 6 }, (_, i) => "an mga ilaw " + i).join("\n") };
+  const sung = g.songLabSungLyrics(draft.lyrics, g.parseSongLabSay("mga = manga")).text;
+  assert.equal(g.songLabFromDraft(sung, draft), false, "not without what was copied");
+  assert.equal(g.songLabFromDraft(sung, { ...draft, sung }), true);
+  assert.equal(g.songLabMadeAs({ ...draft, sung }, [{ id: "t-1", lyrics: sung }]).id, "t-1");
+  assert.equal(g.songLabFromDraft(sung, null), false);
+});

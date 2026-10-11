@@ -65,7 +65,7 @@ function pickSongLabExamples(list, now, seedId, count, drafts) {
   var all = list || [];
   var collapsed = collapseVersions(all, all);
   var withLyrics = collapsed.list.filter(function(track) {
-    return hasLyrics(track) && !(drafts || []).some(function(draft) { return songCameFromDraft(track.lyrics, draft && draft.lyrics); });
+    return hasLyrics(track) && !(drafts || []).some(function(draft) { return songLabFromDraft(track.lyrics, draft); });
   });
   var newest = withLyrics.slice().sort(compareMadeNewestFirst).slice(0, SONG_LAB_NEWEST);
   var loved = withLyrics.filter(function(track) { return newest.indexOf(track) === -1; }).map(function(track) {
@@ -145,14 +145,62 @@ function songCameFromDraft(songLyrics, draftLyrics) {
   return shared >= 0.8 * lines.length;
 }
 
+// Whether a song's words came from a draft, as written or as last copied
+// for Suno with the pronunciation fixes in (draft.sung): Suno writes the
+// sheet it was given into the MP3.
+function songLabFromDraft(songLyrics, draft) {
+  if (!draft) return false;
+  return songCameFromDraft(songLyrics, draft.lyrics) || (!!draft.sung && songCameFromDraft(songLyrics, draft.sung));
+}
+
 // The song a draft became, once it is in the vault: a track whose words
 // came from the draft (Suno writes the sheet it sang into the MP3, and the
 // watcher reads it from there). Null for one not made yet, or made with
 // the words largely changed.
 function songLabMadeAs(draft, list) {
   return (list || []).filter(function(track) {
-    return songCameFromDraft(track && track.lyrics, draft && draft.lyrics);
+    return songLabFromDraft(track && track.lyrics, draft);
   })[0] || null;
+}
+
+// Pronunciation fixes for Suno, which sings by spelling and gets some
+// Tagalog and Bikol words wrong (2026-10-11). The songwriter writes them a
+// line each, "mga = manga": the word, then how Suno should see it. Only
+// their ears can tell which words fail, so nothing is filled in for them.
+var SONG_LAB_SAY_MAX = 2000;
+function parseSongLabSay(text) {
+  var seen = {};
+  return String(text || '').split(/\r?\n/).map(function(line) {
+    var at = line.indexOf('=');
+    if (at < 1) return null;
+    var word = line.slice(0, at).trim();
+    var say = line.slice(at + 1).trim();
+    if (!word || !say || seen[word.toLowerCase()]) return null;
+    seen[word.toLowerCase()] = true;
+    return { word:word, say:say };
+  }).filter(Boolean);
+}
+
+// The lyrics as Suno should get them: each fixed word, whole and in any
+// case, respelled in every sung line; section tags are left alone.
+// { text, count } -- count is how many words were respelled.
+function songLabSungLyrics(lyrics, fixes) {
+  var count = 0;
+  var text = String(lyrics || '');
+  if (!fixes || !fixes.length) return { text:text, count:0 };
+  text = text.split('\n').map(function(line) {
+    if (/^\s*\[[^\]]*\]\s*$/.test(line)) return line;
+    return fixes.reduce(function(out, fix) {
+      var word = fix.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var pattern = new RegExp('(^|[^\\p{L}\\p{N}])(' + word + ')(?=$|[^\\p{L}\\p{N}])', 'giu');
+      return out.replace(pattern, function(match, before, found) {
+        count++;
+        var say = /^\p{Lu}/u.test(found) ? fix.say.charAt(0).toUpperCase() + fix.say.slice(1) : fix.say;
+        return before + say;
+      });
+    }, line);
+  }).join('\n');
+  return { text:text, count:count };
 }
 
 // The newest drafts as a line each -- title and what it says -- so the
