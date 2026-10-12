@@ -180,3 +180,30 @@ test("/ask needs a question and a catalog, and a catalog that fits", async () =>
   assert.equal(huge.res.status, 413);
   assert.equal(empty.calls.length + huge.calls.length, 0);
 });
+
+test("/cover-scene writes a picture from the lyrics and About me, on the writing model", async () => {
+  const { res, json, sent } = await call("/cover-scene", {
+    title: "You Were the Weather", lyrics: "[Verse 1]\nI remember every ordinary Sunday", sound: "indie folk", look: "photo", about: "I live in Naga."
+  }, { fetchImpl: claude({ scene: "  Rain easing on a window on a Sunday morning.  " }) });
+  assert.equal(res.status, 200);
+  assert.deepEqual(json, { scene: "Rain easing on a window on a Sunday morning." });
+  assert.equal(sent.model, "claude-sonnet-5-5");
+  assert.equal(sent.output_config.effort, "low");
+  assert.deepEqual(sent.output_config.format.schema.required, ["scene"]);
+  // A place, a moment and light, not an idea (2026-10-12).
+  assert.match(sent.system, /an image model can paint rain on a window on a Sunday morning, not overlooked love/);
+  assert.match(sent.system, /No faces/);
+  assert.match(sent.system, /don't invent private details/);
+  assert.equal(sent.messages[0].content, "Title: You Were the Weather\nLook: a cinematic photograph\nSound: indie folk\n\nAbout me:\nI live in Naga.\n\nLyrics:\n[Verse 1]\nI remember every ordinary Sunday");
+});
+
+test("/cover-scene needs lyrics, and says when no scene comes back", async () => {
+  const none = await call("/cover-scene", { title: "Instrumental" }, { fetchImpl: claude({ scene: "x" }) });
+  assert.equal(none.res.status, 400);
+  assert.equal(none.calls.length, 0);
+  const empty = await call("/cover-scene", { lyrics: "la" }, { fetchImpl: claude({ scene: " " }) });
+  assert.equal(empty.res.status, 502);
+  assert.match(empty.json.error, /no scene/);
+  const unknownLook = await call("/cover-scene", { lyrics: "la", look: "sculpture" }, { fetchImpl: claude({ scene: "y" }) });
+  assert.match(unknownLook.sent.messages[0].content, /^Title: \(none\)\nLook: a rich oil painting\nSound: \(not described\)\n\nAbout me:\n\(not written yet\)\n/);
+});

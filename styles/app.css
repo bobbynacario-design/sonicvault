@@ -4310,6 +4310,9 @@ body.is-playing .eq i:nth-child(3){animation-duration:.8s;animation-delay:-.2s}
 .release-cover-side .week-note{margin-top:.4rem}
 .release-cover-actions{display:flex;flex-wrap:wrap;gap:.5rem}
 .release-cover-actions .sec-action[disabled]{opacity:.6;cursor:progress}
+.release-cover-scene-row{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .8rem;margin-top:.6rem}
+.release-cover-scene-row .week-note{margin:0}
+.release-cover-scene-row .sec-action[disabled]{opacity:.6;cursor:progress}
 @media (max-width:640px){
   .release-tally{grid-template-columns:repeat(2,minmax(0,1fr))}
   .release-items{margin-left:0}

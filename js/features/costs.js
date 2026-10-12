@@ -18,6 +18,7 @@ var COST_FEATURES = {
   'transcribe':'Lyric timing and transcribing',
   'cover':'Covers',
   'release-cover':'Release covers',
+  'cover-scene':'Release cover scenes',
   'embed':'Search by meaning',
   'lyria':'Songs made with Lyria'
 };

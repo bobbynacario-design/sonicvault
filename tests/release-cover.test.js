@@ -49,3 +49,17 @@ test("the file is named after the title, without characters Windows refuses", ()
   assert.equal(g.coverFileName('What? "Now": a/b'), "What Now ab - cover.jpg");
   assert.equal(g.coverFileName(""), "cover.jpg");
 });
+
+test("a picture of any shape is cut to the square from its middle", () => {
+  assert.deepEqual(g.coverSquareCrop(1536, 1536), { sx: 0, sy: 0, side: 1536 });
+  assert.deepEqual(g.coverSquareCrop(1920, 1080), { sx: 420, sy: 0, side: 1080 });
+  assert.deepEqual(g.coverSquareCrop(1000, 1500), { sx: 0, sy: 250, side: 1000 });
+  assert.deepEqual(g.coverSquareCrop(undefined, 10), { sx: 0, sy: 5, side: 0 });
+});
+
+test("a picture of your own says how it will look at full size", () => {
+  assert.match(g.ownCoverNote(3000, 3000, 3000), /3,000 × 3,000\. That’s big enough to stay sharp/);
+  assert.match(g.ownCoverNote(1536, 1536, 3000), /it will look a little soft/);
+  assert.match(g.ownCoverNote(360, 360, 3000), /it will look blurry/, "a Suno file's own picture");
+  assert.match(g.ownCoverNote(4000, 3000, 3000), /Its middle is used, cut to a square\. That’s big enough/);
+});

@@ -162,6 +162,7 @@ export default {
     if (route === "/lyrics") return handleLyrics(request, env);
     if (route === "/cover") return handleCover(request, env);
     if (route === "/release-cover") return handleReleaseCover(request, env);
+    if (route === "/cover-scene") return handleCoverScene(request, env);
     if (route === "/embed") return handleEmbed(request, env);
     if (route === "/translate") return handleTranslate(request, env);
     if (route === "/story") return handleSongStory(request, env);
@@ -818,6 +819,62 @@ async function handleReleaseCover(request, env) {
   return jsonResponse({ model: RELEASE_COVER_MODEL, mime: imageMime(image), image: image, size: RELEASE_COVER_SIZE, seed: seed }, 200, request, env);
 }
 
+// POST /cover-scene { title, lyrics, sound, look, about } -> { scene }
+// What a release cover's picture shows, written by Claude from the song's
+// own lyrics and the songwriter's About me. The app's first try was the
+// title and the song's themes ("A scene of you were the weather, about
+// overlooked love") -- an idea, not a picture -- and FLUX painted a vague
+// blur the user called generic (2026-10-12). A concrete place, moment and
+// light gives the image model something to paint.
+const MAX_SCENE_LYRICS = 4000;
+const COVER_SCENE_SCHEMA = {
+  type: "object",
+  properties: { scene: { type: "string" } },
+  required: ["scene"],
+  additionalProperties: false
+};
+const COVER_SCENE_PROMPT = [
+  "You describe the picture for a song's release cover, for an image model to paint. You get the song's title, its lyrics, what it sounds like, the look wanted, and About me: the songwriter's life in their own words.",
+  "Describe one concrete scene from the song itself: a real place, moment and light the lyrics point to -- what is in the frame, where the light comes from, the time of day and the weather. Things, places and light, not ideas: an image model can paint rain on a window on a Sunday morning, not overlooked love.",
+  "One clear subject, with calm space in the lower third where the title will go. No text, letters, signs or logos in the picture. No faces: people only as small or turned-away figures, if at all.",
+  "Use what the lyrics and About me say, and the everyday look of where they live; don't invent private details.",
+  "One or two sentences in English, under 400 characters. The reply is JSON: { \"scene\": \"...\" }."
+].join("\n");
+
+async function handleCoverScene(request, env) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return jsonResponse({ error: "Worker secret ANTHROPIC_API_KEY is not configured." }, 500, request, env);
+  }
+  const payload = await readJsonBody(request);
+  if (!payload) {
+    return jsonResponse({ error: "Request body must be valid JSON." }, 400, request, env);
+  }
+  const title = cleanString(payload.title).slice(0, MAX_SONG_TITLE);
+  const lyrics = cleanString(payload.lyrics).slice(0, MAX_SCENE_LYRICS);
+  if (!lyrics) {
+    return jsonResponse({ error: "A scene is written from the lyrics, and this song has none." }, 400, request, env);
+  }
+  const look = RELEASE_COVER_LOOKS[cleanString(payload.look)] || RELEASE_COVER_LOOKS.painting;
+  const lines = [
+    "Title: " + (title || "(none)"),
+    "Look: " + look,
+    "Sound: " + (cleanString(payload.sound).slice(0, 500) || "(not described)"),
+    "",
+    "About me:",
+    cleanString(payload.about).slice(0, MAX_ABOUT) || "(not written yet)",
+    "",
+    "Lyrics:",
+    lyrics
+  ];
+  const asked = await askSongLabClaude(request, env, payload, "cover-scene", COVER_SCENE_PROMPT, lines, COVER_SCENE_SCHEMA, "low");
+  if (asked.response) return asked.response;
+  const scene = cleanString(asked.answer && asked.answer.scene).slice(0, 600);
+  if (!scene) {
+    return jsonResponse({ error: "Claude returned no scene. Try again." }, 502, request, env);
+  }
+  return jsonResponse({ scene: scene }, 200, request, env);
+}
+
 // ─── Search by meaning ───────────────────────────────────────────────────────
 
 // POST /embed { texts: [...] } -> { model, vectors: [[...1024 numbers], ...] }
@@ -1173,9 +1230,10 @@ async function handleSongIdeas(request, env) {
   return jsonResponse({ ideas: ideas }, 200, request, env);
 }
 
-// One Song lab call: { answer } with the parsed JSON, or { response }
-// carrying the error to send back. Songs go to the song model (Opus), ideas
-// to the writing model (Sonnet).
+// One call for a piece of writing -- a song, ideas, a cover's scene --
+// answered as JSON: { answer } with the parsed JSON, or { response }
+// carrying the error to send back. Songs go to the song model (Opus), the
+// rest to the writing model (Sonnet).
 async function askSongLabClaude(request, env, payload, feature, system, lines, schema, effort, songwriting) {
   const model = cleanString(payload.model) || (songwriting ? cleanString(env.SONG_MODEL) || SONG_MODEL : cleanString(env.TRANSLATE_MODEL) || TRANSLATE_MODEL);
   if (await overDailyLimit(env, "claude", claudeWeight(model))) return { response: dailyLimitResponse("claude", request, env) };

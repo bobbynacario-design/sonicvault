@@ -27,6 +27,30 @@ function releaseCoverScene(track) {
   return 'A scene of ' + title.toLowerCase() + (theme ? ', about ' + theme.toLowerCase() : '');
 }
 
+// A picture of any shape as the square a cover needs: the largest square
+// from its middle. { sx, sy, side } in the picture's own pixels.
+function coverSquareCrop(width, height) {
+  var w = Math.max(0, Number(width) || 0);
+  var h = Math.max(0, Number(height) || 0);
+  var side = Math.min(w, h);
+  return { sx:Math.round((w - side) / 2), sy:Math.round((h - side) / 2), side:side };
+}
+
+// What to know about a picture of the songwriter's own (one made in Suno, a
+// photo): how big it is against the cover's size, and whether its sides
+// are cut to make it square. Suno's own file pictures are 360 x 360.
+function ownCoverNote(width, height, px) {
+  var w = Math.round(Number(width) || 0);
+  var h = Math.round(Number(height) || 0);
+  var side = Math.min(w, h);
+  var notes = ['Your picture is ' + w.toLocaleString() + ' × ' + h.toLocaleString() + '.'];
+  if (w !== h) notes.push('Its middle is used, cut to a square.');
+  if (side >= px) notes.push('That’s big enough to stay sharp at ' + px.toLocaleString() + ' × ' + px.toLocaleString() + '.');
+  else if (side >= px / 2) notes.push('Scaled up to ' + px.toLocaleString() + ' × ' + px.toLocaleString() + ', it will look a little soft.');
+  else notes.push('Scaled up to ' + px.toLocaleString() + ' × ' + px.toLocaleString() + ', it will look blurry. A picture ' + px.toLocaleString() + ' pixels wide, or close, stays sharp.');
+  return notes.join(' ');
+}
+
 // The sound the picture takes its mood and colours from: the song's own
 // Suno style, else its genre, mood, theme and tags.
 function releaseCoverStyle(track) {

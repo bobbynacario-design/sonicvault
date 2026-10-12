@@ -3,7 +3,10 @@
 // /release-cover paints the picture (FLUX.2 [klein] 9B, 1536 x 1536); this
 // scales it up and sets the title and artist on it, so they are spelt
 // exactly as the release. Before there is a picture, the song's own colours
-// stand in, so the words can be laid out first.
+// stand in, so the words can be laid out first. What the picture shows is
+// written by Claude from the song's lyrics and About me (/cover-scene), the
+// first time a song's cover is opened. A picture of the songwriter's own --
+// one made in Suno, a photo -- can take the painted one's place.
 //
 // The last picture of each song is kept on this device (Cache Storage
 // sv-covers-v1, which sw.js keeps) with what made it (localStorage
@@ -12,7 +15,8 @@
 var RELEASE_COVER_PX = 3000;
 var RELEASE_COVER_CACHE = 'sv-covers-v1';
 var RELEASE_COVER_META_KEY = 'sv_release_covers';
-var _releaseCover = { id:'', image:null, busy:false, note:'', error:false };
+var _releaseCover = { id:'', image:null, busy:false, note:'', error:false, sceneBusy:false, sceneNote:'' };
+var RELEASE_COVER_MAX_FILE = 25 * 1024 * 1024;
 var _releaseCoverDrawTimer = null;
 
 function readReleaseCoverMeta() {
@@ -70,20 +74,25 @@ async function openReleaseCover(id) {
   var track = getVaultTrack(id);
   if (!track) return;
   var meta = readReleaseCoverMeta()[id] || {};
-  _releaseCover = { id:id, image:null, busy:false, note:'', error:false };
+  _releaseCover = { id:id, image:null, busy:false, note:'', error:false, sceneBusy:false, sceneNote:'' };
+  var canWrite = hasLyrics(track) && !!(_aiConfig && _aiConfig.endpoint);
   var title = meta.title || releaseCheck(track, {}).title || track.title || '';
   var artist = releaseArtistName();
   var summary = getTrackSummary(track);
   document.getElementById('release-cover-song').textContent = track.title || 'Untitled';
   document.getElementById('release-cover-side').innerHTML = ''
     + '<div class="form-group"><label class="form-label" for="rc-scene">What the picture shows</label>'
-    + '<textarea class="form-input" id="rc-scene" rows="3" maxlength="600">' + esc(meta.scene || releaseCoverScene(track)) + '</textarea>'
+    + '<textarea class="form-input" id="rc-scene" rows="4" maxlength="600">' + esc(meta.scene || releaseCoverScene(track)) + '</textarea>'
+    + (canWrite ? '<div class="release-cover-scene-row"><button type="button" class="sec-action" id="rc-scene-write" onclick="writeReleaseCoverScene()">Write it from the lyrics</button>'
+      + '<span class="week-note" id="rc-scene-note" aria-live="polite"></span></div>' : '')
     + (summary ? '<p class="week-note">What the song is about, by Claude: ' + esc(summary) + '</p>' : '') + '</div>'
     + '<div class="form-group"><label class="form-label" for="rc-look">Look</label>'
     + '<select class="form-input" id="rc-look">' + COVER_LOOKS.map(function(look) {
       return '<option value="' + attr(look.id) + '"' + (look.id === (meta.look || 'painting') ? ' selected' : '') + '>' + esc(look.label) + '</option>';
     }).join('') + '</select></div>'
-    + '<div class="release-cover-actions"><button type="button" class="sec-action primary" id="rc-make" onclick="makeReleaseCoverPicture()">Make the picture</button></div>'
+    + '<div class="release-cover-actions"><button type="button" class="sec-action primary" id="rc-make" onclick="makeReleaseCoverPicture()">Make the picture</button>'
+    +   '<button type="button" class="sec-action" onclick="releaseCoverField(\'file\').click()">Use my own picture</button>'
+    +   '<input type="file" id="rc-file" accept="image/*" hidden onchange="useOwnReleaseCoverPicture(this.files && this.files[0]); this.value = \'\'"></div>'
     + '<div class="form-group"><label class="form-label" for="rc-text">Words on the cover</label>'
     + '<select class="form-input" id="rc-text" onchange="scheduleReleaseCoverDraw()">' + COVER_TEXT_MODES.map(function(mode) {
       return '<option value="' + attr(mode.id) + '"' + (mode.id === (meta.text || (artist ? 'both' : 'title')) ? ' selected' : '') + '>' + esc(mode.label) + '</option>';
@@ -97,7 +106,9 @@ async function openReleaseCover(id) {
     + '<p class="week-note" id="rc-note" aria-live="polite"></p>';
   openModal('modal-release-cover');
   renderReleaseCoverNote();
+  renderReleaseCoverSceneNote();
   drawReleaseCover();
+  if (canWrite && !meta.scene) writeReleaseCoverScene(true);
   if (!('caches' in window)) return;
   try {
     var cache = await caches.open(RELEASE_COVER_CACHE);
@@ -106,6 +117,8 @@ async function openReleaseCover(id) {
     var image = await blobToImage(await saved.blob());
     if (_releaseCover.id !== id || _releaseCover.image) return;
     _releaseCover.image = image;
+    _releaseCover.own = !!meta.own;
+    if (meta.own) _releaseCover.note = ownCoverNote(image.naturalWidth, image.naturalHeight, RELEASE_COVER_PX);
     renderReleaseCoverNote();
     drawReleaseCover();
   } catch (e) {
@@ -118,7 +131,7 @@ function renderReleaseCoverNote() {
   var make = releaseCoverField('make');
   if (make) {
     make.disabled = _releaseCover.busy;
-    make.textContent = _releaseCover.busy ? 'Painting…' : (_releaseCover.image ? 'Try another picture' : 'Make the picture');
+    make.textContent = _releaseCover.busy ? 'Painting…' : (_releaseCover.own ? 'Paint one instead' : _releaseCover.image ? 'Try another picture' : 'Make the picture');
   }
   if (!note) return;
   note.classList.toggle('tidy-error', !!_releaseCover.error);
@@ -156,10 +169,11 @@ async function makeReleaseCoverPicture() {
       var cache = await caches.open(RELEASE_COVER_CACHE);
       await cache.put(releaseCoverKey(id), new Response(blob, { headers:{ 'Content-Type':blob.type } }));
     }
-    saveReleaseCoverMeta(id, { scene:scene, look:look, seed:data.seed, at:new Date().toISOString() });
+    saveReleaseCoverMeta(id, { scene:scene, look:look, seed:data.seed, own:false, at:new Date().toISOString() });
     var image = await blobToImage(blob);
     if (_releaseCover.id !== id) return;
     _releaseCover.image = image;
+    _releaseCover.own = false;
     _releaseCover.note = 'Not quite it? Change what it shows or the look, and try another.';
   } catch (e) {
     if (_releaseCover.id !== id) return;
@@ -172,6 +186,94 @@ async function makeReleaseCoverPicture() {
       drawReleaseCover();
     }
   }
+}
+
+// What the picture shows, written by Claude from the lyrics and About me.
+// On a song's first opening it fills the box by itself -- unless something
+// has been typed there meanwhile -- and is kept, so it is asked for once.
+async function writeReleaseCoverScene(auto) {
+  var id = _releaseCover.id;
+  var track = getVaultTrack(id);
+  var box = releaseCoverField('scene');
+  if (!track || !box || _releaseCover.sceneBusy) return;
+  var before = box.value;
+  _releaseCover.sceneBusy = true;
+  _releaseCover.sceneNote = 'Claude is reading the lyrics…';
+  renderReleaseCoverSceneNote();
+  try {
+    var response = await workerRequest('/cover-scene', {
+      title:releaseCoverValue('title') || track.title || '',
+      lyrics:getTrackLyrics(track),
+      sound:releaseCoverStyle(track),
+      look:releaseCoverValue('look') || 'painting',
+      about:typeof songLabAbout === 'function' ? songLabAbout() : ''
+    });
+    if (!response.ok) throw new Error(await workerError(response));
+    var data = await response.json();
+    if (!data || !data.scene) throw new Error('Claude returned no scene.');
+    if (_releaseCover.id !== id) return;
+    var field = releaseCoverField('scene');
+    if (field && (!auto || field.value === before)) {
+      field.value = data.scene;
+      saveReleaseCoverMeta(id, { scene:data.scene });
+    }
+    _releaseCover.sceneNote = '';
+  } catch (e) {
+    if (_releaseCover.id !== id) return;
+    _releaseCover.sceneNote = (e && e.message) || 'Claude couldn’t write it.';
+  } finally {
+    if (_releaseCover.id === id) {
+      _releaseCover.sceneBusy = false;
+      renderReleaseCoverSceneNote();
+    }
+  }
+}
+
+function renderReleaseCoverSceneNote() {
+  var button = releaseCoverField('scene-write');
+  var note = releaseCoverField('scene-note');
+  if (button) {
+    button.disabled = _releaseCover.sceneBusy;
+    button.textContent = _releaseCover.sceneBusy ? 'Writing…' : 'Write it from the lyrics';
+  }
+  if (note) note.textContent = _releaseCover.sceneNote;
+}
+
+// A picture of the songwriter's own in place of a painted one: kept like a
+// painted picture, so reopening shows it, and checked for size.
+async function useOwnReleaseCoverPicture(file) {
+  var id = _releaseCover.id;
+  if (!id || !file) return;
+  _releaseCover.error = false;
+  if (!/^image\//.test(file.type || '')) {
+    _releaseCover.error = true;
+    _releaseCover.note = 'That isn’t a picture. Choose a JPEG, PNG or WebP image.';
+    renderReleaseCoverNote();
+    return;
+  }
+  if (file.size > RELEASE_COVER_MAX_FILE) {
+    _releaseCover.error = true;
+    _releaseCover.note = 'That picture is over 25 MB. Choose a smaller one.';
+    renderReleaseCoverNote();
+    return;
+  }
+  try {
+    var image = await blobToImage(file);
+    if ('caches' in window) {
+      var cache = await caches.open(RELEASE_COVER_CACHE);
+      await cache.put(releaseCoverKey(id), new Response(file, { headers:{ 'Content-Type':file.type } }));
+    }
+    saveReleaseCoverMeta(id, { own:true, at:new Date().toISOString() });
+    if (_releaseCover.id !== id) return;
+    _releaseCover.image = image;
+    _releaseCover.own = true;
+    _releaseCover.note = ownCoverNote(image.naturalWidth, image.naturalHeight, RELEASE_COVER_PX);
+  } catch (e) {
+    _releaseCover.error = true;
+    _releaseCover.note = (e && e.message) || 'The picture couldn’t be read.';
+  }
+  renderReleaseCoverNote();
+  drawReleaseCover();
 }
 
 // Redraw a moment after typing stops, and remember the words for next time.
@@ -202,7 +304,8 @@ async function drawReleaseCover() {
   if (_releaseCover.image) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(_releaseCover.image, 0, 0, size, size);
+    var crop = coverSquareCrop(_releaseCover.image.naturalWidth || _releaseCover.image.width, _releaseCover.image.naturalHeight || _releaseCover.image.height);
+    ctx.drawImage(_releaseCover.image, crop.sx, crop.sy, crop.side, crop.side, 0, 0, size, size);
   } else {
     var palette = getCoverPalette(track);
     ctx.fillStyle = '#0b0f1a';
