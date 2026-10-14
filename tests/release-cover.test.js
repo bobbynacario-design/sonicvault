@@ -63,3 +63,21 @@ test("a picture of your own says how it will look at full size", () => {
   assert.match(g.ownCoverNote(360, 360, 3000), /it will look blurry/, "a Suno file's own picture");
   assert.match(g.ownCoverNote(4000, 3000, 3000), /Its middle is used, cut to a square\. That’s big enough/);
 });
+
+test("the words go at the bottom or the top", () => {
+  assert.deepEqual(g.COVER_PLACES.map((p) => p.id), ["bottom", "top"]);
+});
+
+test("a band's light is the mean of its pixels' light", () => {
+  assert.equal(Math.round(g.coverLuminance([255, 255, 255, 255, 0, 0, 0, 255]) * 10) / 10, 127.5);
+  assert.equal(Math.round(g.coverLuminance([250, 240, 220, 255])), 241, "a pale watercolour sky");
+  assert.equal(g.coverLuminance([]), 0);
+});
+
+test("words take dark ink on a bright picture, white on a dark one", () => {
+  assert.equal(g.coverInk(240).title, "#18202c");
+  assert.match(g.coverInk(240).shade, /^rgba\(255,255,255,/, "a light veil, not a dark band");
+  assert.equal(g.coverInk(60).title, "#ffffff");
+  assert.match(g.coverInk(60).shade, /^rgba\(0,0,0,/);
+  assert.equal(g.coverInk(g.COVER_BRIGHT).title, "#18202c");
+});

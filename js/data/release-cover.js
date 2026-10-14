@@ -16,6 +16,37 @@ var COVER_TEXT_MODES = [
   { id:'title', label:'Title only' },
   { id:'none', label:'No words' }
 ];
+// Where the words go. At the top, for a picture whose subject stands low
+// down -- the figure on a rooftop under a wide sky that the title would
+// otherwise cover (You Were the Weather, 2026-10-12).
+var COVER_PLACES = [
+  { id:'bottom', label:'At the bottom' },
+  { id:'top', label:'At the top' }
+];
+
+// How bright a patch of picture is, 0 (black) to 255 (white): the mean
+// light of its pixels, from RGBA bytes as canvas getImageData gives them.
+function coverLuminance(rgba) {
+  var data = rgba || [];
+  var total = 0;
+  var count = 0;
+  for (var i = 0; i + 2 < data.length; i += 4) {
+    total += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+    count++;
+  }
+  return count ? total / count : 0;
+}
+
+// The ink for the words over that patch: white over a dark shade on a dark
+// picture, as before; dark over a soft light veil on a bright one, so pale
+// skies (watercolour) keep their light instead of gaining a dark band.
+var COVER_BRIGHT = 165;
+function coverInk(luminance) {
+  if (luminance >= COVER_BRIGHT) {
+    return { title:'#18202c', artist:'rgba(24,32,44,0.84)', shade:'rgba(255,255,255,0.4)', glow:'rgba(255,255,255,0.45)' };
+  }
+  return { title:'#ffffff', artist:'rgba(255,255,255,0.86)', shade:'rgba(0,0,0,0.62)', glow:'rgba(0,0,0,0.35)' };
+}
 
 // What the picture shows, to start from: a scene of the title, and what
 // the song is about when Claude has said. A summary describes the song, not

@@ -6,6 +6,8 @@
 // Storage, its palette and a "checked" mark in localStorage. Lyrics are the
 // track's own content, so they are saved to the vault -- but only into a
 // track whose lyrics are empty, never over lyrics someone has written.
+// A finished release cover selected with "Use as song cover" is also
+// device-local, stored separately so it wins over the file's picture.
 
 var ART_CACHE_NAME = 'sv-art-v1';   // sw.js keeps this cache when it activates
 var ART_PROBE_PARAM = 'sv-art';     // sw.js passes these requests straight through
@@ -13,6 +15,8 @@ var ART_PROBE_BYTES = 65536;
 var ART_TAG_LIMIT = 1048576;        // never read past 1MB looking for the end of a tag
 var _artIndex = null;               // track id -> { src, art, palette }
 var _artURLs = {};                  // track id -> object URL, this page only
+var _songCoverURLs = {};            // chosen release covers take precedence
+var _songCoverIndex = null;
 var _artDataURLs = {};              // track id -> data URL, for the OS media controls
 var _artSweepTimer = null;
 var _artSweepRunning = false;
@@ -34,19 +38,61 @@ function artCacheKey(trackId) {
   return './__art/' + encodeURIComponent(trackId);
 }
 
+function songCoverCacheKey(trackId) {
+  return './__art/selected/' + encodeURIComponent(trackId);
+}
+
+function getSongCoverIndex() {
+  if (_songCoverIndex) return _songCoverIndex;
+  var stored = null;
+  try { stored = JSON.parse(localStorage.getItem('sv_song_covers') || 'null'); } catch (e) {}
+  _songCoverIndex = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+  return _songCoverIndex;
+}
+
+// Store the finished release artwork separately from embedded art. Scans
+// may still read lyrics and Suno stamps, but cannot overwrite this choice.
+async function useSongCoverBlob(trackId, blob) {
+  if (!('caches' in window)) throw new Error('This browser cannot save song covers.');
+  var palette = await paletteFromBlob(blob);
+  var cache = await caches.open(ART_CACHE_NAME);
+  // A fresh key keeps the previous selection intact if saving fails.
+  var key = songCoverCacheKey(trackId) + '/' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  await cache.put(key, new Response(blob, { headers:{ 'Content-Type':blob.type } }));
+  var index = getSongCoverIndex();
+  var previous = index[trackId];
+  var next = Object.assign({}, index);
+  next[trackId] = { key:key, palette:palette };
+  try {
+    localStorage.setItem('sv_song_covers', JSON.stringify(next));
+  } catch (e) {
+    await cache.delete(key).catch(function() {});
+    throw new Error('The song cover could not be saved on this device.');
+  }
+  _songCoverIndex = next;
+  if (_songCoverURLs[trackId]) URL.revokeObjectURL(_songCoverURLs[trackId]);
+  _songCoverURLs[trackId] = URL.createObjectURL(blob);
+  delete _artDataURLs[trackId];
+  paintArt(trackId);
+  if (previous && previous.key) await cache.delete(previous.key).catch(function() {});
+}
+
 // Art the track is known to have, whether or not its image is loaded yet.
 function trackHasArt(track) {
+  if (track && track.id && getSongCoverIndex()[track.id]) return true;
   var entry = track && track.id ? getArtIndex()[track.id] : null;
   return !!(entry && entry.art && entry.src === track.audioURL);
 }
 
 function getArtURL(trackId) {
-  return _artURLs[trackId] || '';
+  return _songCoverURLs[trackId] || _artURLs[trackId] || '';
 }
 
 // The colours to tint the shell with: the real artwork's when there is one,
 // else the generated cover's.
 function getCoverPalette(track) {
+  var chosen = track && track.id ? getSongCoverIndex()[track.id] : null;
+  if (chosen && chosen.palette) return chosen.palette;
   if (trackHasArt(track) && getArtIndex()[track.id].palette) return getArtIndex()[track.id].palette;
   return getTrackPalette(track || {});
 }
@@ -63,7 +109,7 @@ function paintArt(onlyId) {
   document.querySelectorAll('.cover-art[data-art-id]').forEach(function(el) {
     var id = el.getAttribute('data-art-id');
     if (onlyId && id !== onlyId) return;
-    var url = _artURLs[id];
+    var url = getArtURL(id);
     if (!url) return;
     var img = el.querySelector('.cover-img');
     if (!img) {
@@ -76,7 +122,7 @@ function paintArt(onlyId) {
     el.classList.add('has-art');
   });
   var current = typeof _currentTrack !== 'undefined' ? _currentTrack : null;
-  if (current && (!onlyId || current.id === onlyId) && _artURLs[current.id]) {
+  if (current && (!onlyId || current.id === onlyId) && getArtURL(current.id)) {
     applyTrackTint(current);
     paintPlayerBackdrop();
     updateMediaSession();
@@ -87,12 +133,13 @@ function paintArt(onlyId) {
 // image. Converted once on demand; the caller retries when it lands.
 function getArtDataURL(trackId) {
   if (_artDataURLs[trackId]) return _artDataURLs[trackId];
-  var url = _artURLs[trackId];
+  var url = getArtURL(trackId);
   if (!url || _artDataURLs[trackId] === false) return '';
   _artDataURLs[trackId] = false;
   fetch(url).then(function(res) { return res.blob(); }).then(function(blob) {
     var reader = new FileReader();
     reader.onload = function() {
+      if (getArtURL(trackId) !== url) return;
       _artDataURLs[trackId] = reader.result;
       if (_currentTrack && _currentTrack.id === trackId) updateMediaSession();
     };
@@ -106,17 +153,31 @@ function getArtDataURL(trackId) {
 function loadCachedArt() {
   if (!('caches' in window)) return Promise.resolve();
   var index = getArtIndex();
+  var chosen = getSongCoverIndex();
   var ids = Object.keys(index).filter(function(id) { return index[id] && index[id].art; });
-  if (!ids.length) return Promise.resolve();
   return caches.open(ART_CACHE_NAME).then(function(cache) {
     return Promise.all(ids.map(function(id) {
       return cache.match(artCacheKey(id)).then(function(res) {
         if (!res) { delete index[id]; return null; }
         return res.blob().then(function(blob) { setArtBlob(id, blob); });
       });
-    }));
+    }).concat(Object.keys(chosen).map(function(id) {
+      var entry = chosen[id];
+      var key = entry && entry.key;
+      if (!key) { delete chosen[id]; return null; }
+      return cache.match(key).then(function(res) {
+        if (!res) { delete chosen[id]; return null; }
+        return res.blob().then(function(blob) {
+          if (getSongCoverIndex()[id] !== entry) return;
+          if (_songCoverURLs[id]) URL.revokeObjectURL(_songCoverURLs[id]);
+          _songCoverURLs[id] = URL.createObjectURL(blob);
+          delete _artDataURLs[id];
+        });
+      });
+    })));
   }).then(function() {
     saveArtIndex();
+    localStorage.setItem('sv_song_covers', JSON.stringify(getSongCoverIndex()));
     paintArt();
   }).catch(function(e) {
     console.warn('cached artwork not restored:', e);
@@ -390,7 +451,7 @@ function paintPlayerBackdrop() {
   }
   var url = getArtURL(track.id);
   var palette = getCoverPalette(track);
-  var key = track.id + '|' + (url ? 'art' : palette.a);
+  var key = track.id + '|' + (url || palette.a);
   if (el.getAttribute('data-track') === key) return;
   el.setAttribute('data-track', key);
   // No art: the generated cover's blooms, painted large. Blurring the cover

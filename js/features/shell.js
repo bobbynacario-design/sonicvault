@@ -46,7 +46,7 @@ function motionAllowed() {
 // the cover each time restarted its image load and its animations.
 function swapCover(host, track, size, includeWords) {
   if (!host) return;
-  var key = track.id + '|' + size + '|' + (getArtURL(track.id) ? 'art' : getCoverStyle(track));
+  var key = track.id + '|' + size + '|' + (getArtURL(track.id) || getCoverStyle(track));
   if (host.getAttribute('data-cover') === key) return;
   var hadCover = !!host.getAttribute('data-cover');
   host.setAttribute('data-cover', key);

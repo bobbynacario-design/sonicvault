@@ -11,6 +11,8 @@
 // The last picture of each song is kept on this device (Cache Storage
 // sv-covers-v1, which sw.js keeps) with what made it (localStorage
 // sv_release_covers), so reopening shows it again without paying twice.
+// "Use as song cover" copies the finished canvas into the artwork store
+// for the library and player; later draft edits leave that choice intact.
 
 var RELEASE_COVER_PX = 3000;
 var RELEASE_COVER_CACHE = 'sv-covers-v1';
@@ -98,11 +100,18 @@ async function openReleaseCover(id) {
       return '<option value="' + attr(mode.id) + '"' + (mode.id === (meta.text || (artist ? 'both' : 'title')) ? ' selected' : '') + '>' + esc(mode.label) + '</option>';
     }).join('') + '</select>'
     + '<p class="week-note">Distributors allow only the release’s title and artist name on a cover: no handles, links or logos.</p></div>'
+    + '<div class="form-group"><label class="form-label" for="rc-place">Where the words go</label>'
+    + '<select class="form-input" id="rc-place" onchange="scheduleReleaseCoverDraw()">' + COVER_PLACES.map(function(place) {
+      return '<option value="' + attr(place.id) + '"' + (place.id === (meta.place || 'bottom') ? ' selected' : '') + '>' + esc(place.label) + '</option>';
+    }).join('') + '</select>'
+    + '<p class="week-note">At the top when the picture’s subject stands low down. The words take dark or light ink from the picture behind them.</p></div>'
     + '<div class="form-group"><label class="form-label" for="rc-title">Title</label>'
     + '<input class="form-input" id="rc-title" maxlength="120" value="' + attr(title) + '" oninput="scheduleReleaseCoverDraw()"></div>'
     + '<div class="form-group"><label class="form-label" for="rc-artist">Artist name, as on Spotify</label>'
     + '<input class="form-input" id="rc-artist" maxlength="120" value="' + attr(artist) + '" oninput="scheduleReleaseCoverDraw()" onchange="setReleaseArtistName(this.value)"></div>'
-    + '<div class="release-cover-actions"><button type="button" class="sec-action" id="rc-download" onclick="downloadReleaseCover()">Download 3000 × 3000 JPEG</button></div>'
+    + '<div class="release-cover-actions"><button type="button" class="sec-action primary" id="rc-apply" onclick="applyReleaseCoverToSong()" disabled>Use as song cover</button>'
+    + '<button type="button" class="sec-action" id="rc-download" onclick="downloadReleaseCover()">Download 3000 × 3000 JPEG</button></div>'
+    + '<p class="week-note">Use as song cover updates the library and player on this device.</p>'
     + '<p class="week-note" id="rc-note" aria-live="polite"></p>';
   openModal('modal-release-cover');
   renderReleaseCoverNote();
@@ -129,8 +138,13 @@ async function openReleaseCover(id) {
 function renderReleaseCoverNote() {
   var note = releaseCoverField('note');
   var make = releaseCoverField('make');
+  var apply = releaseCoverField('apply');
+  if (apply) {
+    apply.disabled = !_releaseCover.image || _releaseCover.busy || _releaseCover.applying;
+    apply.textContent = _releaseCover.applying ? 'Saving…' : 'Use as song cover';
+  }
   if (make) {
-    make.disabled = _releaseCover.busy;
+    make.disabled = _releaseCover.busy || _releaseCover.applying;
     make.textContent = _releaseCover.busy ? 'Painting…' : (_releaseCover.own ? 'Paint one instead' : _releaseCover.image ? 'Try another picture' : 'Make the picture');
   }
   if (!note) return;
@@ -143,7 +157,7 @@ function renderReleaseCoverNote() {
 async function makeReleaseCoverPicture() {
   var id = _releaseCover.id;
   var track = getVaultTrack(id);
-  if (!track || _releaseCover.busy) return;
+  if (!track || _releaseCover.busy || _releaseCover.applying) return;
   if (!_aiConfig || !_aiConfig.endpoint) { renderReleaseCoverNote(); return; }
   var scene = releaseCoverValue('scene');
   var look = releaseCoverValue('look') || 'painting';
@@ -242,6 +256,7 @@ function renderReleaseCoverSceneNote() {
 // A picture of the songwriter's own in place of a painted one: kept like a
 // painted picture, so reopening shows it, and checked for size.
 async function useOwnReleaseCoverPicture(file) {
+  if (_releaseCover.busy || _releaseCover.applying) return;
   var id = _releaseCover.id;
   if (!id || !file) return;
   _releaseCover.error = false;
@@ -257,6 +272,8 @@ async function useOwnReleaseCoverPicture(file) {
     renderReleaseCoverNote();
     return;
   }
+  _releaseCover.busy = true;
+  renderReleaseCoverNote();
   try {
     var image = await blobToImage(file);
     if ('caches' in window) {
@@ -269,25 +286,30 @@ async function useOwnReleaseCoverPicture(file) {
     _releaseCover.own = true;
     _releaseCover.note = ownCoverNote(image.naturalWidth, image.naturalHeight, RELEASE_COVER_PX);
   } catch (e) {
+    if (_releaseCover.id !== id) return;
     _releaseCover.error = true;
     _releaseCover.note = (e && e.message) || 'The picture couldn’t be read.';
+  } finally {
+    if (_releaseCover.id === id) {
+      _releaseCover.busy = false;
+      renderReleaseCoverNote();
+      drawReleaseCover();
+    }
   }
-  renderReleaseCoverNote();
-  drawReleaseCover();
 }
 
 // Redraw a moment after typing stops, and remember the words for next time.
 function scheduleReleaseCoverDraw() {
   clearTimeout(_releaseCoverDrawTimer);
   _releaseCoverDrawTimer = setTimeout(function() {
-    if (_releaseCover.id) saveReleaseCoverMeta(_releaseCover.id, { title:releaseCoverValue('title'), text:releaseCoverValue('text') });
+    if (_releaseCover.id) saveReleaseCoverMeta(_releaseCover.id, { title:releaseCoverValue('title'), text:releaseCoverValue('text'), place:releaseCoverValue('place') });
     drawReleaseCover();
   }, 120);
 }
 
 // The picture filling the square -- or the song's colours until there is
-// one -- and the words over a shade at the foot, set in the app's own
-// display face.
+// one -- and the words over a shade at the foot or the head, set in the
+// app's own display face.
 async function drawReleaseCover() {
   var canvas = document.getElementById('release-cover-canvas');
   var track = getVaultTrack(_releaseCover.id);
@@ -298,6 +320,7 @@ async function drawReleaseCover() {
   try {
     await Promise.all([document.fonts.load('700 200px Syne'), document.fonts.load('500 100px "Space Grotesk"')]);
   } catch (e) {}
+  if (_releaseCover.id !== track.id || document.getElementById('release-cover-canvas') !== canvas) return;
   var size = RELEASE_COVER_PX;
   var ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, size, size);
@@ -321,38 +344,108 @@ async function drawReleaseCover() {
   var showTitle = mode !== 'none' && !!title;
   var showArtist = mode === 'both' && !!artist;
   if (!showTitle && !showArtist) return;
+  var top = releaseCoverValue('place') === 'top';
   var margin = 210;
-  var shade = ctx.createLinearGradient(0, size * 0.52, 0, size);
-  shade.addColorStop(0, 'rgba(0,0,0,0)');
-  shade.addColorStop(1, 'rgba(0,0,0,0.62)');
+  var bandY = top ? 0 : Math.round(size * 0.52);
+  var bandH = Math.round(size * 0.48);
+  var ink = coverInk(coverBandLuminance(canvas, bandY, bandH));
+  var shade = top ? ctx.createLinearGradient(0, bandH, 0, 0) : ctx.createLinearGradient(0, bandY, 0, size);
+  shade.addColorStop(0, ink.shade.replace(/[\d.]+\)$/, '0)'));
+  shade.addColorStop(1, ink.shade);
   ctx.fillStyle = shade;
-  ctx.fillRect(0, size * 0.52, size, size * 0.48);
-  ctx.textBaseline = 'alphabetic';
+  ctx.fillRect(0, bandY, size, bandH);
   ctx.textAlign = 'left';
-  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowColor = ink.glow;
   ctx.shadowBlur = 24;
-  var bottom = size - margin;
-  if (showArtist) {
-    var artistSize = 104;
+  var artistSize = 104;
+  var fit = showTitle ? fitCoverTitle(title, function(text, px) {
+    ctx.font = '700 ' + px + 'px Syne, sans-serif';
+    return ctx.measureText(text).width;
+  }, { maxWidth:size - margin * 2, maxSize:330, minSize:150, maxLines:2 }) : null;
+  function drawArtist(y) {
     ctx.font = '500 ' + artistSize + 'px "Space Grotesk", sans-serif';
     if ('letterSpacing' in ctx) ctx.letterSpacing = Math.round(artistSize * 0.14) + 'px';
-    ctx.fillStyle = 'rgba(255,255,255,0.86)';
-    ctx.fillText(artist.toUpperCase(), margin, bottom);
+    ctx.fillStyle = ink.artist;
+    ctx.fillText(artist.toUpperCase(), margin, y);
     if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-    bottom -= artistSize * 1.55;
   }
-  if (showTitle) {
-    var fit = fitCoverTitle(title, function(text, px) {
-      ctx.font = '700 ' + px + 'px Syne, sans-serif';
-      return ctx.measureText(text).width;
-    }, { maxWidth:size - margin * 2, maxSize:330, minSize:150, maxLines:2 });
-    ctx.font = '700 ' + fit.size + 'px Syne, sans-serif';
-    ctx.fillStyle = '#ffffff';
-    fit.lines.slice().reverse().forEach(function(line, i) {
-      ctx.fillText(line, margin, bottom - i * fit.size * 1.04);
-    });
+  if (top) {
+    // From the top margin down: the title, then the artist under it.
+    ctx.textBaseline = 'top';
+    var y = margin;
+    if (fit) {
+      ctx.font = '700 ' + fit.size + 'px Syne, sans-serif';
+      ctx.fillStyle = ink.title;
+      fit.lines.forEach(function(line, i) { ctx.fillText(line, margin, y + i * fit.size * 1.04); });
+      y += fit.lines.length * fit.size * 1.04 + fit.size * 0.22;
+    }
+    if (showArtist) drawArtist(y);
+  } else {
+    // From the bottom margin up: the artist, then the title above it.
+    ctx.textBaseline = 'alphabetic';
+    var bottom = size - margin;
+    if (showArtist) {
+      drawArtist(bottom);
+      bottom -= artistSize * 1.55;
+    }
+    if (fit) {
+      ctx.font = '700 ' + fit.size + 'px Syne, sans-serif';
+      ctx.fillStyle = ink.title;
+      fit.lines.slice().reverse().forEach(function(line, i) {
+        ctx.fillText(line, margin, bottom - i * fit.size * 1.04);
+      });
+    }
   }
   ctx.shadowBlur = 0;
+}
+
+// How bright the band the words sit in is, from a small copy of it: the
+// words take dark ink on a bright band, white on a dark one.
+function coverBandLuminance(canvas, y, height) {
+  try {
+    var probe = document.createElement('canvas');
+    probe.width = 48;
+    probe.height = 24;
+    var pctx = probe.getContext('2d');
+    pctx.drawImage(canvas, 0, y, canvas.width, height, 0, 0, 48, 24);
+    return coverLuminance(pctx.getImageData(0, 0, 48, 24).data);
+  } catch (e) {
+    return 0;
+  }
+}
+
+async function applyReleaseCoverToSong() {
+  var id = _releaseCover.id;
+  var image = _releaseCover.image;
+  if (!image || _releaseCover.busy || _releaseCover.applying || !getVaultTrack(id)) return;
+  _releaseCover.applying = true;
+  _releaseCover.error = false;
+  renderReleaseCoverNote();
+  try {
+    clearTimeout(_releaseCoverDrawTimer);
+    // Finish any pending lettering changes before exporting the preview.
+    await drawReleaseCover();
+    if (_releaseCover.id !== id || _releaseCover.image !== image) return;
+    var canvas = document.getElementById('release-cover-canvas');
+    if (!canvas) return;
+    var blob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/jpeg', 0.92); });
+    if (!blob) throw new Error('The cover could not be saved.');
+    if (_releaseCover.id !== id || _releaseCover.image !== image || !getVaultTrack(id)) return;
+    saveReleaseCoverMeta(id, { title:releaseCoverValue('title'), text:releaseCoverValue('text'), place:releaseCoverValue('place') });
+    await useSongCoverBlob(id, blob);
+    if (_releaseCover.id === id) _releaseCover.note = 'Song cover updated in the library and player on this device.';
+    showToast('Song cover updated');
+  } catch (e) {
+    if (_releaseCover.id === id) {
+      _releaseCover.error = true;
+      _releaseCover.note = e.message || 'The song cover could not be saved.';
+    }
+  } finally {
+    if (_releaseCover.id === id) {
+      _releaseCover.applying = false;
+      renderReleaseCoverNote();
+    }
+  }
 }
 
 function downloadReleaseCover() {
